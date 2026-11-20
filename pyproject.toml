@@ -24,6 +24,7 @@ dependencies = [
     "rich>=13.0",
     "pillow>=11.0",
     "pytesseract>=0.3.13",
+    "langchain-openai>=1.8.5",
 ]
 
 [project.optional-dependencies]

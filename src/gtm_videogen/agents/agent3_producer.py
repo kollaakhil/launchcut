@@ -161,8 +161,15 @@ async def _render_single_shot(
 
     if shot.engine == "motion_card":
         out_path = clips_dir / f"{shot.id}_card.mp4"
+        is_end = shot.index == len(sheet.shots) - 1
+        card_text = (
+            shot.on_screen_text
+            or sheet.end_card_title
+            or (shot.vo_line if is_end and shot.vo_line else None)
+            or shot.beat
+        )
         return await graphics_renderer.render_card(
-            text=shot.on_screen_text or sheet.end_card_title or shot.beat,
+            text=card_text,
             width=width,
             height=height,
             fps=sheet.fps,
@@ -171,7 +178,7 @@ async def _render_single_shot(
             output_path=out_path,
             subtitle=sheet.end_card_subtitle,
             footer=sheet.end_card_footer,
-            card_kind="end_card" if shot.index == len(sheet.shots) - 1 else "title",
+            card_kind="end_card" if is_end else "title",
             shot_id=shot.id,
             theme=shot.theme or sheet.theme,
             cancel=cancel,

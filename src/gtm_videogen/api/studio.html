@@ -1,0 +1,2156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LaunchCut Studio — Rubric-Gated GTM Video Production</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230e0f11'/><text x='50%25' y='58%25' text-anchor='middle' dominant-baseline='middle' fill='%23e2a336' font-family='Georgia,serif' font-size='20' font-style='italic'>L</text></svg>" />
+  <meta name="description" content="Direct, stream, inspect, and repair bespoke GTM launch videos with LaunchCut's 3-agent rubric-gated production pipeline." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0f11;
+      --bg-subtle: #131519;
+      --surface: #17191e;
+      --surface-raised: #1e2128;
+      --surface-hover: #252932;
+      --ink: #f2efe9;
+      --ink-secondary: #b9b4aa;
+      --ink-muted: #7f7b72;
+      --accent: #e2a336;
+      --accent-soft: rgba(226, 163, 54, 0.14);
+      --accent-ink: #12100c;
+      --pass: #3fb37f;
+      --pass-soft: rgba(63, 179, 127, 0.14);
+      --warn: #e09a3e;
+      --warn-soft: rgba(224, 154, 62, 0.14);
+      --fail: #df5b4a;
+      --fail-soft: rgba(223, 91, 74, 0.14);
+      --rule: rgba(242, 239, 233, 0.085);
+      --rule-strong: rgba(242, 239, 233, 0.16);
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --font-sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+      --shadow-elev: 0 18px 48px rgba(0, 0, 0, 0.42);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(226, 163, 54, 0.055), transparent 65%),
+        radial-gradient(900px 500px at 10% 100%, rgba(255, 255, 255, 0.025), transparent 60%),
+        var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Studio Header */
+    .studio-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+      background: rgba(14, 15, 17, 0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark h1 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+
+    .brand-mark h1 span {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--ink-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ink-muted);
+      flex-shrink: 0;
+    }
+
+    .status-chip.ok .status-dot { background: var(--pass); }
+    .status-chip.warn .status-dot { background: var(--warn); }
+    .status-chip.fail .status-dot { background: var(--fail); }
+
+    .header-link {
+      padding: 5px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--rule);
+      color: var(--ink-secondary);
+      text-decoration: none;
+      font-size: 12px;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .header-link:hover {
+      background: var(--surface-raised);
+      color: var(--ink);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
+      min-height: calc(100vh - 57px);
+    }
+
+    /* Left Rail: Production Brief + Recent Cuts */
+    .composer-rail {
+      background: var(--bg-subtle);
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 57px);
+      overflow-y: auto;
+    }
+
+    .rail-section {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+
+    .preset-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .preset-btn {
+      appearance: none;
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .preset-btn:hover {
+      background: var(--surface-raised);
+      color: var(--ink);
+      border-color: var(--rule-strong);
+    }
+
+    /* Mode Segmented Switch */
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 3px;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+
+    .mode-opt {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .mode-opt.active {
+      background: var(--surface-raised);
+      color: var(--ink);
+    }
+
+    .mode-opt.active[data-mode="live"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* Form Controls */
+    .field {
+      margin-bottom: 13px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      margin-bottom: 5px;
+    }
+
+    .field label .mono-val {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--accent);
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-sm);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent);
+      background: var(--surface-raised);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 62px;
+      line-height: 1.45;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .seg-group {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+
+    .seg-group.three {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .seg-btn {
+      appearance: none;
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 6px 4px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .seg-btn:hover {
+      background: var(--surface-raised);
+      color: var(--ink);
+    }
+
+    .seg-btn.active {
+      background: var(--ink);
+      color: var(--bg);
+      border-color: var(--ink);
+      font-weight: 600;
+    }
+
+    details.constraints {
+      margin: 12px 0 16px;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    details.constraints summary {
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    details.constraints summary::after {
+      content: "+";
+      font-family: var(--font-mono);
+      color: var(--ink-muted);
+    }
+
+    details.constraints[open] summary::after {
+      content: "−";
+    }
+
+    .constraints-body {
+      padding: 4px 12px 12px;
+      border-top: 1px solid var(--rule);
+    }
+
+    /* Action Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      flex: 1;
+      appearance: none;
+      border: none;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 11px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      appearance: none;
+      border: 1px solid var(--rule-strong);
+      background: var(--surface-raised);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--surface-hover);
+    }
+
+    .btn-danger {
+      appearance: none;
+      border: 1px solid rgba(223, 91, 74, 0.4);
+      background: var(--fail-soft);
+      color: #f4998c;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-danger:hover {
+      background: rgba(223, 91, 74, 0.24);
+    }
+
+    .form-error {
+      margin-top: 10px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--fail-soft);
+      color: #f7aba0;
+      font-size: 12px;
+      display: none;
+    }
+
+    .form-error.visible { display: block; }
+
+    /* Recent Cuts List */
+    .runs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .run-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      color: var(--ink);
+      font-family: var(--font-sans);
+      transition: background 0.14s ease, border-color 0.14s ease;
+    }
+
+    .run-item:hover {
+      background: var(--surface-raised);
+    }
+
+    .run-item.selected {
+      background: var(--surface-raised);
+      border-color: var(--rule-strong);
+    }
+
+    .run-item-left {
+      min-width: 0;
+    }
+
+    .run-item-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .run-item-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-muted);
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--surface-hover);
+      color: var(--ink-secondary);
+      flex-shrink: 0;
+    }
+
+    .badge.done, .badge.pass { background: var(--pass-soft); color: var(--pass); }
+    .badge.working { background: var(--accent-soft); color: var(--accent); }
+    .badge.failed, .badge.blocking { background: var(--fail-soft); color: #f59a8e; }
+    .badge.cancelled, .badge.warning { background: var(--warn-soft); color: var(--warn); }
+
+    /* Right Stage: Screening Room & Inspector */
+    .stage {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow-y: auto;
+      max-height: calc(100vh - 57px);
+    }
+
+    .screening-wrap {
+      padding: 22px 28px 18px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .screening-top {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .cut-heading {
+      min-width: 0;
+    }
+
+    .cut-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .cut-title {
+      margin: 3px 0 0;
+      font-family: var(--font-serif);
+      font-size: 30px;
+      font-weight: 400;
+      line-height: 1.08;
+      color: var(--ink);
+    }
+
+    .screening-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Cinema Monitor */
+    .monitor-frame {
+      position: relative;
+      width: 100%;
+      background: #08090b;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      min-height: 310px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-elev);
+    }
+
+    .monitor-video {
+      width: 100%;
+      max-height: 460px;
+      background: #000;
+      display: none;
+    }
+
+    .monitor-video.visible {
+      display: block;
+    }
+
+    /* Idle Film Slate */
+    .slate-empty {
+      padding: 40px 28px;
+      text-align: center;
+      max-width: 560px;
+    }
+
+    .slate-empty h2 {
+      margin: 0 0 8px;
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 32px;
+      line-height: 1.1;
+      color: var(--ink);
+    }
+
+    .slate-empty p {
+      margin: 0 0 20px;
+      color: var(--ink-secondary);
+      font-size: 13.5px;
+    }
+
+    .slate-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Live Pipeline Progress View inside Monitor */
+    .pipeline-live {
+      width: 100%;
+      padding: 24px 26px;
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .pipeline-live.visible {
+      display: flex;
+    }
+
+    .agent-stepper {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .agent-step {
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .agent-step.active {
+      background: var(--surface-raised);
+      border-color: rgba(226, 163, 54, 0.45);
+    }
+
+    .agent-step.done {
+      border-color: rgba(63, 179, 127, 0.35);
+    }
+
+    .agent-num {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .agent-step.active .agent-num { color: var(--accent); }
+    .agent-step.done .agent-num { color: var(--pass); }
+
+    .agent-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-top: 3px;
+    }
+
+    .agent-detail {
+      font-size: 11.5px;
+      color: var(--ink-muted);
+      margin-top: 2px;
+    }
+
+    .live-log {
+      background: rgba(14, 15, 17, 0.72);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      max-height: 175px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 10px;
+      color: var(--ink-secondary);
+      line-height: 1.4;
+    }
+
+    .log-time { color: var(--ink-muted); flex-shrink: 0; }
+    .log-type { color: var(--accent); flex-shrink: 0; min-width: 116px; }
+    .log-type.err { color: var(--fail); }
+    .log-type.ok { color: var(--pass); }
+    .log-msg { color: var(--ink); word-break: break-word; }
+
+    /* Technical Readout Strip */
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .metric-cell {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+    }
+
+    .metric-label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--ink-muted);
+    }
+
+    .metric-val {
+      margin-top: 3px;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .budget-bar {
+      margin-top: 6px;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .budget-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.25s ease;
+    }
+
+    /* Inspector Tabs */
+    .inspector {
+      padding: 0 28px 36px;
+      flex: 1;
+    }
+
+    .tabs-bar {
+      display: flex;
+      gap: 22px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 18px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      appearance: none;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 13px 2px 11px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .tab-btn:hover { color: var(--ink); }
+    .tab-btn.active {
+      color: var(--ink);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Storyboard Timeline Track */
+    .timeline-track {
+      display: flex;
+      gap: 4px;
+      width: 100%;
+      margin-bottom: 16px;
+      padding: 6px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+    }
+
+    .track-seg {
+      min-width: 36px;
+      padding: 8px 9px;
+      border-radius: 6px;
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      overflow: hidden;
+    }
+
+    .track-seg.failed {
+      background: var(--fail-soft);
+      border-color: rgba(223, 91, 74, 0.45);
+    }
+
+    .track-seg-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--accent);
+    }
+
+    .track-seg-beat {
+      font-size: 11.5px;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .repair-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .shots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+    }
+
+    .shot-card {
+      padding: 14px 15px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .shot-card.failed {
+      border-color: rgba(223, 91, 74, 0.45);
+    }
+
+    .shot-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .shot-id-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .shot-id-wrap input[type="checkbox"] {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .shot-id {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .shot-beat {
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .shot-prompt {
+      font-size: 12.5px;
+      color: var(--ink-secondary);
+      margin: 0;
+    }
+
+    .shot-vo {
+      padding: 7px 10px;
+      border-left: 2px solid var(--accent);
+      background: rgba(255, 255, 255, 0.025);
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+
+    .shot-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-muted);
+    }
+
+    /* Creative Bible Layout */
+    .bible-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .info-block {
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+    }
+
+    .info-block.full {
+      grid-column: 1 / -1;
+    }
+
+    .info-block h3 {
+      margin: 0 0 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--ink-muted);
+    }
+
+    .thesis-quote {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 24px;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+
+    .swatch-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .swatch-chip {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .kv-list {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 6px 12px;
+      font-size: 12.5px;
+    }
+
+    .kv-k { color: var(--ink-muted); }
+    .kv-v { color: var(--ink); }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag-pill {
+      padding: 3px 9px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-raised);
+      border: 1px solid var(--rule);
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+    }
+
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .data-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-secondary);
+      vertical-align: top;
+    }
+
+    .data-table td.mono {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--ink);
+    }
+
+    .empty-note {
+      padding: 26px 18px;
+      text-align: center;
+      color: var(--ink-muted);
+      border: 1px dashed var(--rule);
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+
+    .error-banner {
+      margin-top: 12px;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--fail-soft);
+      border: 1px solid rgba(223, 91, 74, 0.35);
+      color: #f7aba0;
+      font-size: 12.5px;
+      display: none;
+    }
+
+    .error-banner.visible { display: block; }
+
+    @media (max-width: 1040px) {
+      .workspace { grid-template-columns: 1fr; }
+      .composer-rail, .stage { max-height: none; overflow: visible; }
+      .composer-rail { border-right: none; border-bottom: 1px solid var(--rule); }
+      .telemetry-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .bible-grid { grid-template-columns: 1fr; }
+      .agent-stepper { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="studio-header">
+    <div class="brand-mark">
+      <h1>Launch<span>Cut</span></h1>
+      <span class="brand-sub">Rubric-Gated GTM Video Studio</span>
+    </div>
+    <div class="header-status" id="healthBar">
+      <span class="status-chip" id="chipLive"><span class="status-dot"></span>Checking APIs…</span>
+      <span class="status-chip" id="chipFfmpeg"><span class="status-dot"></span>ffmpeg</span>
+      <span class="status-chip" id="chipTesseract"><span class="status-dot"></span>ocr</span>
+      <span class="status-chip" id="chipJobs"><span class="status-dot"></span>0 active</span>
+      <a class="header-link" href="/docs" target="_blank" rel="noopener">API Docs</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Left Rail: Production Brief & History -->
+    <aside class="composer-rail">
+      <section class="rail-section">
+        <div class="section-head">
+          <h2 class="section-title">Production Brief</h2>
+          <span class="badge" id="modeBadge">Live APIs</span>
+        </div>
+
+        <div class="mode-switch" role="group" aria-label="Execution mode">
+          <button type="button" class="mode-opt active" data-mode="live" id="btnModeLive">Live APIs</button>
+          <button type="button" class="mode-opt" data-mode="mock" id="btnModeMock">Offline Mock ($0)</button>
+        </div>
+
+        <div class="preset-row">
+          <button type="button" class="preset-btn" id="presetMockDemo">Load Mock Smoke Test</button>
+          <button type="button" class="preset-btn" id="presetLiveDemo">Load Live Brand Brief</button>
+        </div>
+
+        <form id="briefForm">
+          <div class="field">
+            <label for="brandName">Brand Name</label>
+            <input id="brandName" type="text" required placeholder="e.g. Kestrel Roasters" value="Kestrel Roasters" />
+          </div>
+
+          <div class="field">
+            <label for="brandUrl">Brand URL</label>
+            <input id="brandUrl" type="url" required placeholder="https://example.com" value="https://kestrelroasters.example.com" />
+          </div>
+
+          <div class="field">
+            <label for="campaignGoal">Campaign Goal</label>
+            <textarea id="campaignGoal" required placeholder="What should this launch cut achieve?">Drive single-origin coffee subscription trials with grounded sourcing proof.</textarea>
+          </div>
+
+          <div class="field">
+            <label for="durationRange">
+              <span>Target Duration</span>
+              <span class="mono-val" id="durationLabel">15s</span>
+            </label>
+            <input id="durationRange" type="range" min="6" max="60" step="1" value="15" />
+          </div>
+
+          <div class="field">
+            <label>Aspect Ratio</label>
+            <div class="seg-group" id="aspectGroup">
+              <button type="button" class="seg-btn active" data-val="16:9">16:9</button>
+              <button type="button" class="seg-btn" data-val="9:16">9:16</button>
+              <button type="button" class="seg-btn" data-val="1:1">1:1</button>
+              <button type="button" class="seg-btn" data-val="4:5">4:5</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Audio Mode</label>
+            <div class="seg-group three" id="audioGroup">
+              <button type="button" class="seg-btn active" data-val="vo">VO</button>
+              <button type="button" class="seg-btn" data-val="foley">Foley</button>
+              <button type="button" class="seg-btn" data-val="both">Both</button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="capUsd">USD Cap</label>
+              <input id="capUsd" type="number" min="0" max="500" step="0.5" value="5.0" />
+            </div>
+            <div class="field">
+              <label for="fpsSelect">FPS / Quality</label>
+              <select id="fpsSelect">
+                <option value="24|preview">24 fps · Preview</option>
+                <option value="24|final">24 fps · Final</option>
+                <option value="30|preview">30 fps · Preview</option>
+                <option value="30|final">30 fps · Final</option>
+              </select>
+            </div>
+          </div>
+
+          <details class="constraints">
+            <summary>Creative Constraints &amp; Facts (Optional)</summary>
+            <div class="constraints-body">
+              <div class="field">
+                <label for="offerInput">Promotional Offer</label>
+                <input id="offerInput" type="text" placeholder="e.g. First bag 25% off" />
+              </div>
+              <div class="field">
+                <label for="factsInput">Verified Facts (one per line)</label>
+                <textarea id="factsInput" placeholder="Small-batch roasted within 24 hours of shipping&#10;100% traceable direct-trade micro-lots"></textarea>
+              </div>
+              <div class="field">
+                <label for="mustSayInput">Must-Say Phrases (one per line)</label>
+                <textarea id="mustSayInput" placeholder="Start your morning ritual"></textarea>
+              </div>
+              <div class="field">
+                <label for="directionInput">Director Notes</label>
+                <input id="directionInput" type="text" placeholder="e.g. Tactile 35mm macro feel, dry wit" />
+              </div>
+              <div class="field">
+                <label for="inspirationUrl">Inspiration URL</label>
+                <input id="inspirationUrl" type="url" placeholder="https://..." />
+              </div>
+            </div>
+          </details>
+
+          <div class="btn-row">
+            <button type="submit" class="btn-primary" id="btnStartCut">Direct &amp; Render Cut</button>
+            <button type="button" class="btn-danger" id="btnCancelCut" style="display:none;">Cancel</button>
+          </div>
+          <div class="form-error" id="formError" role="alert"></div>
+        </form>
+      </section>
+
+      <section class="rail-section" style="border-bottom:none; flex:1;">
+        <div class="section-head">
+          <h2 class="section-title">Recent Cuts</h2>
+          <button type="button" class="preset-btn" id="btnRefreshRuns">Refresh</button>
+        </div>
+        <div class="runs-list" id="runsList">
+          <div class="empty-note">No cuts yet. Direct your first cut above.</div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Right Stage: Screening Monitor & Inspector -->
+    <section class="stage">
+      <div class="screening-wrap">
+        <div class="screening-top">
+          <div class="cut-heading">
+            <div class="cut-eyebrow" id="cutEyebrow">SCREENING ROOM · READY</div>
+            <h2 class="cut-title" id="cutTitle">New Production Cut</h2>
+          </div>
+          <div class="screening-actions">
+            <span class="badge" id="cutStatusBadge">idle</span>
+            <a class="btn-secondary" id="btnDownloadMp4" href="#" download style="display:none;">Download MP4</a>
+          </div>
+        </div>
+
+        <div class="monitor-frame" id="monitorFrame">
+          <video class="monitor-video" id="screeningVideo" controls playsinline></video>
+
+          <div class="slate-empty" id="slateEmpty">
+            <h2>Zero hard templates.<br />Three rubric-gated agents.</h2>
+            <p>
+              LaunchCut researches your brand, synthesizes a bespoke CreativeBible, directs a speakability-checked ShotSheet, and renders + QAs a stitched MP4 in one pass.
+            </p>
+            <div class="slate-actions">
+              <button type="button" class="btn-primary" style="flex:0 1 auto;" id="btnQuickMock">Run 15s Mock Smoke Test ($0)</button>
+              <button type="button" class="btn-secondary" id="btnFocusLive">Configure Live Cut</button>
+            </div>
+          </div>
+
+          <div class="pipeline-live" id="pipelineLive">
+            <div class="agent-stepper">
+              <div class="agent-step" id="stepAgent1">
+                <div class="agent-num">Stage 01</div>
+                <div class="agent-name">Research &amp; CreativeBible</div>
+                <div class="agent-detail" id="step1Detail">Scraping brand &amp; 4 orthogonal pitches</div>
+              </div>
+              <div class="agent-step" id="stepAgent2">
+                <div class="agent-num">Stage 02</div>
+                <div class="agent-name">Director Script &amp; ShotSheet</div>
+                <div class="agent-detail" id="step2Detail">Pure script rules &amp; timing physics</div>
+              </div>
+              <div class="agent-step" id="stepAgent3">
+                <div class="agent-num">Stage 03</div>
+                <div class="agent-name">Producer Render &amp; QA</div>
+                <div class="agent-detail" id="step3Detail">Overlapped media, FFmpeg stitch &amp; QA</div>
+              </div>
+            </div>
+            <div class="live-log" id="liveLog"></div>
+          </div>
+        </div>
+
+        <div class="error-banner" id="runErrorBanner"></div>
+
+        <div class="telemetry-strip">
+          <div class="metric-cell">
+            <div class="metric-label">Duration</div>
+            <div class="metric-val" id="mDuration">—</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label">Format</div>
+            <div class="metric-val" id="mFormat">—</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label">Shots</div>
+            <div class="metric-val" id="mShots">—</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label">Loudness</div>
+            <div class="metric-val" id="mLufs">—</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label">QA Score</div>
+            <div class="metric-val" id="mScore">—</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label">Spend / Cap</div>
+            <div class="metric-val" id="mSpend">$0.00 / $5.00</div>
+            <div class="budget-bar"><div class="budget-fill" id="mBudgetFill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="inspector">
+        <div class="tabs-bar" role="tablist">
+          <button type="button" class="tab-btn active" data-tab="storyboard" role="tab">ShotSheet &amp; Storyboard</button>
+          <button type="button" class="tab-btn" data-tab="bible" role="tab">Creative Bible</button>
+          <button type="button" class="tab-btn" data-tab="qa" role="tab">QA &amp; Rubric Gates</button>
+          <button type="button" class="tab-btn" data-tab="ledger" role="tab">Cost Ledger &amp; Events</button>
+        </div>
+
+        <div class="tab-panel active" id="tab-storyboard">
+          <div class="empty-note">Select or launch a cut to inspect its ShotSheet timeline and shot-level prompts.</div>
+        </div>
+        <div class="tab-panel" id="tab-bible">
+          <div class="empty-note">Bespoke CreativeBible, visual palette, sonic identity, and concept pitches appear here after Stage 01.</div>
+        </div>
+        <div class="tab-panel" id="tab-qa">
+          <div class="empty-note">Deterministic Media QA (ffprobe, LUFS, OCR, Whisper sync) and blocking rubric evaluations appear here.</div>
+        </div>
+        <div class="tab-panel" id="tab-ledger">
+          <div class="empty-note">Itemized provider cost ledger and SSE event stream appear here.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ACTOR_ID = "studio";
+    const state = {
+      mock: false,
+      aspect: "16:9",
+      audioMode: "vo",
+      currentRunId: null,
+      currentRun: null,
+      runs: [],
+      sse: null,
+      events: [],
+      liveReady: false,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(str) {
+      return String(str ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function fmtUsd(v) {
+      const n = Number(v || 0);
+      return "$" + n.toFixed(n > 0 && n < 0.01 ? 4 : 2);
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return "";
+      try {
+        return new Date(iso).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      } catch {
+        return "";
+      }
+    }
+
+    async function apiFetch(path, opts = {}) {
+      const headers = Object.assign({ "X-Actor-Id": ACTOR_ID }, opts.headers || {});
+      if (opts.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+      const res = await fetch(path, { ...opts, headers });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { detail: text }; }
+      if (!res.ok) {
+        const msg = data?.detail
+          ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))
+          : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    function setMode(isMock) {
+      state.mock = isMock;
+      $("btnModeLive").classList.toggle("active", !isMock);
+      $("btnModeMock").classList.toggle("active", isMock);
+      const badge = $("modeBadge");
+      badge.textContent = isMock ? "Offline Mock ($0)" : "Live APIs";
+      badge.className = "badge " + (isMock ? "done" : "working");
+    }
+
+    function showFormError(msg) {
+      const el = $("formError");
+      if (!msg) {
+        el.classList.remove("visible");
+        el.textContent = "";
+      } else {
+        el.textContent = msg;
+        el.classList.add("visible");
+      }
+    }
+
+    async function loadHealth() {
+      try {
+        const [health, jobs] = await Promise.all([
+          apiFetch("/api/health"),
+          apiFetch("/api/jobs"),
+        ]);
+        const liveOk = Boolean(health.api_keys?.live_ready);
+        state.liveReady = liveOk;
+        const chipLive = $("chipLive");
+        chipLive.className = "status-chip " + (liveOk ? "ok" : "warn");
+        chipLive.innerHTML = `<span class="status-dot"></span>${liveOk ? "OpenRouter + fal.ai ready" : "Mock mode only"}`;
+
+        const ffOk = Boolean(health.tools?.ffmpeg && health.tools?.ffprobe);
+        $("chipFfmpeg").className = "status-chip " + (ffOk ? "ok" : "fail");
+        $("chipFfmpeg").innerHTML = `<span class="status-dot"></span>ffmpeg ${ffOk ? "ok" : "missing"}`;
+
+        const ocrOk = Boolean(health.tools?.tesseract);
+        $("chipTesseract").className = "status-chip " + (ocrOk ? "ok" : "warn");
+        $("chipTesseract").innerHTML = `<span class="status-dot"></span>ocr ${ocrOk ? "ok" : "off"}`;
+
+        const activeCount = (jobs.jobs || []).filter((j) => j.state === "running" || j.state === "queued").length;
+        $("chipJobs").className = "status-chip " + (activeCount > 0 ? "warn" : "ok");
+        $("chipJobs").innerHTML = `<span class="status-dot"></span>${activeCount} active`;
+      } catch (err) {
+        $("chipLive").className = "status-chip fail";
+        $("chipLive").innerHTML = `<span class="status-dot"></span>API offline`;
+      }
+    }
+
+    async function loadRuns() {
+      try {
+        const res = await apiFetch("/api/runs?limit=30");
+        state.runs = res.runs || [];
+        renderRunsList();
+        if (!state.currentRunId && state.runs.length > 0) {
+          await selectRun(state.runs[0].run_id);
+        }
+      } catch (err) {
+        console.error("Failed to load runs:", err);
+      }
+    }
+
+    function renderRunsList() {
+      const container = $("runsList");
+      if (!state.runs.length) {
+        container.innerHTML = `<div class="empty-note">No cuts yet. Direct your first cut above.</div>`;
+        return;
+      }
+      container.innerHTML = state.runs.map((r) => {
+        const inp = r.input || {};
+        const spend = fmtUsd(r.cost_ledger?.actual_usd || 0);
+        const modeTag = inp.mock ? "mock" : "live";
+        return `
+          <button type="button" class="run-item ${r.run_id === state.currentRunId ? "selected" : ""}" data-run-id="${esc(r.run_id)}">
+            <div class="run-item-left">
+              <div class="run-item-name">${esc(inp.brand_name || r.run_id)}</div>
+              <div class="run-item-meta">${esc(inp.aspect || "16:9")} · ${esc(inp.target_duration_sec || 15)}s · ${modeTag} · ${spend}</div>
+            </div>
+            <span class="badge ${esc(r.status)}">${esc(r.status)}</span>
+          </button>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".run-item").forEach((btn) => {
+        btn.addEventListener("click", () => selectRun(btn.dataset.runId));
+      });
+    }
+
+    async function selectRun(runId) {
+      closeSse();
+      state.currentRunId = runId;
+      state.events = [];
+      renderRunsList();
+      try {
+        const run = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
+        state.currentRun = run;
+        renderRun(run);
+        if (run.status === "working") {
+          subscribeSse(runId);
+        }
+      } catch (err) {
+        showFormError(`Failed to load run: ${err.message}`);
+      }
+    }
+
+    function closeSse() {
+      if (state.sse) {
+        state.sse.close();
+        state.sse = null;
+      }
+    }
+
+    function resetAgentSteps() {
+      ["stepAgent1", "stepAgent2", "stepAgent3"].forEach((id) => {
+        $(id).classList.remove("active", "done");
+      });
+      $("step1Detail").textContent = "Scraping brand & 4 orthogonal pitches";
+      $("step2Detail").textContent = "Pure script rules & timing physics";
+      $("step3Detail").textContent = "Overlapped media, FFmpeg stitch & QA";
+    }
+
+    function updateStageVisual(stage, evType, detailText) {
+      const s = String(stage || "").toLowerCase();
+      let idx = 0;
+      if (s.includes("research") || s.includes("bible") || s.includes("agent1") || s.includes("concept")) idx = 1;
+      else if (s.includes("director") || s.includes("script") || s.includes("shot") || s.includes("agent2") || s.includes("sound")) idx = 2;
+      else if (s.includes("producer") || s.includes("render") || s.includes("stitch") || s.includes("qa") || s.includes("agent3") || s.includes("repair")) idx = 3;
+
+      if (idx === 1) {
+        $("stepAgent1").classList.add(evType === "stage_completed" ? "done" : "active");
+        if (evType === "stage_completed") $("stepAgent1").classList.remove("active");
+        if (detailText) $("step1Detail").textContent = detailText;
+      } else if (idx === 2) {
+        $("stepAgent1").classList.add("done");
+        $("stepAgent1").classList.remove("active");
+        $("stepAgent2").classList.add(evType === "stage_completed" ? "done" : "active");
+        if (evType === "stage_completed") $("stepAgent2").classList.remove("active");
+        if (detailText) $("step2Detail").textContent = detailText;
+      } else if (idx === 3) {
+        $("stepAgent1").classList.add("done");
+        $("stepAgent1").classList.remove("active");
+        $("stepAgent2").classList.add("done");
+        $("stepAgent2").classList.remove("active");
+        $("stepAgent3").classList.add(evType === "stage_completed" ? "done" : "active");
+        if (evType === "stage_completed") $("stepAgent3").classList.remove("active");
+        if (detailText) $("step3Detail").textContent = detailText;
+      }
+    }
+
+    function appendLiveEvent(ev) {
+      state.events.push(ev);
+      const log = $("liveLog");
+      const line = document.createElement("div");
+      line.className = "log-line";
+      const typeClass = ev.type === "run_failed" || ev.type === "warning" ? "err" : (ev.type === "run_completed" || ev.type === "stage_completed" ? "ok" : "");
+      const summary = summarizeEventData(ev);
+      line.innerHTML = `
+        <span class="log-time">${esc(fmtTime(ev.timestamp))}</span>
+        <span class="log-type ${typeClass}">${esc(ev.type)}</span>
+        <span class="log-msg">${esc(summary)}</span>
+      `;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+      updateStageVisual(ev.stage, ev.type, summary);
+
+      if (ev.type === "cost_update" && ev.data) {
+        const actual = Number(ev.data.actual_usd ?? ev.data.total_usd ?? 0);
+        const cap = Number(state.currentRun?.cost_ledger?.cap_usd ?? $("capUsd").value ?? 5);
+        $("mSpend").textContent = `${fmtUsd(actual)} / ${fmtUsd(cap)}`;
+        $("mBudgetFill").style.width = `${Math.min(100, cap > 0 ? (actual / cap) * 100 : 0)}%`;
+      }
+
+      renderLedgerTab(state.currentRun);
+    }
+
+    function summarizeEventData(ev) {
+      const stage = ev.stage ? `[${ev.stage}] ` : "";
+      const d = ev.data || {};
+      if (d.error) return `${stage}${d.error}`;
+      if (d.message) return `${stage}${d.message}`;
+      if (d.shot_id && d.status) return `${stage}${d.shot_id}: ${d.status}`;
+      if (d.what && d.actual_usd !== undefined) return `${stage}${d.what} (${fmtUsd(d.actual_usd)})`;
+      if (d.passed !== undefined) return `${stage}rubric passed=${d.passed}`;
+      const keys = Object.keys(d);
+      if (!keys.length) return `${stage}${ev.type}`;
+      return stage + keys.slice(0, 4).map((k) => `${k}=${typeof d[k] === "object" ? JSON.stringify(d[k]) : d[k]}`).join(" · ");
+    }
+
+    function subscribeSse(runId) {
+      closeSse();
+      $("liveLog").innerHTML = "";
+      resetAgentSteps();
+      $("stepAgent1").classList.add("active");
+      $("slateEmpty").style.display = "none";
+      $("screeningVideo").classList.remove("visible");
+      $("pipelineLive").classList.add("visible");
+      $("btnCancelCut").style.display = "inline-block";
+      $("btnStartCut").disabled = true;
+
+      const src = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
+      state.sse = src;
+
+      const eventTypes = [
+        "stage_started",
+        "rubric_evaluation",
+        "shot_progress",
+        "cost_update",
+        "warning",
+        "stage_completed",
+        "run_completed",
+        "run_cancelled",
+        "run_failed",
+      ];
+
+      eventTypes.forEach((evType) => {
+        src.addEventListener(evType, async (msg) => {
+          let payload = { type: evType, timestamp: new Date().toISOString(), data: {} };
+          try { payload = JSON.parse(msg.data); } catch {}
+          appendLiveEvent(payload);
+
+          if (evType === "stage_completed") {
+            try {
+              const fresh = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
+              state.currentRun = fresh;
+              renderInspectorTabs(fresh);
+            } catch {}
+          }
+
+          if (evType === "run_completed" || evType === "run_cancelled" || evType === "run_failed") {
+            closeSse();
+            $("btnCancelCut").style.display = "none";
+            $("btnStartCut").disabled = false;
+            await loadHealth();
+            await loadRuns();
+            try {
+              const finalRun = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
+              state.currentRun = finalRun;
+              renderRun(finalRun);
+            } catch {}
+          }
+        });
+      });
+
+      src.onerror = () => {
+        // EventSource auto-reconnects unless closed on terminal events
+      };
+    }
+
+    function renderRun(run) {
+      if (!run) return;
+      const inp = run.input || {};
+      const status = run.status || "idle";
+      const isWorking = status === "working";
+
+      $("cutEyebrow").textContent = `${run.run_id} · ${inp.mock ? "OFFLINE MOCK" : "LIVE PRODUCTION"}`;
+      $("cutTitle").textContent = inp.brand_name || run.run_id;
+
+      const badge = $("cutStatusBadge");
+      badge.textContent = status;
+      badge.className = "badge " + status;
+
+      $("btnCancelCut").style.display = isWorking ? "inline-block" : "none";
+      $("btnStartCut").disabled = isWorking;
+
+      // Error banner
+      const errBanner = $("runErrorBanner");
+      if (run.error) {
+        errBanner.textContent = run.error;
+        errBanner.classList.add("visible");
+      } else {
+        errBanner.classList.remove("visible");
+        errBanner.textContent = "";
+      }
+
+      // Monitor state: video vs live pipeline vs empty
+      const hasVideo = Boolean(run.render_manifest?.stitched_path);
+      const vid = $("screeningVideo");
+      const dl = $("btnDownloadMp4");
+
+      if (isWorking) {
+        $("slateEmpty").style.display = "none";
+        vid.classList.remove("visible");
+        $("pipelineLive").classList.add("visible");
+        dl.style.display = "none";
+      } else if (hasVideo) {
+        $("slateEmpty").style.display = "none";
+        $("pipelineLive").classList.remove("visible");
+        const videoUrl = `/api/runs/${encodeURIComponent(run.run_id)}/video?t=${encodeURIComponent(run.updated_at || Date.now())}`;
+        if (vid.dataset.src !== videoUrl) {
+          vid.src = videoUrl;
+          vid.dataset.src = videoUrl;
+        }
+        vid.classList.add("visible");
+        dl.href = `/api/runs/${encodeURIComponent(run.run_id)}/video`;
+        dl.download = `${(inp.brand_name || run.run_id).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${run.run_id}.mp4`;
+        dl.style.display = "inline-flex";
+      } else {
+        vid.classList.remove("visible");
+        $("pipelineLive").classList.remove("visible");
+        $("slateEmpty").style.display = "block";
+        dl.style.display = "none";
+      }
+
+      // Telemetry strip
+      const dur = run.qa_report?.ffprobe_summary?.duration_sec ?? run.shot_sheet?.target_duration_sec ?? inp.target_duration_sec;
+      $("mDuration").textContent = dur ? `${Number(dur).toFixed(2)}s` : "—";
+      $("mFormat").textContent = `${inp.aspect || "16:9"} · ${inp.fps || 24}fps`;
+      $("mShots").textContent = run.shot_sheet?.shots ? `${run.shot_sheet.shots.length} shots` : "—";
+      $("mLufs").textContent = run.qa_report?.loudness_lufs != null ? `${Number(run.qa_report.loudness_lufs).toFixed(1)} LUFS` : "—";
+      if (run.qa_report) {
+        const orig = Number(run.qa_report.originality_score || 0).toFixed(1);
+        const coh = Number(run.qa_report.bible_coherence_score || 0).toFixed(1);
+        $("mScore").textContent = `${orig} / ${coh}`;
+      } else {
+        $("mScore").textContent = "—";
+      }
+
+      const actual = Number(run.cost_ledger?.actual_usd || 0);
+      const cap = Number(run.cost_ledger?.cap_usd ?? inp.cap_usd ?? 5);
+      $("mSpend").textContent = `${fmtUsd(actual)} / ${fmtUsd(cap)}`;
+      $("mBudgetFill").style.width = `${Math.min(100, cap > 0 ? (actual / cap) * 100 : 0)}%`;
+
+      renderInspectorTabs(run);
+    }
+
+    function renderInspectorTabs(run) {
+      renderStoryboardTab(run);
+      renderBibleTab(run);
+      renderQaTab(run);
+      renderLedgerTab(run);
+    }
+
+    function renderStoryboardTab(run) {
+      const el = $("tab-storyboard");
+      const sheet = run?.shot_sheet;
+      if (!sheet || !sheet.shots?.length) {
+        el.innerHTML = `<div class="empty-note">ShotSheet has not been generated for this cut yet.</div>`;
+        return;
+      }
+
+      const failedSet = new Set(run.qa_report?.failed_shot_ids || []);
+      const totalDur = sheet.shots.reduce((acc, s) => acc + Number(s.duration_sec || 0), 0) || 1;
+      let cursor = 0;
+
+      const trackHtml = sheet.shots.map((s) => {
+        const pct = Math.max(6, (Number(s.duration_sec) / totalDur) * 100);
+        const start = cursor.toFixed(1);
+        cursor += Number(s.duration_sec || 0);
+        return `
+          <div class="track-seg ${failedSet.has(s.id) ? "failed" : ""}" style="flex: 0 0 ${pct.toFixed(2)}%;">
+            <div class="track-seg-top"><span>${esc(s.id)}</span><span>${Number(s.duration_sec).toFixed(1)}s</span></div>
+            <div class="track-seg-beat">${esc(s.beat)}</div>
+          </div>
+        `;
+      }).join("");
+
+      const cardsHtml = sheet.shots.map((s) => {
+        const isFail = failedSet.has(s.id);
+        return `
+          <article class="shot-card ${isFail ? "failed" : ""}">
+            <div class="shot-head">
+              <div class="shot-id-wrap">
+                <input type="checkbox" class="shot-select" value="${esc(s.id)}" ${isFail ? "checked" : ""} aria-label="Select ${esc(s.id)} for repair" />
+                <span class="shot-id">${esc(s.id)}</span>
+                <span class="shot-beat">${esc(s.beat)}</span>
+              </div>
+              <span class="badge ${isFail ? "failed" : ""}">${esc(s.engine)} · ${Number(s.duration_sec).toFixed(2)}s</span>
+            </div>
+            <p class="shot-prompt">${esc(s.visual_prompt)}</p>
+            ${s.vo_line ? `<div class="shot-vo">“${esc(s.vo_line)}”</div>` : ""}
+            <div class="shot-meta">
+              ${s.on_screen_text ? `<span>TXT: ${esc(s.on_screen_text)}</span>` : ""}
+              ${s.camera_move ? `<span>CAM: ${esc(s.camera_move)}</span>` : ""}
+              ${s.lens_mm ? `<span>${esc(s.lens_mm)}mm</span>` : ""}
+              <span>TRANS: ${esc(s.transition)}</span>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      el.innerHTML = `
+        <div class="timeline-track">${trackHtml}</div>
+        <div class="repair-bar">
+          <div class="shot-meta">
+            <span>Total: ${totalDur.toFixed(2)}s / ${Number(sheet.target_duration_sec).toFixed(2)}s</span>
+            <span>·</span>
+            <span>Audio: ${esc(sheet.audio_mode)}</span>
+            <span>·</span>
+            <span>Font: ${esc(sheet.theme?.font_family || "Roboto")}</span>
+          </div>
+          <button type="button" class="btn-secondary" id="btnRepairSelected">Repair Selected Shots</button>
+        </div>
+        <div class="shots-grid">${cardsHtml}</div>
+      `;
+
+      $("btnRepairSelected")?.addEventListener("click", async () => {
+        const ids = Array.from(el.querySelectorAll(".shot-select:checked")).map((c) => c.value);
+        if (!ids.length) {
+          showFormError("Select at least one shot checkbox to run targeted repair.");
+          return;
+        }
+        showFormError("");
+        try {
+          await apiFetch(`/api/runs/${encodeURIComponent(run.run_id)}/repair`, {
+            method: "POST",
+            body: JSON.stringify({ failed_shot_ids: ids }),
+          });
+          subscribeSse(run.run_id);
+        } catch (err) {
+          showFormError(`Repair failed: ${err.message}`);
+        }
+      });
+    }
+
+    function renderBibleTab(run) {
+      const el = $("tab-bible");
+      const bible = run?.creative_bible;
+      if (!bible) {
+        el.innerHTML = `<div class="empty-note">CreativeBible has not been synthesized for this cut yet.</div>`;
+        return;
+      }
+
+      const palette = (bible.visual_language?.color_palette || []).map((hex) => `
+        <span class="swatch"><span class="swatch-chip" style="background:${esc(hex)};"></span>${esc(hex)}</span>
+      `).join("");
+
+      const beats = (bible.narrative_structure?.beats || []).map((b) => `
+        <tr>
+          <td class="mono">${esc(b.name)}</td>
+          <td>${esc(b.purpose)}</td>
+          <td class="mono">${Number(b.duration_hint_sec || 0).toFixed(1)}s</td>
+          <td>${esc(b.emotional_shift || "—")}</td>
+        </tr>
+      `).join("");
+
+      const concepts = (run.concepts || []).map((c) => `
+        <tr>
+          <td class="mono">${esc(c.title)}</td>
+          <td>${esc(c.thesis)}</td>
+          <td>${esc(c.visual_world)}</td>
+          <td class="mono">${Number(c.diversity_score || 0).toFixed(2)}</td>
+        </tr>
+      `).join("");
+
+      const antiCliches = (bible.anti_cliche_list || []).map((x) => `<span class="tag-pill">${esc(x)}</span>`).join("");
+
+      el.innerHTML = `
+        <div class="bible-grid">
+          <div class="info-block full">
+            <h3>Concept Thesis</h3>
+            <p class="thesis-quote">${esc(bible.concept_thesis)}</p>
+          </div>
+
+          <div class="info-block">
+            <h3>Visual Language</h3>
+            <div class="kv-list">
+              <span class="kv-k">World</span><span class="kv-v">${esc(bible.visual_language?.world)}</span>
+              <span class="kv-k">Lighting</span><span class="kv-v">${esc(bible.visual_language?.lighting_style)}</span>
+              <span class="kv-k">Grade</span><span class="kv-v">${esc(bible.visual_language?.texture_and_grade || "—")}</span>
+            </div>
+            ${palette ? `<div class="swatch-row">${palette}</div>` : ""}
+          </div>
+
+          <div class="info-block">
+            <h3>Camera, Type &amp; Sonic Identity</h3>
+            <div class="kv-list">
+              <span class="kv-k">Camera</span><span class="kv-v">${esc(bible.camera_grammar?.dominant_style)} (${esc(bible.camera_grammar?.lens_range_mm)})</span>
+              <span class="kv-k">Typography</span><span class="kv-v">${esc(bible.typography_and_layout?.font_family)} · ${esc(bible.typography_and_layout?.motion_feel)}</span>
+              <span class="kv-k">Audio</span><span class="kv-v">${esc(bible.sonic_identity?.audio_strategy)}</span>
+              <span class="kv-k">Voice</span><span class="kv-v">${esc(bible.sonic_identity?.voice_casting?.energy)} · ${esc(bible.sonic_identity?.voice_casting?.pace)} · ${esc(bible.sonic_identity?.voice_casting?.accent)}</span>
+            </div>
+          </div>
+
+          <div class="info-block full">
+            <h3>Narrative Arc — ${esc(bible.narrative_structure?.arc_name || "")} (${esc(bible.narrative_structure?.ending_strategy || "cta")})</h3>
+            <table class="data-table">
+              <thead><tr><th>Beat</th><th>Purpose</th><th>Hint</th><th>Shift</th></tr></thead>
+              <tbody>${beats || `<tr><td colspan="4">No beats recorded.</td></tr>`}</tbody>
+            </table>
+          </div>
+
+          ${antiCliches ? `
+            <div class="info-block full">
+              <h3>Brief-Specific Anti-Cliché Guardrails</h3>
+              <div class="pill-list">${antiCliches}</div>
+            </div>
+          ` : ""}
+
+          ${concepts ? `
+            <div class="info-block full">
+              <h3>Divergent Concept Pitches (${run.concepts.length})</h3>
+              <table class="data-table">
+                <thead><tr><th>Title</th><th>Thesis</th><th>Visual World</th><th>Diversity</th></tr></thead>
+                <tbody>${concepts}</tbody>
+              </table>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function renderQaTab(run) {
+      const el = $("tab-qa");
+      const qa = run?.qa_report;
+      if (!qa) {
+        el.innerHTML = `<div class="empty-note">Media &amp; script QA report will appear once production finishes.</div>`;
+        return;
+      }
+
+      const issues = [...(qa.blocking_errors || []), ...(qa.warnings || [])];
+      const issuesHtml = issues.length
+        ? `<table class="data-table">
+            <thead><tr><th>Severity</th><th>Code</th><th>Shot</th><th>Message</th></tr></thead>
+            <tbody>${issues.map((i) => `
+              <tr>
+                <td><span class="badge ${esc(i.severity)}">${esc(i.severity)}</span></td>
+                <td class="mono">${esc(i.code)}</td>
+                <td class="mono">${esc(i.shot_id || "—")}</td>
+                <td>${esc(i.message)}</td>
+              </tr>
+            `).join("")}</tbody>
+          </table>`
+        : `<div class="empty-note" style="border-style:solid;">Zero blocking errors or warnings detected.</div>`;
+
+      const ocrHtml = (qa.ocr_checks || []).length
+        ? `<table class="data-table">
+            <thead><tr><th>Shot</th><th>Expected Text</th><th>Observed (Tesseract)</th><th>Similarity</th><th>Status</th></tr></thead>
+            <tbody>${qa.ocr_checks.map((o) => `
+              <tr>
+                <td class="mono">${esc(o.shot_id)}</td>
+                <td>${esc(o.expected_text)}</td>
+                <td>${esc(o.observed_text || "(none)")}</td>
+                <td class="mono">${(Number(o.similarity || 0) * 100).toFixed(0)}%</td>
+                <td><span class="badge ${o.passed ? "pass" : "failed"}">${o.passed ? "pass" : "fail"}</span></td>
+              </tr>
+            `).join("")}</tbody>
+          </table>`
+        : "";
+
+      el.innerHTML = `
+        <div class="bible-grid">
+          <div class="info-block full">
+            <h3>QA Verdict</h3>
+            <div class="pill-list" style="align-items:center; gap:12px;">
+              <span class="badge ${qa.passed ? "pass" : "failed"}">${qa.passed ? "PASSED" : "BLOCKED"}</span>
+              <span class="tag-pill">Originality: ${Number(qa.originality_score || 0).toFixed(1)} / 10</span>
+              <span class="tag-pill">Bible Coherence: ${Number(qa.bible_coherence_score || 0).toFixed(1)} / 10</span>
+              ${qa.loudness_lufs != null ? `<span class="tag-pill">Loudness: ${Number(qa.loudness_lufs).toFixed(1)} LUFS</span>` : ""}
+              ${qa.peak_dbtp != null ? `<span class="tag-pill">Peak: ${Number(qa.peak_dbtp).toFixed(1)} dBTP</span>` : ""}
+            </div>
+          </div>
+
+          <div class="info-block full">
+            <h3>Issues &amp; Guardrails (${issues.length})</h3>
+            ${issuesHtml}
+          </div>
+
+          ${ocrHtml ? `
+            <div class="info-block full">
+              <h3>On-Screen Text OCR Verification</h3>
+              ${ocrHtml}
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function renderLedgerTab(run) {
+      const el = $("tab-ledger");
+      const entries = run?.cost_ledger?.entries || [];
+      const costRows = entries.length
+        ? `<table class="data-table">
+            <thead><tr><th>Stage</th><th>Provider / Model</th><th>Action</th><th>Cache</th><th>Actual USD</th></tr></thead>
+            <tbody>${entries.map((e) => `
+              <tr>
+                <td class="mono">${esc(e.stage)}</td>
+                <td class="mono">${esc(e.provider)} · ${esc(e.model)}</td>
+                <td>${esc(e.what)}</td>
+                <td>${e.cache_hit ? `<span class="badge pass">hit</span>` : "miss"}</td>
+                <td class="mono">${fmtUsd(e.actual_usd)}</td>
+              </tr>
+            `).join("")}</tbody>
+          </table>`
+        : `<div class="empty-note">No metered provider entries recorded for this cut.</div>`;
+
+      const eventRows = state.events.length
+        ? `<table class="data-table">
+            <thead><tr><th>Time</th><th>Event</th><th>Stage</th><th>Details</th></tr></thead>
+            <tbody>${state.events.slice().reverse().map((ev) => `
+              <tr>
+                <td class="mono">${esc(fmtTime(ev.timestamp))}</td>
+                <td class="mono">${esc(ev.type)}</td>
+                <td class="mono">${esc(ev.stage || "—")}</td>
+                <td>${esc(summarizeEventData(ev))}</td>
+              </tr>
+            `).join("")}</tbody>
+          </table>`
+        : `<div class="empty-note">Live SSE events will log here while a cut is running.</div>`;
+
+      el.innerHTML = `
+        <div class="bible-grid">
+          <div class="info-block full">
+            <h3>Cost Ledger (${fmtUsd(run?.cost_ledger?.actual_usd || 0)} / ${fmtUsd(run?.cost_ledger?.cap_usd ?? 5)})</h3>
+            ${costRows}
+          </div>
+          <div class="info-block full">
+            <h3>Session SSE Events (${state.events.length})</h3>
+            ${eventRows}
+          </div>
+        </div>
+      `;
+    }
+
+    async function launchCut() {
+      showFormError("");
+      const [fpsStr, renderMode] = $("fpsSelect").value.split("|");
+      const facts = $("factsInput").value.split("\n").map((s) => s.trim()).filter(Boolean);
+      const mustSay = $("mustSayInput").value.split("\n").map((s) => s.trim()).filter(Boolean);
+
+      const payload = {
+        brand_name: $("brandName").value.trim(),
+        brand_url: $("brandUrl").value.trim(),
+        goal: $("campaignGoal").value.trim(),
+        target_duration_sec: Number($("durationRange").value),
+        aspect: state.aspect,
+        fps: Number(fpsStr),
+        audio_mode: state.audioMode,
+        cap_usd: Number($("capUsd").value || 5.0),
+        render_mode: renderMode,
+        mock: state.mock,
+        facts,
+        must_say: mustSay,
+      };
+      const offer = $("offerInput").value.trim();
+      const dir = $("directionInput").value.trim();
+      const insp = $("inspirationUrl").value.trim();
+      if (offer) payload.offer = offer;
+      if (dir) payload.user_direction = dir;
+      if (insp) payload.inspiration_url = insp;
+
+      $("btnStartCut").disabled = true;
+      try {
+        const created = await apiFetch("/api/runs", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        state.currentRunId = created.run_id;
+        state.currentRun = created;
+        state.events = [];
+        renderRun(created);
+
+        await apiFetch(`/api/runs/${encodeURIComponent(created.run_id)}/start`, {
+          method: "POST",
+        });
+        created.status = "working";
+        renderRun(created);
+        subscribeSse(created.run_id);
+        await loadRuns();
+        await loadHealth();
+      } catch (err) {
+        $("btnStartCut").disabled = false;
+        showFormError(err.message);
+      }
+    }
+
+    // Wire UI controls
+    $("btnModeLive").addEventListener("click", () => setMode(false));
+    $("btnModeMock").addEventListener("click", () => setMode(true));
+
+    $("durationRange").addEventListener("input", (e) => {
+      $("durationLabel").textContent = `${e.target.value}s`;
+    });
+
+    $("aspectGroup").querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        $("aspectGroup").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.aspect = btn.dataset.val;
+      });
+    });
+
+    $("audioGroup").querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        $("audioGroup").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.audioMode = btn.dataset.val;
+      });
+    });
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        $(`tab-${btn.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    $("briefForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      launchCut();
+    });
+
+    $("btnCancelCut").addEventListener("click", async () => {
+      if (!state.currentRunId) return;
+      try {
+        await apiFetch(`/api/runs/${encodeURIComponent(state.currentRunId)}/cancel`, { method: "POST" });
+      } catch (err) {
+        showFormError(`Cancel failed: ${err.message}`);
+      }
+    });
+
+    $("btnRefreshRuns").addEventListener("click", () => {
+      loadRuns();
+      loadHealth();
+    });
+
+    function fillMockPreset() {
+      setMode(true);
+      $("brandName").value = "Kestrel Roasters";
+      $("brandUrl").value = "https://kestrelroasters.example.com";
+      $("campaignGoal").value = "Drive single-origin coffee subscription trials with grounded sourcing proof.";
+      $("durationRange").value = "15";
+      $("durationLabel").textContent = "15s";
+      $("capUsd").value = "5.0";
+      $("factsInput").value = "Small-batch roasted within 24 hours of shipping\n100% traceable direct-trade micro-lots";
+    }
+
+    function fillLivePreset() {
+      setMode(false);
+      $("brandName").value = "Linear";
+      $("brandUrl").value = "https://linear.app";
+      $("campaignGoal").value = "Launch cut highlighting speed and craft for modern product engineering teams.";
+      $("durationRange").value = "12";
+      $("durationLabel").textContent = "12s";
+      $("capUsd").value = "3.0";
+      $("factsInput").value = "";
+    }
+
+    $("presetMockDemo").addEventListener("click", fillMockPreset);
+    $("presetLiveDemo").addEventListener("click", fillLivePreset);
+    $("btnQuickMock").addEventListener("click", () => {
+      fillMockPreset();
+      launchCut();
+    });
+    $("btnFocusLive").addEventListener("click", () => {
+      fillLivePreset();
+      $("brandName").focus();
+    });
+
+    // Boot
+    setMode(false);
+    loadHealth();
+    loadRuns();
+    setInterval(loadHealth, 12000);
+  </script>
+</body>
+</html>

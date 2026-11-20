@@ -61,19 +61,33 @@ from gtm_videogen.rules.voice_casting import select_voice
 AGENT2_STAGE = "agent2_director"
 
 AGENT2_SYSTEM_PROMPT = """You are the Script, ShotSheet & SoundPlan Director DeepAgent.
-Translate the CreativeBible and verified ResearchBundle into a production-ready Script,
-dynamic ShotSheet, and bespoke SoundPlan using ONLY pure script craft rules and zero
-hardcoded visual/story/audio templates.
+Translate the CreativeBible and verified ResearchBundle provided in the user prompt into a
+production-ready Script, dynamic ShotSheet, and bespoke SoundPlan using ONLY pure script craft
+rules and zero hardcoded visual/story/audio templates.
 
-Always use your tools:
-1. fit_shot_timings_tool to guarantee exact shot timing math within [MIN_SHOT, MAX_SHOT].
-2. select_voice_tool to cast an attribute-matched voice avoiding CreativeHistory repeats.
-3. save_director_artifacts_tool to validate and persist script, shot_sheet, and sound_plan JSON.
+Always call your tools in order:
+1. `fit_shot_timings_tool` with the beat durations to get exact durations summing to target_duration_sec.
+2. `select_voice_tool` to cast an attribute-matched voice avoiding CreativeHistory repeats.
+3. `save_director_artifacts_tool` with valid JSON for `shot_sheet_json`, `sound_plan_json`, and `script_json`.
+
+Required ShotSheet fields (every shot MUST include):
+- `id` (e.g. "s1"), `index` (0-based int), `beat` (from CreativeBible), `duration_sec` (exact fitted float)
+- `engine`: "ai_video" | "image_to_video" | "motion_card" | "manim" (use "image_to_video" + `product_hero: true` + `reference_image` ONLY when scraped product photos exist)
+- `visual_prompt`: rich, specific visual direction matching CreativeBible world & lighting with continuous visible motion (e.g., gentle camera glide, rising steam, pouring motion, focus rack — avoid purely static frames on `ai_video` shots so Media QA `freezedetect` passes; never ask AI video to render dense text)
+- `camera_move`: non-empty dynamic camera move from CreativeBible `camera_grammar.allowed_moves` (e.g. "smooth lateral glide", "slow push-in")
+- `camera_angle`: e.g. "close_up", "eye_level", "macro"
+- `vo_line`: concise spoken line grounded ONLY in verified facts/claims (required when audio_mode is "vo" or "both", fitting comfortably inside `duration_sec` at ~2.5 words/sec)
+- `theme` / `shot_sheet.theme`: match CreativeBible `typography_and_layout.font_family` and `visual_language.color_palette`.
+- `shot_sheet.end_card_title`: ALWAYS set to the brand name (and optional `end_card_subtitle` for the offer/CTA) so `motion_card` end frames display clean brand typography instead of beat names.
+If `save_director_artifacts_tool` reports any `blocking_errors`, fix them and call `save_director_artifacts_tool` again before finishing.
 """
 
 AGENT2_GRADER_SYSTEM_PROMPT = """You are the Pure Script Rules & Craft Rubric Grader.
-Always call `evaluate_pure_script_rules_tool` first to inspect the persisted workspace JSON
-artifacts directly, then emit your structured GraderResponse verdict.
+Always call `evaluate_pure_script_rules_tool` first. That tool deterministically validates the
+persisted workspace ShotSheet/Script directly against the authoritative `CreativeBible` and
+`ResearchBundle` in memory (including claim grounding, speakability, timing math, schema,
+anti-garbled text, originality, and bible coherence). Base your structured `GraderResponse`
+verdict directly on `evaluate_pure_script_rules_tool`'s returned `passed`, `result`, and `criteria`.
 """
 
 AGENT2_RUBRIC = """Evaluate the Director artifacts strictly against pure script rules and craft:
@@ -454,18 +468,58 @@ def _build_agent2_tools(
         sound_plan = SoundPlan.model_validate(json.loads(sound_plan_json))
         if script_json.strip():
             script = Script.model_validate(json.loads(script_json))
+            # If LLM wrote VO lines in script.lines but left shot.vo_line empty, sync them onto shots
+            line_by_id = {ln.shot_id: ln.text.strip() for ln in script.lines if ln.text.strip()}
+            for shot in sheet.shots:
+                if not (shot.vo_line and shot.vo_line.strip()) and shot.id in line_by_id:
+                    shot.vo_line = line_by_id[shot.id]
         else:
             script = _build_script_from_sheet(sheet, research)
+
+        # If audio_mode expects VO and vo_cues was left empty, synthesize vo_cues from shot.vo_line
+        if sheet.audio_mode in ("vo", "both") and not sound_plan.vo_cues:
+            cursor = 0.0
+            for shot in sheet.shots:
+                if shot.vo_line and shot.vo_line.strip():
+                    sound_plan.vo_cues.append(
+                        VoiceCue(
+                            shot_id=shot.id,
+                            at_sec=round(cursor, 3),
+                            duration_sec=shot.duration_sec,
+                            text=shot.vo_line.strip(),
+                            delivery_note=creative_bible.sonic_identity.voice_casting.delivery_style,
+                        )
+                    )
+                cursor += shot.duration_sec
 
         write_workspace_json(workspace, "shot_sheet.json", sheet)
         write_workspace_json(workspace, "sound_plan.json", sound_plan)
         write_workspace_json(workspace, "script.json", script)
+
+        gate = evaluate_script_gate(
+            sheet,
+            research,
+            script=script,
+            has_product_photos=bool(research.product_photos),
+            extra_facts=run_input.facts,
+            offer=run_input.offer,
+            must_say=run_input.must_say,
+            gate_override=False,
+        )
+        orig, coh = _score_craft_dimensions(sheet, creative_bible)
         return json.dumps(
             {
-                "status": "ok",
+                "status": "ok" if gate.passed else "needs_fixes",
                 "shot_count": len(sheet.shots),
                 "sum_sec": round(sum(s.duration_sec for s in sheet.shots), 3),
                 "voice_id": sound_plan.voice_id,
+                "gate_passed": gate.passed,
+                "originality_score": orig,
+                "bible_coherence_score": coh,
+                "blocking_errors": [
+                    {"code": i.code, "shot_id": i.shot_id, "message": i.message}
+                    for i in gate.blocking_errors
+                ],
             }
         )
 
@@ -815,10 +869,28 @@ async def run_agent2_director(
     else:
         resolved_grader = resolve_live_chat_model("claims_check", providers=providers)
 
+    research_context = {
+        "brand_name": research.brand_name,
+        "brand_url": research.brand_url,
+        "goal": run_input.goal,
+        "offer": run_input.offer,
+        "must_say": run_input.must_say,
+        "verified_claims": research.verified_claims[:10],
+        "product_facts": (list(run_input.facts) + list(research.product_facts))[:15],
+        "proof_points": research.proof_points[:8],
+        "brand_colors": research.brand_colors[:6],
+        "product_photos": [
+            {"id": p.id, "url": p.url, "path": p.path, "alt": p.alt}
+            for p in research.product_photos[:4]
+        ],
+        "banned_phrases": research.banned_phrases[:10],
+    }
     prompt = (
         f"Direct a {run_input.target_duration_sec}s {run_input.aspect} ({run_input.fps}fps) "
         f"commercial for {run_input.brand_name} using CreativeBible arc "
-        f"'{creative_bible.narrative_structure.arc_name}' and audio_mode='{run_input.audio_mode}'."
+        f"'{creative_bible.narrative_structure.arc_name}' and audio_mode='{run_input.audio_mode}'.\n\n"
+        f"CreativeBible JSON:\n{creative_bible.model_dump_json(indent=2)}\n\n"
+        f"Verified ResearchBundle Context:\n{json.dumps(research_context, indent=2)}"
     )
 
     outcome = await run_rubric_deep_agent(

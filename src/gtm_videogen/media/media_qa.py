@@ -396,7 +396,20 @@ class MediaQA:
                     )
                 ]
 
-            transcribed = await whisper.transcribe(wav_path)
+            try:
+                transcribed = await whisper.transcribe(wav_path)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                return [
+                    SyncCheck(
+                        shot_id="full",
+                        expected_vo=expected_text,
+                        transcribed_vo="",
+                        passed=False,
+                        similarity=0.0,
+                    )
+                ]
             sim = _text_similarity(expected_text, transcribed or "")
             return [
                 SyncCheck(

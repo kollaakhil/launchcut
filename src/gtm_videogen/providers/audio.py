@@ -178,9 +178,18 @@ def build_tts_payload(
         return payload.model_dump(exclude_none=True)
 
     # Default: fal-ai/elevenlabs/tts/eleven-v3
+    resolved_voice = voice_id or "Aria"
+    if resolved_voice.startswith("v_"):
+        low_v = resolved_voice.lower()
+        if "_m_" in low_v or any(n in low_v for n in ("marcus", "liam", "daniel", "brian", "george", "david")):
+            resolved_voice = "George"
+        elif "_n_" in low_v or "sam" in low_v or "river" in low_v:
+            resolved_voice = "River"
+        else:
+            resolved_voice = "Rachel"
     payload = ElevenLabsTTSPayload(
         text=normalized_text,
-        voice=voice_id or "Aria",
+        voice=resolved_voice,
         stability=0.5,
     )
     return payload.model_dump(exclude_none=True)

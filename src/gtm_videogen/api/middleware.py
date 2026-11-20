@@ -132,6 +132,21 @@ class OriginSecurityMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         valid, reason, _ = validate_origin(origin, allowed_origins=self._allowed_origins)
+        if not valid and self._allowed_origins is None:
+            normalized = _normalize_origin(origin)
+            if normalized is not None:
+                origin_netloc = urlparse(normalized).netloc.lower()
+                req_hosts = {
+                    h.strip().lower()
+                    for hdr in (
+                        request.headers.get("host", ""),
+                        request.headers.get("x-forwarded-host", ""),
+                    )
+                    for h in hdr.split(",")
+                    if h.strip()
+                }
+                if origin_netloc and origin_netloc in req_hosts:
+                    valid = True
         if not valid:
             return JSONResponse(status_code=403, content={"detail": reason})
 

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from gtm_videogen.api.middleware import (
     OriginSecurityMiddleware,
@@ -92,6 +93,15 @@ def create_app(
     application.state.rate_limiter = limiter
 
     application.include_router(router)
+
+    studio_html_path = Path(__file__).with_name("studio.html")
+
+    @application.get("/", include_in_schema=False)
+    async def studio_index() -> HTMLResponse:
+        if studio_html_path.is_file():
+            return HTMLResponse(studio_html_path.read_text(encoding="utf-8"))
+        return HTMLResponse("<h1>LaunchCut API</h1><p>Open <a href='/docs'>/docs</a>.</p>")
+
     return application
 
 

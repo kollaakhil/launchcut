@@ -347,6 +347,17 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
     tesseract_ok = shutil.which(settings.tesseract_bin) is not None
     manim_info = manim_diagnostics()
 
+    llm_ready = any(
+        bool(k)
+        for k in (
+            settings.openrouter_api_key,
+            settings.openai_api_key,
+            settings.anthropic_api_key,
+            settings.google_api_key,
+        )
+    )
+    fal_ready = bool(settings.fal_key)
+
     return {
         "status": "ok" if (ffmpeg_ok and ffprobe_ok) else "degraded",
         "tools": {
@@ -354,6 +365,11 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             "ffprobe": ffprobe_ok,
             "tesseract": tesseract_ok,
             "manim": bool(manim_info.get("available", False)),
+        },
+        "api_keys": {
+            "llm": llm_ready,
+            "fal": fal_ready,
+            "live_ready": llm_ready and fal_ready,
         },
         "manim": manim_info,
     }
@@ -843,6 +859,76 @@ async def serve_media(
             headers={
                 "Accept-Ranges": "bytes",
                 "Content-Length": str(file_size),
+            },
+        )
+
+    parsed_range = _parse_byte_range(range_header, file_size)
+    if parsed_range is None:
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+            },
+        )
+
+    start, end = parsed_range
+    content_length = end - start + 1
+    return StreamingResponse(
+        _iter_file_range(path, start, content_length),
+        status_code=206,
+        media_type=media_type,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(content_length),
+        },
+    )
+
+
+@router.get("/runs/{run_id}/video")
+async def serve_run_video(
+    run_id: str,
+    request: Request,
+    services: ServicesDep,
+) -> Response:
+    """Stream the stitched MP4 output for a completed run with HTTP 206 Range support."""
+    if not run_id or len(run_id) > MAX_RUN_ID_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+    try:
+        state = services.run_store.load(run_id)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=404, detail="Invalid run_id") from exc
+
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
+
+    stitched = state.render_manifest.stitched_path if state.render_manifest else None
+    if not stitched:
+        raise HTTPException(status_code=404, detail="Run has no rendered video yet")
+
+    path = Path(stitched).resolve()
+    try:
+        path.relative_to(services.data_dir.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Video path outside data directory") from exc
+
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Rendered video file not found on disk")
+
+    file_size = path.stat().st_size
+    media_type = mimetypes.guess_type(path.name)[0] or "video/mp4"
+    range_header = request.headers.get("range")
+
+    if not range_header:
+        return StreamingResponse(
+            _iter_file_range(path, 0, file_size),
+            status_code=200,
+            media_type=media_type,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+                "Content-Disposition": f'inline; filename="{run_id}.mp4"',
             },
         )
 

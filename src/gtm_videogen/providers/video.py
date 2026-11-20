@@ -71,9 +71,24 @@ def build_fal_video_payload(
     shot: Shot,
     aspect: AspectRatio,
     fps: int,
+    model: str = "",
 ) -> dict[str, Any]:
     """Build fal.ai video queue submission payload honoring requested aspect ratio."""
-    payload: dict[str, Any] = {
+    low_model = model.strip().lower()
+    if "kling/v4" in low_model:
+        dur_int = max(3, min(20, int(round(float(shot.duration_sec)))))
+        payload: dict[str, Any] = {
+            "prompt": shot.visual_prompt,
+            "duration": dur_int,
+            "resolution": "720p",
+        }
+        if shot.engine == "image_to_video" and shot.reference_image and shot.reference_image.startswith(("http://", "https://")):
+            payload["start_image_url"] = shot.reference_image
+        else:
+            payload["aspect_ratio"] = select_supported_aspect(aspect)
+        return payload
+
+    payload = {
         "prompt": shot.visual_prompt,
         "aspect_ratio": select_supported_aspect(aspect),
         "duration": str(int(round(max(1.0, shot.duration_sec)))),
@@ -434,8 +449,17 @@ class VideoProvider:
         if self.settings.fal_key:
             headers["Authorization"] = f"Key {self.settings.fal_key}"
 
-        submit_url = f"https://queue.fal.run/{model.lstrip('/')}"
-        payload = build_fal_video_payload(shot, aspect, fps)
+        target_model = model.lstrip("/")
+        if (
+            shot.engine == "image_to_video"
+            and shot.reference_image
+            and shot.reference_image.startswith(("http://", "https://"))
+            and target_model.endswith("/text-to-video")
+        ):
+            target_model = target_model[: -len("/text-to-video")] + "/image-to-video"
+
+        submit_url = f"https://queue.fal.run/{target_model}"
+        payload = build_fal_video_payload(shot, aspect, fps, model=target_model)
         submitted = await client.post_json(submit_url, json=payload, headers=headers, cancel=cancel)
         if not isinstance(submitted, dict):
             raise VideoProviderError(f"fal returned non-object submit payload: {submitted!r}")
