@@ -1,0 +1,378 @@
+"""Bespoke Pillow + FFmpeg motion graphics card renderer (title, end, lower-third, metric).
+
+Addresses:
+- F12 / Pillar 4: Driven by CreativeBible.typography_and_layout & color_palette.
+- BUG-08 & BUG-09: Explicitly binds width, height, fps, and duration_sec on every render.
+- P5: Memoizes PIL font loading per process via functools.lru_cache.
+- Zero hardcoded house styles (no fixed yellow pills, tilt angles, or OS font paths).
+"""
+
+from __future__ import annotations
+
+import shutil
+import tempfile
+import textwrap
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from PIL import Image, ImageDraw, ImageFont
+
+from gtm_videogen.core.config import get_settings
+from gtm_videogen.core.job_registry import CancellationToken
+from gtm_videogen.media._subprocess import probe_media, run_subprocess
+from gtm_videogen.media.captions import (
+    ensure_wcag_contrast,
+    parse_hex_color,
+    relative_luminance,
+    resolve_font_path,
+)
+from gtm_videogen.media.ffmpeg_stitcher import _move_output_atomically
+from gtm_videogen.models.schemas import CreativeBible, GraphicsTheme, RenderedClip
+
+CardKind = Literal["title", "end_card", "lower_third", "metric"]
+
+
+@lru_cache(maxsize=128)
+def _load_pil_font(font_path_str: str, size: int) -> ImageFont.FreeTypeFont:
+    """Memoized TrueType font loader (P5)."""
+    return ImageFont.truetype(font_path_str, size=max(10, size))
+
+
+def _pick_card_colors(
+    bible: CreativeBible,
+    theme: GraphicsTheme | None = None,
+) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]:
+    """Return (bg_rgb, text_rgb, accent_rgb) with guaranteed WCAG >= 4.5:1 contrast."""
+    palette: list[str] = []
+    for raw in bible.visual_language.color_palette:
+        try:
+            parse_hex_color(raw)
+            palette.append(raw.strip())
+        except ValueError:
+            continue
+
+    if theme is not None:
+        bg_hex = theme.background_color
+        fg_hex = theme.text_color
+        accent_hex = theme.accent_color
+        clamp_bg = theme.clamp_background_luminance
+    else:
+        bg_hex = (
+            min(palette, key=lambda c: relative_luminance(parse_hex_color(c)))
+            if palette
+            else "#111827"
+        )
+        fg_hex = "#FFFFFF"
+        accent_hex = (
+            max(palette, key=lambda c: relative_luminance(parse_hex_color(c)))
+            if len(palette) > 1
+            else (palette[0] if palette else "#3B82F6")
+        )
+        clamp_bg = False
+
+    fg_checked, bg_checked = ensure_wcag_contrast(
+        fg_hex,
+        bg_hex,
+        min_ratio=4.5,
+        clamp_background_luminance=clamp_bg,
+    )
+    return (
+        parse_hex_color(bg_checked),
+        parse_hex_color(fg_checked),
+        parse_hex_color(accent_hex),
+    )
+
+
+def _wrap_lines(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    max_width: int,
+) -> list[str]:
+    words = text.strip().split()
+    if not words:
+        return []
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if (bbox[2] - bbox[0]) <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+
+    # Fallback hard-wrap if a single token exceeds max_width
+    final_lines: list[str] = []
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        if (bbox[2] - bbox[0]) <= max_width or len(line) <= 8:
+            final_lines.append(line)
+        else:
+            est_chars = max(8, int(len(line) * (max_width / max(1, bbox[2] - bbox[0]))))
+            final_lines.extend(textwrap.wrap(line, width=est_chars))
+    return final_lines
+
+
+class GraphicsCardRenderer:
+    """Renders bespoke motion-graphics cards via Pillow + FFmpeg with exact video specs."""
+
+    def __init__(
+        self,
+        *,
+        ffmpeg_bin: str | None = None,
+        ffprobe_bin: str | None = None,
+        fonts_dir: Path | None = None,
+    ) -> None:
+        settings = get_settings()
+        self.ffmpeg_bin = ffmpeg_bin or settings.ffmpeg_bin
+        self.ffprobe_bin = ffprobe_bin or settings.ffprobe_bin
+        self.fonts_dir = str(fonts_dir.resolve()) if fonts_dir else None
+
+    def _compose_card_image(
+        self,
+        *,
+        text: str,
+        width: int,
+        height: int,
+        bible: CreativeBible,
+        subtitle: str | None = None,
+        footer: str | None = None,
+        card_kind: CardKind = "title",
+        theme: GraphicsTheme | None = None,
+    ) -> Image.Image:
+        bg_rgb, text_rgb, accent_rgb = _pick_card_colors(bible, theme)
+        typo = bible.typography_and_layout
+        font_family = typo.font_family or (theme.font_family if theme else "Roboto")
+
+        bold_path = str(resolve_font_path(font_family, bold=True, fonts_dir=self.fonts_dir))
+        reg_path = str(resolve_font_path(font_family, bold=False, fonts_dir=self.fonts_dir))
+
+        base_dim = min(width, height)
+        if card_kind == "metric":
+            title_size = max(36, int(base_dim * 0.13))
+            sub_size = max(22, int(base_dim * 0.052))
+        elif card_kind == "lower_third":
+            title_size = max(28, int(base_dim * 0.068))
+            sub_size = max(20, int(base_dim * 0.044))
+        else:
+            title_size = max(32, int(base_dim * 0.088))
+            sub_size = max(20, int(base_dim * 0.046))
+        footer_size = max(16, int(base_dim * 0.034))
+
+        title_font = _load_pil_font(bold_path, title_size)
+        sub_font = _load_pil_font(reg_path, sub_size)
+        footer_font = _load_pil_font(reg_path, footer_size)
+
+        img = Image.new("RGB", (width, height), color=bg_rgb)
+        draw = ImageDraw.Draw(img)
+
+        margin_x = max(32, int(width * 0.09))
+        max_text_w = max(100, width - 2 * margin_x)
+        layout = (typo.end_card_layout or "centered_minimal").lower()
+
+        title_lines = _wrap_lines(draw, text, title_font, max_text_w)
+        sub_lines = _wrap_lines(draw, subtitle, sub_font, max_text_w) if subtitle else []
+
+        title_line_h = int(title_size * 1.24)
+        sub_line_h = int(sub_size * 1.35)
+        accent_h = max(4, int(base_dim * 0.008))
+
+        block_h = len(title_lines) * title_line_h
+        if sub_lines:
+            block_h += int(base_dim * 0.04) + len(sub_lines) * sub_line_h
+
+        if card_kind == "lower_third":
+            band_h = block_h + int(height * 0.10)
+            band_top = max(int(height * 0.55), height - band_h - int(height * 0.07))
+            # Accent rule at top of lower-third band
+            draw.rectangle(
+                [margin_x, band_top, margin_x + int(width * 0.18), band_top + accent_h],
+                fill=accent_rgb,
+            )
+            cursor_y = band_top + accent_h + int(height * 0.03)
+            align_left = True
+        elif "split" in layout or "left" in layout:
+            # Editorial left-aligned with vertical accent rule
+            rule_w = max(6, int(base_dim * 0.012))
+            cursor_y = max(40, (height - block_h) // 2)
+            draw.rectangle(
+                [margin_x, cursor_y, margin_x + rule_w, cursor_y + block_h],
+                fill=accent_rgb,
+            )
+            margin_x = margin_x + rule_w + int(width * 0.03)
+            max_text_w = max(100, width - margin_x - int(width * 0.08))
+            title_lines = _wrap_lines(draw, text, title_font, max_text_w)
+            sub_lines = _wrap_lines(draw, subtitle, sub_font, max_text_w) if subtitle else []
+            align_left = True
+        else:
+            cursor_y = max(40, (height - block_h) // 2)
+            # Centered horizontal accent rule above headline
+            rule_w = int(width * 0.14)
+            rule_x = (width - rule_w) // 2
+            rule_y = max(20, cursor_y - int(base_dim * 0.045))
+            draw.rectangle([rule_x, rule_y, rule_x + rule_w, rule_y + accent_h], fill=accent_rgb)
+            align_left = False
+
+        for line in title_lines:
+            bbox = draw.textbbox((0, 0), line, font=title_font)
+            line_w = bbox[2] - bbox[0]
+            x = margin_x if align_left else (width - line_w) // 2
+            draw.text((x, cursor_y), line, fill=text_rgb, font=title_font)
+            cursor_y += title_line_h
+
+        if sub_lines:
+            cursor_y += int(base_dim * 0.035)
+            for line in sub_lines:
+                bbox = draw.textbbox((0, 0), line, font=sub_font)
+                line_w = bbox[2] - bbox[0]
+                x = margin_x if align_left else (width - line_w) // 2
+                draw.text((x, cursor_y), line, fill=text_rgb, font=sub_font)
+                cursor_y += sub_line_h
+
+        if footer and footer.strip():
+            f_text = footer.strip()
+            bbox = draw.textbbox((0, 0), f_text, font=footer_font)
+            fw = bbox[2] - bbox[0]
+            fx = margin_x if align_left else (width - fw) // 2
+            fy = height - int(height * 0.08) - footer_size
+            draw.text((fx, fy), f_text, fill=text_rgb, font=footer_font)
+
+        return img
+
+    async def render_card(
+        self,
+        text: str,
+        width: int,
+        height: int,
+        fps: int,
+        duration_sec: float,
+        bible: CreativeBible,
+        output_path: Path | str,
+        *,
+        subtitle: str | None = None,
+        footer: str | None = None,
+        card_kind: CardKind = "title",
+        shot_id: str = "card",
+        theme: GraphicsTheme | None = None,
+        cancel: CancellationToken | None = None,
+    ) -> RenderedClip:
+        """Render a motion-graphics card to an H.264 MP4 with exact width/height/fps/duration."""
+        if width < 16 or height < 16:
+            raise ValueError(f"Invalid card dimensions: {width}x{height}")
+        if fps <= 0:
+            raise ValueError(f"Invalid fps: {fps}")
+        if duration_sec <= 0.0:
+            raise ValueError(f"Invalid duration_sec: {duration_sec}")
+
+        # Ensure even dimensions for yuv420p
+        even_w = width if width % 2 == 0 else width + 1
+        even_h = height if height % 2 == 0 else height + 1
+
+        out = Path(output_path).resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="gtm_card_"))
+        try:
+            png_path = tmp_dir / "card.png"
+            tmp_mp4 = tmp_dir / "card.mp4"
+
+            img = self._compose_card_image(
+                text=text,
+                width=even_w,
+                height=even_h,
+                bible=bible,
+                subtitle=subtitle,
+                footer=footer,
+                card_kind=card_kind,
+                theme=theme,
+            )
+            img.save(png_path, format="PNG")
+
+            motion = (bible.typography_and_layout.motion_feel or "crisp").lower()
+            fade_dur = min(0.25, duration_sec * 0.15)
+            vf_parts = [f"fps={fps}", "format=yuv420p"]
+            if "smooth" in motion or "measured" in motion or "gentle" in motion:
+                fade_out_st = max(0.0, duration_sec - fade_dur)
+                vf_parts.insert(
+                    1,
+                    f"fade=t=in:st=0:d={fade_dur:.3f},fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}",
+                )
+
+            cmd = [
+                self.ffmpeg_bin,
+                "-y",
+                "-loop",
+                "1",
+                "-framerate",
+                str(fps),
+                "-i",
+                str(png_path),
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=r=44100:cl=stereo",
+                "-t",
+                f"{duration_sec:.4f}",
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-vf",
+                ",".join(vf_parts),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                "18",
+                "-profile:v",
+                "high",
+                "-level:v",
+                "4.1",
+                "-pix_fmt",
+                "yuv420p",
+                "-color_range",
+                "tv",
+                "-colorspace",
+                "bt709",
+                "-color_primaries",
+                "bt709",
+                "-color_trc",
+                "bt709",
+                "-video_track_timescale",
+                "90000",
+                "-r",
+                str(fps),
+                "-c:a",
+                "aac",
+                "-ar",
+                "44100",
+                "-ac",
+                "2",
+                "-b:a",
+                "128k",
+                "-shortest",
+                "-movflags",
+                "+faststart",
+                str(tmp_mp4),
+            ]
+            await run_subprocess(cmd, cancel=cancel, timeout_sec=60.0)
+            _move_output_atomically(tmp_mp4, out)
+
+            probe = await probe_media(out, ffprobe_bin=self.ffprobe_bin, cancel=cancel)
+            return RenderedClip(
+                shot_id=shot_id,
+                path=str(out),
+                duration_sec=probe.duration_sec or duration_sec,
+                fps=round(probe.fps) if probe.fps > 0 else fps,
+                width=probe.width or even_w,
+                height=probe.height or even_h,
+                cache_hit=False,
+                usd=0.0,
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
