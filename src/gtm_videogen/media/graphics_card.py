@@ -319,10 +319,6 @@ class GraphicsCardRenderer:
             img.save(png_path, format="PNG")
 
             total_frames = max(1, int(round(duration_sec * fps)))
-            fade_dur = min(0.22, duration_sec * 0.15)
-            fade_out_st = max(0.0, duration_sec - fade_dur)
-            motion = (bible.typography_and_layout.motion_feel or "crisp").lower()
-
             zoom_step = 0.045
             vf_parts = [
                 (
@@ -330,11 +326,8 @@ class GraphicsCardRenderer:
                     f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
                     f":d={total_frames}:s={even_w}x{even_h}:fps={fps}"
                 ),
-                f"fade=t=in:st=0:d={fade_dur:.3f}",
+                "format=yuv420p",
             ]
-            if "smooth" in motion or "measured" in motion or "gentle" in motion:
-                vf_parts.append(f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}")
-            vf_parts.append("format=yuv420p")
 
             cmd = [
                 self.ffmpeg_bin,

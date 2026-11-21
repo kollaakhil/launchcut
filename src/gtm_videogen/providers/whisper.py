@@ -39,7 +39,7 @@ def _mime_for_audio(audio_path: Path) -> str:
     ext = audio_path.suffix.lower()
     if ext == ".mp3":
         return "audio/mpeg"
-    if ext == ".m4a":
+    if ext in (".m4a", ".mp4"):
         return "audio/mp4"
     if ext == ".ogg":
         return "audio/ogg"
@@ -282,27 +282,52 @@ class WhisperProvider:
             )
 
         try:
-            raw_bytes = audio_path.read_bytes()
-            b64 = base64.b64encode(raw_bytes).decode("ascii")
-            data_url = f"data:{_mime_for_audio(audio_path)};base64,{b64}"
+            send_path = audio_path
+            tmp_mp3: Path | None = None
+            if audio_path.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm"):
+                ffmpeg_bin = shutil.which("ffmpeg")
+                if ffmpeg_bin:
+                    import tempfile
+
+                    tmp_fd, tmp_name = tempfile.mkstemp(prefix="gtm_whisper_", suffix=".mp3")
+                    import os
+
+                    os.close(tmp_fd)
+                    tmp_mp3 = Path(tmp_name)
+                    proc = await asyncio.create_subprocess_exec(
+                        ffmpeg_bin,
+                        "-y",
+                        "-i",
+                        str(audio_path),
+                        "-vn",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
+                        "-b:a",
+                        "64k",
+                        str(tmp_mp3),
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    await proc.communicate()
+                    if proc.returncode == 0 and tmp_mp3.is_file() and tmp_mp3.stat().st_size > 0:
+                        send_path = tmp_mp3
+
+            try:
+                raw_bytes = send_path.read_bytes()
+                b64 = base64.b64encode(raw_bytes).decode("ascii")
+                data_url = f"data:{_mime_for_audio(send_path)};base64,{b64}"
+            finally:
+                if tmp_mp3 is not None and tmp_mp3.exists():
+                    tmp_mp3.unlink(missing_ok=True)
 
             lang = self._effective_lang()
-            fal_lang_map = {
-                "en": "english",
-                "es": "spanish",
-                "fr": "french",
-                "de": "german",
-                "it": "italian",
-                "pt": "portuguese",
-                "ja": "japanese",
-                "ko": "korean",
-                "zh": "chinese",
-            }
             payload: dict[str, Any] = {
                 "audio_url": data_url,
                 "task": "transcribe",
                 "chunk_level": "segment",
-                "language": fal_lang_map.get(lang.lower(), lang),
+                "language": lang.lower()[:2],
             }
             if vocabulary:
                 prompt_str = ", ".join(term.strip() for term in vocabulary if term and term.strip())
