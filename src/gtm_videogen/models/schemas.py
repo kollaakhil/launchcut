@@ -286,6 +286,7 @@ class Shot(BaseModel):
     vo_line: str | None = None
     sfx_note: str | None = None
     reference_image: str | None = None
+    end_reference_image: str | None = None
     keyframe_path: str | None = None
     keyframe_url: str | None = None
     keyframe_approved: bool = False
@@ -543,6 +544,8 @@ class RunState(BaseModel):
     winning_version_id: str | None = None
     brand_logo_path: str | None = None
     uploaded_assets: list[MediaRef] = Field(default_factory=list)
+    craft_archetype: str | None = None
+    reference_taste_notes: str | None = None
     input: RunInput
     research: ResearchBundle | None = None
     concepts: list[ConceptPitch] = Field(default_factory=list)

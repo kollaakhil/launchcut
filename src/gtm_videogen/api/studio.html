@@ -765,7 +765,7 @@
     /* Brand Asset Uploader & Shot Filmstrip */
     .asset-bar {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
       padding: 12px 14px;
       border-radius: var(--radius);
@@ -773,6 +773,44 @@
       border: 1px solid var(--rule);
       margin-bottom: 14px;
     }
+    .archetype-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .archetype-pill {
+      appearance: none;
+      text-align: left;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.14s ease;
+    }
+    .archetype-pill:hover { background: var(--surface-raised); border-color: var(--rule-strong); }
+    .archetype-pill.active { background: var(--accent-soft); border-color: var(--accent); }
+    .archetype-pill strong { font-size: 12.5px; }
+    .archetype-pill span { font-size: 11px; color: var(--ink-muted); }
+    .audition-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      margin-bottom: 14px;
+    }
+    .audition-strip select { width: auto; min-width: 195px; padding: 6px 8px; font-size: 12.5px; }
+    .audition-strip audio { height: 30px; max-width: 240px; }
     .asset-thumbs {
       display: flex;
       flex-wrap: wrap;
@@ -831,7 +869,7 @@
     .film-fix-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 
     @media (max-width: 900px) {
-      .grid-2, .grid-3, .grid-4, .metrics-row, .asset-bar { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .grid-4, .metrics-row, .asset-bar, .archetype-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -966,17 +1004,45 @@
             </div>
           </div>
 
-          <!-- Real Brand Asset Uploader -->
+          <!-- Upgrade 5: Craft Archetype Taste Presets -->
+          <div class="field" style="margin-bottom:6px;">
+            <label>Film Craft Archetype (optional taste preset)</label>
+          </div>
+          <div class="archetype-row" id="archetypeRow">
+            <button type="button" class="archetype-pill" data-arch="quiet_editorial">
+              <strong>Quiet Editorial</strong>
+              <span>Anthropic / Stripe Press</span>
+            </button>
+            <button type="button" class="archetype-pill" data-arch="kinetic_saas">
+              <strong>Kinetic SaaS</strong>
+              <span>Linear / Vercel</span>
+            </button>
+            <button type="button" class="archetype-pill" data-arch="bold_athletic">
+              <strong>Bold Athletic</strong>
+              <span>Nike / On</span>
+            </button>
+            <button type="button" class="archetype-pill" data-arch="tactile_industrial">
+              <strong>Tactile Industrial</strong>
+              <span>Apple / Fellow</span>
+            </button>
+          </div>
+
+          <!-- Real Brand Asset & Reference Moodboard Uploader -->
           <div class="asset-bar">
             <div class="field">
-              <label for="inLogoFile">Real Brand Logo (PNG/JPG/WebP — used on closing lockup)</label>
+              <label for="inLogoFile">Real Brand Logo (closing lockup)</label>
               <input id="inLogoFile" type="file" accept="image/png,image/jpeg,image/webp" />
               <div class="asset-thumbs" id="logoPreview"></div>
             </div>
             <div class="field">
-              <label for="inProductFiles">Real Product Photos / App UI Screenshots (up to 4)</label>
+              <label for="inProductFiles">Real Product / App UI (up to 4)</label>
               <input id="inProductFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple />
               <div class="asset-thumbs" id="productPreviews"></div>
+            </div>
+            <div class="field">
+              <label for="inRefMoodboard">Reference Moodboard (taste clone)</label>
+              <input id="inRefMoodboard" type="file" accept="image/png,image/jpeg,image/webp" />
+              <div class="asset-thumbs" id="refMoodboardPreview"></div>
             </div>
           </div>
 
@@ -1110,6 +1176,19 @@
           </div>
         </div>
 
+        <!-- Upgrade 2: Voice Casting & Audio Audition Strip -->
+        <div class="audition-strip">
+          <span style="font-size:11.5px; font-weight:600; color:var(--ink-secondary);">Voice Casting:</span>
+          <select id="inVoiceSelect" aria-label="Voiceover narrator voice">
+            <option value="Rachel">Rachel — Warm Editorial</option>
+            <option value="George">George — Deep Cinema</option>
+            <option value="River">River — Crisp Modern</option>
+          </select>
+          <button type="button" class="btn btn-sm" id="btnAuditionVoice">▶ Audition Voice</button>
+          <button type="button" class="btn btn-sm" id="btnAuditionMusic">▶ Audition Music</button>
+          <audio id="auditionPlayer" controls style="display:none;"></audio>
+        </div>
+
         <div class="sheet-table-wrap">
           <table class="sheet-table">
             <thead>
@@ -1218,6 +1297,12 @@
             <p class="panel-sub" id="finalSub">Render the winning preview stack at full Final quality, verify deterministic Media QA + Multimodal Vision Critic, and download your master MP4.</p>
           </div>
           <div class="btn-group">
+            <select id="inMasterEngine" aria-label="Final Cut Master Video Engine" style="width:auto; min-width:240px; padding:7px 9px; font-size:12.5px;">
+              <option value="">Same as Winner (Kling v4 Flash)</option>
+              <option value="kling/v4/text-to-video">Kling v4 Pro Cinema (Start→End Bridged)</option>
+              <option value="fal-ai/veo3/fast">Google Veo 3 Fast (Hero Realism)</option>
+              <option value="fal-ai/veo3">Google Veo 3 Flagship (Studio Master)</option>
+            </select>
             <button type="button" class="btn btn-primary" id="btnRenderFinal">Render Final Cut</button>
             <a class="btn btn-pass" id="btnDownloadFinal" href="#" download style="display:none;">Download Master MP4</a>
           </div>
@@ -1272,6 +1357,9 @@
       ratingDrafts: {},
       pendingLogo: null,
       pendingProducts: [],
+      craftArchetype: "",
+      pendingRefMoodboard: null,
+      auditionBlobUrl: null,
       kfBust: Date.now(),
       sse: null,
       pollTimer: null,
@@ -1536,6 +1624,14 @@
       state.draftShots = JSON.parse(JSON.stringify(sheet.shots || []));
       $("edEndTitle").value = sheet.end_card_title || r.input.brand_name || "";
       $("edEndSubtitle").value = sheet.end_card_subtitle || "";
+      const curVoice = r.sound_plan?.voice_id || "Rachel";
+      const voiceSel = $("inVoiceSelect");
+      if (voiceSel) {
+        if (["Rachel", "George", "River"].includes(curVoice)) voiceSel.value = curVoice;
+        else if (curVoice.toLowerCase().includes("m_") || curVoice.toLowerCase().includes("george")) voiceSel.value = "George";
+        else if (curVoice.toLowerCase().includes("n_") || curVoice.toLowerCase().includes("river")) voiceSel.value = "River";
+        else voiceSel.value = "Rachel";
+      }
       renderSheetRows();
       renderSheetGate();
     }
@@ -1608,9 +1704,15 @@
       sheet.shots = state.draftShots.map((s, idx) => ({ ...s, index: idx }));
       sheet.end_card_title = $("edEndTitle").value.trim() || null;
       sheet.end_card_subtitle = $("edEndSubtitle").value.trim() || null;
+      const bodyPayload = { shot_sheet: sheet };
+      if (state.run.sound_plan) {
+        const sp = JSON.parse(JSON.stringify(state.run.sound_plan));
+        if ($("inVoiceSelect")) sp.voice_id = $("inVoiceSelect").value;
+        bodyPayload.sound_plan = sp;
+      }
       const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/sheet`, {
         method: "PATCH",
-        body: JSON.stringify({ shot_sheet: sheet }),
+        body: JSON.stringify(bodyPayload),
       });
       state.run = updated;
       renderSheetStep();
@@ -1839,6 +1941,9 @@
                   <button type="button" class="btn btn-sm ${isWin ? "btn-pass" : "btn-primary"}" data-pick="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
                     ${isWin ? "★ Selected Winner" : "Pick Winner"}
                   </button>
+                  <button type="button" class="btn btn-sm" data-autopolish="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
+                    ✦ Auto-Polish 8.5+
+                  </button>
                   <button type="button" class="btn btn-sm" data-reiterate="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
                     ↻ Reiterate Weak Shots
                   </button>
@@ -1928,6 +2033,30 @@
               state.run = updated;
               setBanner("ok", `Saved ${d.rating}/5 human score & updated per-brand taste memory.`);
               renderAll();
+            } catch (err) {
+              setBanner("error", err.message);
+            }
+          });
+        });
+
+        // Wire Autonomous Auto-Polish Loop (Target >= 8.5/10)
+        $("versionsGrid").querySelectorAll("[data-autopolish]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const vid = btn.dataset.autopolish;
+            const d = state.ratingDrafts[vid] || { notes: "", tags: new Set() };
+            const combinedNotes = [d.notes, ...Array.from(d.tags)].filter(Boolean).join("; ");
+            setBanner("working", "Running Autonomous Auto-Polish Loop (target ≥ 8.5/10, reusing strong shots)…", true);
+            try {
+              await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/auto-polish`, {
+                method: "POST",
+                body: JSON.stringify({
+                  version_id: vid,
+                  target_score: 8.5,
+                  max_rounds: 2,
+                  notes: combinedNotes,
+                }),
+              });
+              subscribeSse(state.run.run_id, () => setView("previews"));
             } catch (err) {
               setBanner("error", err.message);
             }
@@ -2218,7 +2347,28 @@
       }
     });
 
-    // Step 1 Submit -> Create Run + Upload Assets + Step 1 Research
+    // Upgrade 5: Craft Archetype Pills & Reference Moodboard Reader
+    $("archetypeRow")?.querySelectorAll(".archetype-pill").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.arch || "";
+        state.craftArchetype = state.craftArchetype === key ? "" : key;
+        $("archetypeRow").querySelectorAll(".archetype-pill").forEach((b) => {
+          b.classList.toggle("active", b.dataset.arch === state.craftArchetype);
+        });
+      });
+    });
+
+    $("inRefMoodboard")?.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) { state.pendingRefMoodboard = null; $("refMoodboardPreview").innerHTML = ""; return; }
+      try {
+        const data_url = await readFileAsDataUrl(file);
+        state.pendingRefMoodboard = data_url;
+        $("refMoodboardPreview").innerHTML = `<img class="asset-thumb" src="${data_url}" alt="Reference moodboard" title="${esc(file.name)}" />`;
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    // Step 1 Submit -> Create Run + Upload Assets + Reference Taste + Step 1 Research
     $("brandForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       setBanner("working", "Creating run & researching brand (Agent 1)…", true);
@@ -2259,6 +2409,19 @@
             });
             if (up.run) state.run = up.run;
           }
+        }
+
+        // Apply Craft Archetype &/or Reference Moodboard Taste Cloning (Upgrade 5)
+        if (state.craftArchetype || state.pendingRefMoodboard) {
+          setBanner("working", "Extracting reference film taste blueprint…", true);
+          const refRes = await api(`/api/runs/${encodeURIComponent(created.run_id)}/reference`, {
+            method: "POST",
+            body: JSON.stringify({
+              craft_archetype: state.craftArchetype || null,
+              reference_image_data_url: state.pendingRefMoodboard || null,
+            }),
+          });
+          if (refRes.run) state.run = refRes.run;
         }
 
         setBanner("working", "Researching brand & pitching 4 concepts (Agent 1)…", true);
@@ -2319,6 +2482,43 @@
         });
       } catch (err) { setBanner("error", err.message); }
     });
+
+    // Step 3: Voice & Music Audition (Upgrade 2)
+    async function runAudioAudition(kind) {
+      const voiceId = $("inVoiceSelect")?.value || "Rachel";
+      const firstVo = (state.draftShots || []).find((s) => s.vo_line && s.vo_line.trim())?.vo_line
+        || `${state.run?.input?.brand_name || "Our product"} — engineered for quiet precision.`;
+      const musicPrompt = state.run?.sound_plan?.music_cue?.prompt
+        || state.run?.creative_bible?.sonic_identity?.audio_strategy
+        || "Minimal modern warm analog synth pulse for a product launch film";
+      setBanner("working", kind === "voice" ? `Auditioning ${voiceId} voice…` : "Auditioning music tone…");
+      try {
+        const res = await fetch("/api/studio/audition", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Actor-Id": ACTOR_ID },
+          body: JSON.stringify({
+            kind,
+            voice_id: voiceId,
+            text: firstVo,
+            prompt: musicPrompt,
+            mock: Boolean(state.run?.input?.mock || state.mock),
+          }),
+        });
+        if (!res.ok) throw new Error(`Audition failed (HTTP ${res.status})`);
+        const blob = await res.blob();
+        if (state.auditionBlobUrl) URL.revokeObjectURL(state.auditionBlobUrl);
+        state.auditionBlobUrl = URL.createObjectURL(blob);
+        const player = $("auditionPlayer");
+        player.src = state.auditionBlobUrl;
+        player.style.display = "inline-block";
+        player.play().catch(() => {});
+        setBanner("ok", kind === "voice" ? `Playing ${voiceId} audition clip.` : "Playing music audition clip.");
+      } catch (err) {
+        setBanner("error", err.message);
+      }
+    }
+    $("btnAuditionVoice")?.addEventListener("click", () => runAudioAudition("voice"));
+    $("btnAuditionMusic")?.addEventListener("click", () => runAudioAudition("music"));
 
     // Step 3: Shot-by-Shot Sheet Actions
     $("btnAddShot").addEventListener("click", () => {
@@ -2436,14 +2636,17 @@
 
     $("btnGoFinal").addEventListener("click", () => setView("final"));
 
-    // Step 6: Render Final Cut
+    // Step 6: Render Final Cut (with Upgrade 4 Flagship Master Engine Override)
     $("btnRenderFinal").addEventListener("click", async () => {
       if (!state.run) return;
-      setBanner("working", "Rendering full-quality Final Cut, Whisper Sync QA & Vision Quality Critic…", true);
+      const masterEngine = $("inMasterEngine")?.value || "";
+      setBanner("working", `Rendering full-quality Final Cut${masterEngine ? ` (${masterEngine})` : ""}, Whisper Sync QA & Vision Critic…`, true);
       try {
+        const reqBody = { version_id: state.run.winning_version_id };
+        if (masterEngine) reqBody.video_model_override = masterEngine;
         await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/final`, {
           method: "POST",
-          body: JSON.stringify({ version_id: state.run.winning_version_id }),
+          body: JSON.stringify(reqBody),
         });
         subscribeSse(state.run.run_id, () => setView("final"));
       } catch (err) { setBanner("error", err.message); }

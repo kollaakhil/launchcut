@@ -409,3 +409,58 @@ class WhisperProvider:
         raise WhisperError(
             f"fal.ai Whisper transcription timed out after {self._max_poll_attempts} polls"
         )
+
+    async def transcribe_words(
+        self,
+        audio_path: Path | str,
+        *,
+        cancel: CancellationToken | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return word-level [{word, start, end}] timestamps via fal-ai/whisper (best-effort)."""
+        path = Path(audio_path)
+        fal_key = self.settings.fal_key.strip()
+        if not path.is_file() or not fal_key:
+            return []
+        try:
+            raw_bytes = path.read_bytes()
+            b64 = base64.b64encode(raw_bytes).decode("ascii")
+            data_url = f"data:{_mime_for_audio(path)};base64,{b64}"
+            headers = {"Content-Type": "application/json", "Authorization": f"Key {fal_key}"}
+            payload = {
+                "audio_url": data_url,
+                "task": "transcribe",
+                "chunk_level": "word",
+                "language": self._effective_lang().lower()[:2],
+            }
+            async with ResilientHttpClient(
+                connect_timeout=self.settings.http_connect_timeout_sec,
+                read_timeout=45.0,
+                write_timeout=20.0,
+                pool_timeout=10.0,
+                max_retries=1,
+            ) as client:
+                data = await client.post_json(
+                    f"https://fal.run/{FAL_WHISPER_MODEL}",
+                    json=payload,
+                    headers=headers,
+                    cancel=cancel,
+                )
+            chunks = data.get("chunks") if isinstance(data, dict) else None
+            out: list[dict[str, Any]] = []
+            if isinstance(chunks, list):
+                for ch in chunks:
+                    if not isinstance(ch, dict):
+                        continue
+                    w = str(ch.get("text", "")).strip()
+                    ts = ch.get("timestamp")
+                    if w and isinstance(ts, list) and len(ts) >= 2 and ts[0] is not None:
+                        out.append(
+                            {
+                                "word": w,
+                                "start": float(ts[0]),
+                                "end": float(ts[1] if ts[1] is not None else ts[0] + 0.25),
+                            }
+                        )
+            return out
+        except Exception:
+            return []

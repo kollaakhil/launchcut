@@ -428,12 +428,30 @@ class FFmpegStitcher:
             sfx_cues = sound_plan.sfx_cues if sound_plan else []
             music_cue = sound_plan.music_cue if sound_plan else None
 
-            # Prepare voice pre-pass WAVs (atempo capped at 1.5x)
+            # Detect musical beats once if a music track exists (for beat-locked SFX snapping)
+            music_path = Path(music_assets[0].path).resolve() if music_assets else None
+            detected_beats: list[float] = []
+            if music_path is not None:
+                try:
+                    from gtm_videogen.media.audio_sync import detect_audio_beats
+
+                    detected_beats = await detect_audio_beats(
+                        music_path, ffmpeg_bin=self.ffmpeg_bin, cancel=cancel
+                    )
+                except Exception:
+                    detected_beats = []
+
+            # Prepare voice pre-pass WAVs (atempo capped at 1.5x) with J-cut anticipation
             prepared_vo: list[tuple[Path, float]] = []
             vo_cue_by_id = {c.shot_id: c for c in vo_cues}
+            shot_by_id = {s.id: s for s in sheet.shots}
             for idx, va in enumerate(vo_assets):
                 cue = vo_cue_by_id.get(va.cue_id) or (vo_cues[idx] if idx < len(vo_cues) else None)
                 at_sec = cue.at_sec if cue else 0.0
+                # Editorial J-cut: start voiceover 0.18s ahead of cut on j_cut transitions
+                sh = shot_by_id.get(cue.shot_id) if cue else None
+                if sh is not None and sh.transition == "j_cut" and at_sec >= 0.25:
+                    at_sec = round(max(0.0, at_sec - 0.18), 3)
                 if at_sec > target_sec - 0.15:
                     continue
                 cue_dur = cue.duration_sec if cue else max(0.5, target_sec - at_sec)
@@ -446,14 +464,18 @@ class FFmpegStitcher:
                 )
                 prepared_vo.append((wav_path, at_sec))
 
-            # Filter SFX cues against silence_gaps and end-of-timeline cutoff (BUG-10)
+            # Filter SFX cues against silence_gaps, snap to nearest musical beat, and check cutoff
             prepared_sfx: list[tuple[Path, float, float]] = []
             sfx_cue_by_id = {c.shot_id: c for c in sfx_cues if c.shot_id}
+            from gtm_videogen.media.audio_sync import snap_to_nearest_beat
+
             for idx, sa in enumerate(sfx_assets):
                 cue = sfx_cue_by_id.get(sa.cue_id) or (
                     sfx_cues[idx] if idx < len(sfx_cues) else None
                 )
                 at_sec = cue.at_sec if cue else 0.0
+                if detected_beats and at_sec > 0.1:
+                    at_sec = snap_to_nearest_beat(at_sec, detected_beats, max_shift_sec=0.18)
                 gain_db = cue.gain_db if cue else -6.0
                 if at_sec > target_sec - 0.2:
                     warnings.append(
@@ -467,7 +489,6 @@ class FFmpegStitcher:
                     continue
                 prepared_sfx.append((Path(sa.path).resolve(), at_sec, gain_db))
 
-            music_path = Path(music_assets[0].path).resolve() if music_assets else None
             has_audio_mix = bool(prepared_vo or prepared_sfx or music_path)
 
             cmd = [self.ffmpeg_bin, "-y", "-i", str(concat_mp4)]
@@ -577,14 +598,17 @@ class FFmpegStitcher:
                 cmd.extend(["-filter_complex", ";".join(filter_parts)])
                 cmd.extend(["-map", "0:v:0", "-map", "[aout]"])
 
-                if generated_ass_path is not None:
-                    cmd.extend(
-                        [
-                            "-vf",
-                            build_ass_filter(generated_ass_path, self.fonts_dir),
-                            *_pinned_h264_flags(fps),
-                        ]
+                # Apply optional Unified Cinema Finishing Grade (glues AI clips & kinetic cards)
+                vf_chain: list[str] = []
+                if not preview:
+                    vf_chain.append(
+                        "eq=contrast=1.03:saturation=1.04,noise=alls=3:allf=t+u,vignette=angle=PI/7"
                     )
+                if generated_ass_path is not None:
+                    vf_chain.append(build_ass_filter(generated_ass_path, self.fonts_dir))
+
+                if vf_chain:
+                    cmd.extend(["-vf", ",".join(vf_chain), *_pinned_h264_flags(fps)])
                 else:
                     cmd.extend(["-c:v", "copy"])
 

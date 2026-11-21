@@ -82,10 +82,43 @@ def build_fal_video_payload(
             "duration": dur_int,
             "resolution": "720p",
         }
-        if shot.engine == "image_to_video" and shot.reference_image and shot.reference_image.startswith(("http://", "https://")):
+        has_start = bool(
+            shot.engine == "image_to_video"
+            and shot.reference_image
+            and shot.reference_image.startswith(("http://", "https://"))
+        )
+        if has_start:
             payload["start_image_url"] = shot.reference_image
+            # Full Kling v4 Pro I2V (non-flash) supports Start -> End keyframe bridging!
+            if (
+                "flash" not in low_model
+                and shot.end_reference_image
+                and shot.end_reference_image.startswith(("http://", "https://"))
+            ):
+                payload["end_image_url"] = shot.end_reference_image
         else:
             payload["aspect_ratio"] = select_supported_aspect(aspect)
+        return payload
+
+    if "veo3" in low_model:
+        dur_val = float(shot.duration_sec)
+        veo_dur = "4s" if dur_val <= 5.0 else ("6s" if dur_val <= 7.0 else "8s")
+        payload = {
+            "prompt": shot.visual_prompt,
+            "aspect_ratio": select_supported_aspect(aspect),
+            "duration": veo_dur,
+            "resolution": "720p",
+            "generate_audio": False,
+            "auto_fix": True,
+        }
+        if shot.negative_prompt:
+            payload["negative_prompt"] = shot.negative_prompt
+        if (
+            shot.engine == "image_to_video"
+            and shot.reference_image
+            and shot.reference_image.startswith(("http://", "https://"))
+        ):
+            payload["image_url"] = shot.reference_image
         return payload
 
     payload = {
@@ -450,13 +483,15 @@ class VideoProvider:
             headers["Authorization"] = f"Key {self.settings.fal_key}"
 
         target_model = model.lstrip("/")
-        if (
+        has_ref = bool(
             shot.engine == "image_to_video"
             and shot.reference_image
             and shot.reference_image.startswith(("http://", "https://"))
-            and target_model.endswith("/text-to-video")
-        ):
+        )
+        if has_ref and target_model.endswith("/text-to-video"):
             target_model = target_model[: -len("/text-to-video")] + "/image-to-video"
+        elif has_ref and target_model in ("fal-ai/veo3", "fal-ai/veo3/fast"):
+            target_model = "fal-ai/veo3/image-to-video"
 
         submit_url = f"https://queue.fal.run/{target_model}"
         payload = build_fal_video_payload(shot, aspect, fps, model=target_model)

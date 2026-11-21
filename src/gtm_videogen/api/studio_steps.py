@@ -17,8 +17,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
+import io
+import math
 import mimetypes
 import re
+import struct
+import wave
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
@@ -44,15 +48,22 @@ from gtm_videogen.api.routes import (
     _parse_byte_range,
     make_sse_event,
 )
+from gtm_videogen.core.cache_store import ContentCache
 from gtm_videogen.core.cost_meter import CostMeter
 from gtm_videogen.core.job_registry import CancellationToken
-from gtm_videogen.media.vision_critic import VisionQualityCritic
+from gtm_videogen.core.media_store import MediaStore
+from gtm_videogen.media.vision_critic import (
+    CRAFT_ARCHETYPES,
+    VisionQualityCritic,
+    analyze_reference_moodboard,
+)
 from gtm_videogen.models.schemas import (
     CostEntry,
     CreativeBible,
     CreativeFingerprint,
     HumanScore,
     MediaRef,
+    MusicCue,
     RunState,
     Script,
     ShotSheet,
@@ -60,6 +71,7 @@ from gtm_videogen.models.schemas import (
     Version,
     VoiceCue,
 )
+from gtm_videogen.providers.audio import AudioProvider
 from gtm_videogen.providers.storyboard import StoryboardGenerator
 from gtm_videogen.rules.creative_history import CreativeHistoryStore
 from gtm_videogen.rules.script_gate import evaluate_script_gate
@@ -73,7 +85,7 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
         "label": "Launch Film Hybrid (Recommended)",
         "description": (
             "Anthropic/OpenAI style: continuity-locked Kling v4 Flash hero shots "
-            "+ $0 editorial typography, product/UI bezel, and brand logo screens."
+            "+ $0 kinetic typography, product/UI bezel, and brand logo screens."
         ),
         "video_model": "kling/v4/flash/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
@@ -112,6 +124,30 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
     },
 ]
 
+# Upgrade 4: Flagship Final Cut mastering engines selectable in Step 6
+FLAGSHIP_MASTER_MODELS: list[dict[str, Any]] = [
+    {
+        "id": "",
+        "label": "Same as Winning Preview (Kling v4 Flash)",
+        "description": "Fast, cost-efficient master using the exact model stack you approved.",
+    },
+    {
+        "id": "kling/v4/text-to-video",
+        "label": "Kling v4 Pro Cinema (Start→End Frame Bridged)",
+        "description": "High-craft Kling v4 Pro with Start→End keyframe bridging across adjacent shots.",
+    },
+    {
+        "id": "fal-ai/veo3/fast",
+        "label": "Google Veo 3 Fast (Hero Realism)",
+        "description": "Google Veo 3 Fast for photorealistic lighting, physics, and keyframe animation.",
+    },
+    {
+        "id": "fal-ai/veo3",
+        "label": "Google Veo 3 Flagship (Studio Master)",
+        "description": "Top-tier Google Veo 3 flagship rendering for showcase hero launches.",
+    },
+]
+
 
 def _resolve_brand_assets(run_state: RunState) -> tuple[Path | None, list[Path]]:
     """Return (brand_logo_path, product_image_paths) for existing uploaded files on disk."""
@@ -127,6 +163,58 @@ def _resolve_brand_assets(run_state: RunState) -> tuple[Path | None, list[Path]]
             if pp.is_file():
                 products.append(pp)
     return logo, products
+
+
+def _wire_adjacent_end_keyframes(sheet: ShotSheet) -> None:
+    """Populate Start->End keyframe links between adjacent approved AI shots for Kling v4 Pro."""
+    shots = sheet.shots
+    for idx, sh in enumerate(shots):
+        if (
+            sh.engine in ("ai_video", "image_to_video")
+            and sh.keyframe_approved
+            and sh.keyframe_url
+            and sh.keyframe_url.startswith(("http://", "https://"))
+        ):
+            sh.engine = "image_to_video"
+            sh.reference_image = sh.keyframe_url
+            if idx + 1 < len(shots):
+                nxt = shots[idx + 1]
+                if (
+                    nxt.engine in ("ai_video", "image_to_video")
+                    and nxt.keyframe_approved
+                    and nxt.keyframe_url
+                    and nxt.keyframe_url.startswith(("http://", "https://"))
+                    and nxt.keyframe_url != sh.keyframe_url
+                ):
+                    sh.end_reference_image = nxt.keyframe_url
+
+
+def _synthesize_mock_audition_wav(kind: str, label: str = "") -> bytes:
+    """Generate a clean 2.2s studio chime WAV for zero-cost offline voice/music auditions."""
+    sr = 22050
+    dur = 2.2
+    n = int(sr * dur)
+    base_hz = 260.0 if kind == "music" else 340.0
+    if "george" in label.lower():
+        base_hz = 210.0
+    elif "river" in label.lower():
+        base_hz = 290.0
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        frames = bytearray()
+        for i in range(n):
+            t = i / sr
+            env = min(1.0, t / 0.08) * max(0.0, 1.0 - max(0.0, (t - (dur - 0.35)) / 0.35))
+            sig = 0.55 * math.sin(2.0 * math.pi * base_hz * t) + 0.25 * math.sin(
+                2.0 * math.pi * (base_hz * 1.5) * t
+            )
+            sample = int(max(-32000, min(32000, sig * env * 12000)))
+            frames.extend(struct.pack("<h", sample))
+        wf.writeframes(bytes(frames))
+    return buf.getvalue()
 
 
 class ConceptPatchRequest(BaseModel):
@@ -194,12 +282,13 @@ class PreviewsRequest(BaseModel):
 
 
 class FinalRenderRequest(BaseModel):
-    """Optional override for Final Cut."""
+    """Optional override for Final Cut (including Step 6 Flagship Master video engine)."""
 
     model_config = ConfigDict(extra="forbid")
 
     version_id: str | None = None
     mock: bool | None = None
+    video_model_override: str | None = None
 
 
 class CapPatchRequest(BaseModel):
@@ -230,6 +319,39 @@ class AssetUploadRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=120)
     data_url: str = Field(min_length=20)
     alt: str = ""
+
+
+class AuditionRequest(BaseModel):
+    """Request a short cached voice or music audition clip for Step 3."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["voice", "music"] = "voice"
+    voice_id: str = "Rachel"
+    text: str = "Built for teams that ship with quiet precision."
+    prompt: str = "Minimal warm analog synth pulse, clean modern product launch music"
+    mock: bool = False
+
+
+class ReferenceTasteRequest(BaseModel):
+    """Apply a Craft Archetype preset and/or analyze an uploaded reference moodboard image."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    craft_archetype: str | None = None
+    reference_image_data_url: str | None = None
+    notes: str = ""
+
+
+class AutoPolishRequest(BaseModel):
+    """Autonomous Auto-Polish loop targeting >= target_score (up to 2 rounds within USD cap)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: str | None = None
+    target_score: float = Field(8.5, ge=5.0, le=10.0)
+    max_rounds: int = Field(2, ge=1, le=2)
+    notes: str = ""
 
 
 def _estimate_stack_usd(sheet: ShotSheet | None, stack: dict[str, Any]) -> float:
@@ -328,7 +450,62 @@ async def list_preview_presets(
         item = dict(p)
         item["estimated_usd"] = _estimate_stack_usd(sheet, p)
         presets.append(item)
-    return {"presets": presets}
+    return {
+        "presets": presets,
+        "flagship_models": FLAGSHIP_MASTER_MODELS,
+        "craft_archetypes": CRAFT_ARCHETYPES,
+    }
+
+
+@studio_router.post("/studio/audition")
+async def audition_audio(
+    payload: AuditionRequest,
+    services: ServicesDep,
+) -> Response:
+    """Generate or replay a cached 3-4s voice or music audition clip for Step 3."""
+    use_mock = payload.mock or not services.settings.fal_key.strip()
+    if use_mock:
+        label = payload.voice_id if payload.kind == "voice" else payload.prompt
+        wav = _synthesize_mock_audition_wav(payload.kind, label=label)
+        return Response(content=wav, media_type="audio/wav")
+
+    aud_dir = services.data_dir / "cache" / "auditions"
+    aud_dir.mkdir(parents=True, exist_ok=True)
+    provider = AudioProvider(
+        settings=services.settings,
+        media_store=MediaStore(aud_dir / "media"),
+        audio_cache=ContentCache(aud_dir / "cache"),
+    )
+    try:
+        if payload.kind == "voice":
+            sample_text = (payload.text or "").strip()[:180] or (
+                "Built for teams that ship with quiet precision."
+            )
+            cue = VoiceCue(
+                shot_id="audition",
+                at_sec=0.0,
+                duration_sec=3.5,
+                text=sample_text,
+            )
+            rendered = await provider.generate_voice(cue, voice_id=payload.voice_id or "Rachel")
+        else:
+            prompt = (payload.prompt or "").strip()[:240] or (
+                "Minimal warm analog synth pulse, modern product launch film score"
+            )
+            cue_m = MusicCue(prompt=prompt, duration_sec=4.0)
+            rendered = await provider.generate_music(cue_m)
+    except Exception:
+        wav = _synthesize_mock_audition_wav(payload.kind, label=payload.voice_id)
+        return Response(content=wav, media_type="audio/wav")
+
+    path = Path(rendered.path)
+    if not path.is_file():
+        wav = _synthesize_mock_audition_wav(payload.kind, label=payload.voice_id)
+        return Response(content=wav, media_type="audio/wav")
+    media_type = mimetypes.guess_type(path.name)[0] or (
+        "audio/mpeg" if path.suffix.lower() == ".mp3" else "audio/wav"
+    )
+    return Response(content=path.read_bytes(), media_type=media_type)
 
 
 @studio_router.patch("/runs/{run_id}/cap")
@@ -765,15 +942,7 @@ async def step_render_previews(
                         else run_state.shot_sheet.model_copy(deep=True)
                     )
                     if stack.use_keyframes and not (stack.mock or run_state.input.mock):
-                        for sh in ver_sheet.shots:
-                            if (
-                                sh.engine == "ai_video"
-                                and sh.keyframe_approved
-                                and sh.keyframe_url
-                                and sh.keyframe_url.startswith(("http://", "https://"))
-                            ):
-                                sh.engine = "image_to_video"
-                                sh.reference_image = sh.keyframe_url
+                        _wire_adjacent_end_keyframes(ver_sheet)
 
                     ver_input = run_state.input.model_copy(deep=True)
                     ver_input.render_mode = "preview"
@@ -1073,7 +1242,7 @@ async def step_render_final(
                 final_dir = services.data_dir / "work" / run_id / "final"
                 final_dir.mkdir(parents=True, exist_ok=True)
 
-                stack = winner.stack if winner else {}
+                stack = dict(winner.stack) if winner else {}
                 final_sheet = (
                     winner.shot_sheet.model_copy(deep=True)
                     if winner and winner.shot_sheet
@@ -1085,6 +1254,19 @@ async def step_render_final(
                     final_input.mock = payload.mock
                 elif stack.get("mock") is not None:
                     final_input.mock = bool(run_state.input.mock or stack.get("mock"))
+
+                chosen_video_model = (
+                    payload.video_model_override.strip()
+                    if payload
+                    and payload.video_model_override
+                    and payload.video_model_override.strip()
+                    else stack.get("video_model")
+                )
+                if chosen_video_model:
+                    stack["video_model"] = chosen_video_model
+
+                if not final_input.mock:
+                    _wire_adjacent_end_keyframes(final_sheet)
 
                 remaining_cap = max(
                     0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd
@@ -1102,7 +1284,7 @@ async def step_render_final(
                     final_dir,
                     meter,
                     force_mock=final_input.mock,
-                    video_model_override=stack.get("video_model"),
+                    video_model_override=chosen_video_model,
                     voice_model_override=stack.get("voice_model"),
                 )
 
@@ -1143,10 +1325,13 @@ async def step_render_final(
                 run_state.qa_report = a3.qa_report
                 run_state.quality_scorecard = final_scorecard
                 run_state.rubric_evaluations["agent3_producer"] = a3.rubric_evaluations
+                model_tag = (
+                    f" · {chosen_video_model}" if payload and payload.video_model_override else ""
+                )
                 run_state.versions.append(
                     Version(
                         version_id=f"final_{uuid4().hex[:6]}",
-                        label=f"Final Cut ({winner.label if winner else 'Default'})",
+                        label=f"Final Cut ({winner.label if winner else 'Default'}{model_tag})",
                         tier="final",
                         status="done" if a3.render_manifest.stitched_path else "failed",
                         stack=stack,
@@ -1361,9 +1546,7 @@ async def regenerate_shot_keyframe(
                 if first_ai is not None and first_ai.id != shot.id and first_ai.keyframe_url
                 else None
             )
-            media_img = (
-                product_imgs[shot.index % len(product_imgs)] if product_imgs else None
-            )
+            media_img = product_imgs[shot.index % len(product_imgs)] if product_imgs else None
             p, url, _ = await gen.generate_shot_keyframe(
                 shot,
                 run_state.shot_sheet,
@@ -1562,9 +1745,7 @@ async def reiterate_weak_shots(
                 )
 
                 brand_logo, product_imgs = _resolve_brand_assets(run_state)
-                first_ai = next(
-                    (s for s in base_sheet.shots if s.engine != "motion_card"), None
-                )
+                first_ai = next((s for s in base_sheet.shots if s.engine != "motion_card"), None)
 
                 # Optionally regenerate keyframes for reiterated shots first (anchored to Shot 1)
                 if payload.regenerate_keyframes:
@@ -1580,9 +1761,7 @@ async def reiterate_weak_shots(
                                 else None
                             )
                             media_img = (
-                                product_imgs[sh.index % len(product_imgs)]
-                                if product_imgs
-                                else None
+                                product_imgs[sh.index % len(product_imgs)] if product_imgs else None
                             )
                             p, url, _ = await kf_gen.generate_shot_keyframe(
                                 sh,
@@ -1812,3 +1991,389 @@ async def serve_brand_asset(
         raise HTTPException(status_code=404, detail="Asset not found")
     media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
     return Response(content=target.read_bytes(), media_type=media_type)
+
+
+@studio_router.post("/runs/{run_id}/reference")
+async def apply_reference_taste(
+    run_id: str,
+    payload: ReferenceTasteRequest,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Upgrade 5: Apply a Craft Archetype preset and/or Gemini-analyzed moodboard taste brief."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+
+    archetype_key = (payload.craft_archetype or "").strip()
+    if archetype_key and archetype_key not in CRAFT_ARCHETYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown craft_archetype {archetype_key!r}; valid: {sorted(CRAFT_ARCHETYPES)}",
+        )
+
+    taste_parts: list[str] = []
+    if archetype_key:
+        arch = CRAFT_ARCHETYPES[archetype_key]
+        taste_parts.append(
+            f"Craft Archetype ({arch['label']} — {arch['references']}): {arch['brief']}"
+        )
+
+    moodboard_notes = ""
+    if payload.reference_image_data_url and payload.reference_image_data_url.strip():
+        data_url = payload.reference_image_data_url.strip()
+        if not _DATA_URL_RE.match(data_url):
+            raise HTTPException(
+                status_code=400,
+                detail="Reference moodboard must be a valid base64 image data URL.",
+            )
+        moodboard_notes = await analyze_reference_moodboard(
+            data_url,
+            settings=services.settings,
+            mock=run_state.input.mock,
+        )
+        taste_parts.append(moodboard_notes)
+
+    if payload.notes and payload.notes.strip():
+        taste_parts.append(payload.notes.strip())
+
+    combined_taste = "\n".join(taste_parts).strip()
+
+    async with services.run_lock(run_id):
+        run_state = services.run_store.load(run_id) or run_state
+        if archetype_key:
+            run_state.craft_archetype = archetype_key
+        if combined_taste:
+            run_state.reference_taste_notes = combined_taste
+            existing_dir = (run_state.input.user_direction or "").strip()
+            if combined_taste not in existing_dir:
+                run_state.input.user_direction = (
+                    f"{existing_dir}\n\n{combined_taste}".strip()
+                    if existing_dir
+                    else combined_taste
+                )
+        services.run_store.save(run_state)
+
+    return {
+        "run_id": run_id,
+        "craft_archetype": run_state.craft_archetype,
+        "reference_taste_notes": run_state.reference_taste_notes,
+        "run": run_state.model_dump(mode="json"),
+    }
+
+
+@studio_router.post("/runs/{run_id}/auto-polish", status_code=202)
+async def auto_polish_run(
+    run_id: str,
+    payload: AutoPolishRequest,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Upgrade 5: Autonomous multi-round polish loop targeting overall_score >= target_score."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    if run_state.shot_sheet is None or run_state.creative_bible is None:
+        raise HTTPException(status_code=400, detail="Run has no shot_sheet to auto-polish.")
+
+    async with services.run_lock(run_id):
+        if services.job_registry.is_run_active(run_id):
+            raise HTTPException(status_code=409, detail=f"Run {run_id!r} already has an active job")
+
+        run_state = services.run_store.load(run_id) or run_state
+        gen = services.next_generation(run_id)
+        run_state.status = "working"
+        run_state.error = None
+        services.event_broker.reset_run(run_id)
+
+        done_previews = [v for v in run_state.versions if v.status == "done"]
+        start_ver = (
+            next((v for v in run_state.versions if v.version_id == payload.version_id), None)
+            if payload.version_id
+            else (done_previews[-1] if done_previews else None)
+        )
+        if start_ver is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Render at least one preview before launching Auto-Polish.",
+            )
+
+        async def _on_event(ev: dict[str, Any]) -> None:
+            if not services.is_current_generation(run_id, gen):
+                return
+            if ev.get("type") not in TERMINAL_EVENT_TYPES:
+                services.event_broker.publish(run_id, ev)
+
+        async def _job(cancel_token: CancellationToken) -> RunState | None:
+            services.event_broker.publish(
+                run_id,
+                make_sse_event(
+                    "stage_started",
+                    run_id,
+                    stage="auto_polish",
+                    data={
+                        "target_score": payload.target_score,
+                        "max_rounds": payload.max_rounds,
+                        "start_version_id": start_ver.version_id,
+                    },
+                ),
+            )
+            try:
+                assert run_state.shot_sheet is not None and run_state.creative_bible is not None
+                current_ver = start_ver
+                best_ver = start_ver
+                best_score = (
+                    float(start_ver.quality_scorecard.overall_score)
+                    if start_ver.quality_scorecard
+                    else 0.0
+                )
+                brand_logo, product_imgs = _resolve_brand_assets(run_state)
+                rounds_completed = 0
+
+                for round_idx in range(1, payload.max_rounds + 1):
+                    cancel_token.raise_if_cancelled()
+                    if best_score >= payload.target_score:
+                        break
+
+                    stack = dict(current_ver.stack or {})
+                    iter_input = run_state.input.model_copy(deep=True)
+                    if stack.get("mock") is not None:
+                        iter_input.mock = bool(run_state.input.mock or stack.get("mock"))
+
+                    remaining = max(
+                        0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd
+                    )
+                    if not iter_input.mock and remaining < 0.25:
+                        services.event_broker.publish(
+                            run_id,
+                            make_sse_event(
+                                "warning",
+                                run_id,
+                                stage="auto_polish",
+                                data={
+                                    "message": f"Stopped before round {round_idx}: USD cap reached."
+                                },
+                            ),
+                        )
+                        break
+
+                    base_sheet = (
+                        current_ver.shot_sheet.model_copy(deep=True)
+                        if current_ver.shot_sheet
+                        else run_state.shot_sheet.model_copy(deep=True)
+                    )
+                    sc = current_ver.quality_scorecard
+                    weak_ids: list[str] = []
+                    fixes: dict[str, str] = {}
+                    if sc and sc.shot_scores:
+                        fixes = {s.shot_id: s.suggested_prompt_fix for s in sc.shot_scores}
+                        weak_ids = [
+                            s.shot_id
+                            for s in sc.shot_scores
+                            if s.verdict == "reiterate" or float(s.score) < payload.target_score
+                        ]
+                        if not weak_ids:
+                            lowest = min(sc.shot_scores, key=lambda s: float(s.score))
+                            weak_ids = [lowest.shot_id]
+                    if not weak_ids and base_sheet.shots:
+                        weak_ids = [base_sheet.shots[0].id]
+
+                    for sh in base_sheet.shots:
+                        if sh.id in weak_ids:
+                            if fixes.get(sh.id):
+                                sh.visual_prompt = fixes[sh.id]
+                            else:
+                                sh.visual_prompt = (
+                                    f"{sh.visual_prompt.strip()}; elevate lighting contrast, "
+                                    "crisp framing, and deliberate camera motion."
+                                )
+                            if payload.notes.strip():
+                                sh.visual_prompt = (
+                                    f"{sh.visual_prompt.strip()}; {payload.notes.strip()}"
+                                )
+
+                    iter_id = f"polish_r{round_idx}_{uuid4().hex[:6]}"
+                    iter_dir = services.data_dir / "work" / run_id / "versions" / iter_id
+                    iter_dir.mkdir(parents=True, exist_ok=True)
+                    meter = CostMeter(
+                        run_id=f"{run_id}_{iter_id}",
+                        cap_usd=remaining if not iter_input.mock else run_state.cost_ledger.cap_usd,
+                        ledger_path=iter_dir / "spend_ledger.jsonl",
+                    )
+
+                    services.event_broker.publish(
+                        run_id,
+                        make_sse_event(
+                            "shot_progress",
+                            run_id,
+                            stage="auto_polish",
+                            data={
+                                "label": f"Auto-Polish Round {round_idx}/{payload.max_rounds} ({', '.join(weak_ids)})",
+                                "round": round_idx,
+                                "shot_ids": weak_ids,
+                            },
+                        ),
+                    )
+
+                    # Regenerate keyframes for polished shots anchored to Shot 1
+                    first_ai = next(
+                        (s for s in base_sheet.shots if s.engine != "motion_card"), None
+                    )
+                    kf_gen = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+                    kf_dir = services.data_dir / "work" / run_id / "keyframes"
+                    for sh in base_sheet.shots:
+                        if sh.id in weak_ids:
+                            anchor_url = (
+                                first_ai.keyframe_url
+                                if first_ai is not None
+                                and first_ai.id != sh.id
+                                and first_ai.keyframe_url
+                                else None
+                            )
+                            media_img = (
+                                product_imgs[sh.index % len(product_imgs)] if product_imgs else None
+                            )
+                            p, url, _ = await kf_gen.generate_shot_keyframe(
+                                sh,
+                                base_sheet,
+                                run_state.creative_bible,
+                                kf_dir,
+                                mock=iter_input.mock,
+                                anchor_image_url=anchor_url,
+                                logo_path=brand_logo,
+                                media_image_path=media_img,
+                                cancel=cancel_token,
+                            )
+                            sh.keyframe_path = str(p)
+                            sh.keyframe_url = url
+                    if not iter_input.mock:
+                        _wire_adjacent_end_keyframes(base_sheet)
+
+                    existing_clips = (
+                        {c.shot_id: c for c in current_ver.render_manifest.clips}
+                        if current_ver.render_manifest and current_ver.render_manifest.clips
+                        else None
+                    )
+                    providers = _build_step_providers(
+                        services,
+                        run_state,
+                        iter_dir,
+                        meter,
+                        force_mock=iter_input.mock,
+                        video_model_override=stack.get("video_model"),
+                        voice_model_override=stack.get("voice_model"),
+                    )
+                    a3 = await run_agent3_producer(
+                        run_id=f"{run_id}_{iter_id}",
+                        run_input=iter_input,
+                        shot_sheet=base_sheet,
+                        sound_plan=run_state.sound_plan,
+                        creative_bible=run_state.creative_bible,
+                        providers=providers,
+                        cost_meter=meter,
+                        work_dir=iter_dir,
+                        director_qa=run_state.qa_report,
+                        event_cb=_on_event,
+                        cancel=cancel_token,
+                        max_iterations=1,
+                        raise_on_failure=False,
+                        existing_clips=existing_clips,
+                        repair_shot_ids=set(weak_ids),
+                        brand_logo_path=brand_logo,
+                        product_image_paths=product_imgs,
+                    )
+                    if not services.is_current_generation(run_id, gen):
+                        return None
+
+                    _merge_cost_ledger(run_state, a3.cost_ledger.entries)
+                    new_sc = None
+                    if a3.render_manifest.stitched_path:
+                        critic = VisionQualityCritic(settings=services.settings)
+                        new_sc = await critic.score_video(
+                            a3.render_manifest.stitched_path,
+                            base_sheet,
+                            run_state.creative_bible,
+                            qa=a3.qa_report,
+                            mock=iter_input.mock,
+                            cancel=cancel_token,
+                        )
+                    new_ver = Version(
+                        version_id=iter_id,
+                        label=f"Auto-Polished R{round_idx} ({', '.join(weak_ids)})",
+                        tier="preview",
+                        status="done" if a3.render_manifest.stitched_path else "failed",
+                        stack=stack,
+                        usd=round(a3.cost_ledger.actual_usd, 4),
+                        creative_bible=run_state.creative_bible,
+                        shot_sheet=base_sheet,
+                        sound_plan=run_state.sound_plan,
+                        render_manifest=a3.render_manifest,
+                        qa_report=a3.qa_report,
+                        quality_scorecard=new_sc,
+                    )
+                    run_state.versions.append(new_ver)
+                    rounds_completed = round_idx
+                    if new_ver.status == "done":
+                        current_ver = new_ver
+                        new_score = float(new_sc.overall_score) if new_sc else 0.0
+                        if new_score >= best_score:
+                            best_score = new_score
+                            best_ver = new_ver
+                            run_state.shot_sheet = base_sheet
+                    services.run_store.save(run_state)
+
+                # Auto-select highest-scoring cut as winning preview
+                run_state.winning_version_id = best_ver.version_id
+                for v in run_state.versions:
+                    v.is_winner = v.version_id == best_ver.version_id
+                run_state.quality_scorecard = best_ver.quality_scorecard
+                run_state.step = "previews"
+                run_state.status = "idle"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "stage_completed",
+                        run_id,
+                        stage="auto_polish",
+                        data={
+                            "rounds_completed": rounds_completed,
+                            "best_version_id": best_ver.version_id,
+                            "best_score": best_score,
+                            "target_score": payload.target_score,
+                        },
+                    ),
+                )
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_completed",
+                        run_id,
+                        stage="auto_polish",
+                        data={"status": "idle", "best_version_id": best_ver.version_id},
+                    ),
+                )
+                return run_state
+            except asyncio.CancelledError:
+                run_state.status = "cancelled"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id, make_sse_event("run_cancelled", run_id, stage="auto_polish")
+                )
+                raise
+            except Exception as exc:
+                run_state.status = "failed"
+                run_state.error = str(exc)
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_failed", run_id, stage="auto_polish", data={"error": str(exc)}
+                    ),
+                )
+                raise
+
+        job = await services.job_registry.submit(run_id, _job, stage="auto_polish")
+        services.run_store.save(run_state)
+    return {
+        "run_id": run_id,
+        "target_score": payload.target_score,
+        "max_rounds": payload.max_rounds,
+        "job": job.model_dump(mode="json"),
+    }

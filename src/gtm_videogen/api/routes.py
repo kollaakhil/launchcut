@@ -377,6 +377,14 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             "fal": fal_ready,
             "live_ready": llm_ready and fal_ready,
         },
+        "features": {
+            "upgrades_v2": True,
+            "kinetic_motion": True,
+            "audio_audition": True,
+            "veo3_flagship": True,
+            "taste_cloning": True,
+            "auto_polish": True,
+        },
         "manim": manim_info,
     }
 
@@ -438,9 +446,7 @@ async def start_run(
     run_state = load_owned_run(run_id, services.run_store, actor)
     async with services.run_lock(run_id):
         if services.job_registry.is_run_active(run_id):
-            raise HTTPException(
-                status_code=409, detail=f"Run {run_id!r} already has an active job"
-            )
+            raise HTTPException(status_code=409, detail=f"Run {run_id!r} already has an active job")
 
         run_state = services.run_store.load(run_id) or run_state
         gen = services.next_generation(run_id)
@@ -677,9 +683,7 @@ async def repair_run(
     failed_shot_ids = payload.failed_shot_ids if payload is not None else None
     async with services.run_lock(run_id):
         if services.job_registry.is_run_active(run_id):
-            raise HTTPException(
-                status_code=409, detail=f"Run {run_id!r} already has an active job"
-            )
+            raise HTTPException(status_code=409, detail=f"Run {run_id!r} already has an active job")
 
         run_state = services.run_store.load(run_id) or run_state
         gen = services.next_generation(run_id)

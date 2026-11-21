@@ -293,4 +293,120 @@ class VisionQualityCritic:
             return _deterministic_scorecard(sheet, qa, reason="vision-critic-fallback")
 
 
-__all__ = ["VisionQualityCritic", "_deterministic_scorecard"]
+CRAFT_ARCHETYPES: dict[str, dict[str, str]] = {
+    "quiet_editorial": {
+        "label": "Quiet Editorial",
+        "references": "Anthropic / Kinfolk / Stripe Press",
+        "brief": (
+            "Quiet editorial launch film: warm diffused north-window lighting, deep charcoal "
+            "and warm off-white palette, measured 2.5–3.5s holds with intentional negative space, "
+            "high-craft restrained serif/sans typography, intimate low-key studio voiceover, "
+            "minimal atmospheric analog synth pad."
+        ),
+    },
+    "kinetic_saas": {
+        "label": "Kinetic SaaS",
+        "references": "Linear / Vercel / Raycast",
+        "brief": (
+            "High-tempo kinetic SaaS launch film: obsidian surfaces with razor-sharp rim light, "
+            "crisp UI product bezels with precision cursor motion, 1.5–2.5s rhythmic hook cuts "
+            "opening into steady 3s product showcases, crisp dry micro-click foley, confident "
+            "modern voiceover, pulse-driven minimalist electronic score."
+        ),
+    },
+    "bold_athletic": {
+        "label": "Bold Athletic",
+        "references": "Nike / On / Arc'teryx",
+        "brief": (
+            "Bold athletic launch film: dramatic directional golden-hour / high-contrast stadium "
+            "lighting, low-angle kinetic tracking motion, punchy 1.5–2s opening hook transitioning "
+            "to visceral close-up material texture, crisp rhythmic percussion + sub-bass risers, "
+            "energetic grounded voiceover."
+        ),
+    },
+    "tactile_industrial": {
+        "label": "Tactile Industrial",
+        "references": "Apple / Teenage Engineering / Fellow",
+        "brief": (
+            "Tactile industrial design launch film: sculptural studio spotlighting on matte metal "
+            "and glass textures, controlled slow-push macro dolly moves, crisp foley of clicks, "
+            "pours, and machined tolerances, sparse ultra-clean typographic cards, calm authoritative "
+            "voiceover with airy acoustic-electronic bed."
+        ),
+    },
+}
+
+
+async def analyze_reference_moodboard(
+    image_data_url: str,
+    *,
+    settings: Settings | None = None,
+    mock: bool = False,
+    cancel: CancellationToken | None = None,
+) -> str:
+    """Analyze a reference moodboard/keyframe image via Gemini 3.8 Flash into a taste brief."""
+    cfg = settings or get_settings()
+    if mock or not cfg.openrouter_api_key.strip() or not image_data_url.strip():
+        return (
+            "Reference moodboard taste: sculptural studio lighting, high-contrast neutral palette "
+            "with a single warm accent, disciplined negative space, measured editorial pacing, "
+            "and crisp minimal typography."
+        )
+
+    vision_model = cfg.vision_model or "google/gemini-3.8-flash"
+    payload = {
+        "model": vision_model,
+        "temperature": 0.2,
+        "max_tokens": 300,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze this visual reference / moodboard frame for a commercial "
+                            "product launch film. In 2-3 concise sentences (max 70 words), specify: "
+                            "(1) lighting rig and shadow contrast, (2) dominant 3-4 hex colors, "
+                            "(3) camera framing and cut cadence, and (4) matching sonic/typography "
+                            "aesthetic. Plain text only."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": {"url": image_data_url.strip()}},
+                ],
+            }
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {cfg.openrouter_api_key.strip()}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with ResilientHttpClient(
+            connect_timeout=15.0,
+            read_timeout=45.0,
+            write_timeout=20.0,
+            pool_timeout=15.0,
+            max_retries=1,
+        ) as client:
+            resp = await client.post_json(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                cancel=cancel,
+            )
+        text = str(resp["choices"][0]["message"]["content"] or "").strip()
+        return text or "Reference moodboard taste: cohesive editorial lighting and palette."
+    except Exception:
+        return (
+            "Reference moodboard taste: sculptural studio lighting, cohesive restrained palette, "
+            "clean framing with intentional negative space."
+        )
+
+
+__all__ = [
+    "CRAFT_ARCHETYPES",
+    "VisionQualityCritic",
+    "_deterministic_scorecard",
+    "analyze_reference_moodboard",
+]

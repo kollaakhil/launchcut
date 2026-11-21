@@ -393,7 +393,18 @@ async def render_assets_overlapped(
         coros: list[Any] = []
         for vc in sound_plan.vo_cues:
             coros.append(_gen_vo(vc))
-        for sc in sound_plan.sfx_cues:
+
+        effective_sfx = list(sound_plan.sfx_cues)
+        if (
+            shot_sheet.audio_mode in ("both", "foley")
+            and len(effective_sfx) < len(shot_sheet.shots) - 1
+        ):
+            from gtm_videogen.media.audio_sync import build_transition_sfx_cues
+
+            effective_sfx = build_transition_sfx_cues(shot_sheet, existing_sfx=effective_sfx)
+            sound_plan.sfx_cues = effective_sfx
+
+        for sc in effective_sfx:
             coros.append(_gen_sfx(sc))
         if sound_plan.music_cue is not None:
             coros.append(_gen_music(sound_plan.music_cue))

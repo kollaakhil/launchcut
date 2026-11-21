@@ -78,7 +78,8 @@ Required ShotSheet fields (every shot MUST include):
 - `camera_angle`: e.g. "close_up", "eye_level", "macro"
 - `vo_line`: concise spoken line grounded ONLY in verified facts/claims (required when audio_mode is "vo" or "both", fitting comfortably inside `duration_sec` at ~2.5 words/sec)
 - `theme` / `shot_sheet.theme`: match CreativeBible `typography_and_layout.font_family` and `visual_language.color_palette`.
-- `shot_sheet.end_card_title`: ALWAYS set to the brand name (and optional `end_card_subtitle` for the offer/CTA) so `motion_card` end frames display clean brand typography instead of beat names.
+- `shot_sheet.end_card_title`: ALWAYS set to the brand name (and optional `end_card_subtitle` for a crisp brand tagline/offer — NEVER nav copy like "Log in" or "Sign up") so `motion_card` end frames display clean brand typography instead of beat names.
+- Editorial pacing & sound craft: use variable launch-film rhythm (punchy 2.0-2.8s opening hook -> lush 3.5-5.0s hero product reveal -> crisp proof beat -> calm 2.5-3.0s brand resolve; use `j_cut` transitions where voiceover anticipates the next cut). In `sound_plan.music_cue.prompt`, specify a 3-act arc (minimal rhythmic pulse in the hook -> harmonic lift on the hero reveal -> clean resonant tail on the closing logo).
 If `save_director_artifacts_tool` reports any `blocking_errors`, fix them and call `save_director_artifacts_tool` again before finishing.
 """
 

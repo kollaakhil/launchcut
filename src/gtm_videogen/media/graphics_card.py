@@ -342,6 +342,8 @@ class GraphicsCardRenderer:
         theme: GraphicsTheme | None = None,
         logo_path: Path | None = None,
         media_image_path: Path | None = None,
+        word_timings: list[dict[str, object]] | None = None,
+        kinetic: bool = True,
         cancel: CancellationToken | None = None,
     ) -> RenderedClip:
         """Render a motion-graphics card to an H.264 MP4 with exact width/height/fps/duration."""
@@ -358,6 +360,39 @@ class GraphicsCardRenderer:
 
         out = Path(output_path).resolve()
         out.parent.mkdir(parents=True, exist_ok=True)
+
+        if kinetic:
+            try:
+                from gtm_videogen.media.kinetic_motion import render_kinetic_card_mp4
+
+                bg_rgb, text_rgb, accent_rgb = _pick_card_colors(bible, theme)
+                return await render_kinetic_card_mp4(
+                    text=text,
+                    width=even_w,
+                    height=even_h,
+                    fps=fps,
+                    duration_sec=duration_sec,
+                    bible=bible,
+                    output_path=out,
+                    bg_rgb=bg_rgb,
+                    text_rgb=text_rgb,
+                    accent_rgb=accent_rgb,
+                    ffmpeg_bin=self.ffmpeg_bin,
+                    ffprobe_bin=self.ffprobe_bin,
+                    fonts_dir=self.fonts_dir,
+                    subtitle=subtitle,
+                    footer=footer,
+                    card_kind=card_kind,
+                    shot_id=shot_id,
+                    theme=theme,
+                    logo_path=logo_path,
+                    media_image_path=media_image_path,
+                    word_timings=word_timings,
+                    cancel=cancel,
+                )
+            except Exception:
+                # Fall back to single-image zoompan if kinetic pipe ever hits an OS error
+                pass
 
         tmp_dir = Path(tempfile.mkdtemp(prefix="gtm_card_"))
         try:
