@@ -469,10 +469,15 @@ class ChatOptions(BaseModel):
 
 
 class Version(BaseModel):
-    """Individual creative/render version supporting A/B Creative Bibles per run."""
+    """Individual creative/render version supporting A/B Creative Bibles and preview stacks."""
 
     version_id: str
     label: str = ""
+    tier: Literal["preview", "final"] = "preview"
+    status: Literal["queued", "working", "done", "failed", "cancelled"] = "done"
+    stack: dict[str, Any] = Field(default_factory=dict)
+    usd: float = Field(0.0, ge=0.0)
+    is_winner: bool = False
     creative_bible: CreativeBible | None = None
     shot_sheet: ShotSheet | None = None
     sound_plan: SoundPlan | None = None
@@ -490,6 +495,9 @@ class RunState(BaseModel):
     created_at: datetime = Field(default_factory=_utc_now)
     updated_at: datetime = Field(default_factory=_utc_now)
     status: Literal["idle", "working", "done", "cancelled", "failed", "interrupted"] = "idle"
+    step: Literal["brand", "concept", "sheet", "previews", "final"] = "brand"
+    selected_concept_id: str | None = None
+    winning_version_id: str | None = None
     input: RunInput
     research: ResearchBundle | None = None
     concepts: list[ConceptPitch] = Field(default_factory=list)

@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LaunchCut Studio — Rubric-Gated GTM Video Production</title>
+  <title>LaunchCut Studio — Human-in-the-Loop GTM Video Production</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230e0f11'/><text x='50%25' y='58%25' text-anchor='middle' dominant-baseline='middle' fill='%23e2a336' font-family='Georgia,serif' font-size='20' font-style='italic'>L</text></svg>" />
-  <meta name="description" content="Direct, stream, inspect, and repair bespoke GTM launch videos with LaunchCut's 3-agent rubric-gated production pipeline." />
+  <meta name="description" content="5-step human-in-the-loop GTM video production studio: Brand & Goal, Concept & Bible, Shot-by-Shot Script Editor, Multi-Option Previews, and Final Cut." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0e0f11;
-      --bg-subtle: #131519;
-      --surface: #17191e;
-      --surface-raised: #1e2128;
-      --surface-hover: #252932;
+      --bg: #0d0e11;
+      --bg-subtle: #121418;
+      --surface: #17191f;
+      --surface-raised: #1e2129;
+      --surface-hover: #262a34;
       --ink: #f2efe9;
-      --ink-secondary: #b9b4aa;
+      --ink-secondary: #bbb6ac;
       --ink-muted: #7f7b72;
       --accent: #e2a336;
       --accent-soft: rgba(226, 163, 54, 0.14);
@@ -29,27 +29,23 @@
       --fail: #df5b4a;
       --fail-soft: rgba(223, 91, 74, 0.14);
       --rule: rgba(242, 239, 233, 0.085);
-      --rule-strong: rgba(242, 239, 233, 0.16);
+      --rule-strong: rgba(242, 239, 233, 0.17);
       --radius-sm: 6px;
       --radius: 10px;
       --radius-lg: 14px;
       --font-sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
       --font-serif: "Instrument Serif", Georgia, serif;
       --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-      --shadow-elev: 0 18px 48px rgba(0, 0, 0, 0.42);
     }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { box-sizing: border-box; }
 
     html, body {
       margin: 0;
       padding: 0;
       min-height: 100%;
       background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(226, 163, 54, 0.055), transparent 65%),
-        radial-gradient(900px 500px at 10% 100%, rgba(255, 255, 255, 0.025), transparent 60%),
+        radial-gradient(1200px 550px at 85% -15%, rgba(226, 163, 54, 0.055), transparent 65%),
         var(--bg);
       color: var(--ink);
       font-family: var(--font-sans);
@@ -58,64 +54,56 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Top Studio Header */
-    .studio-header {
+    /* Header */
+    .topbar {
       position: sticky;
       top: 0;
-      z-index: 40;
+      z-index: 50;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      padding: 12px 24px;
-      background: rgba(14, 15, 17, 0.88);
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 20px;
+      background: rgba(13, 14, 17, 0.9);
       backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--rule);
     }
 
-    .brand-mark {
+    .brand-group {
       display: flex;
       align-items: baseline;
-      gap: 12px;
-      min-width: 0;
+      gap: 10px;
     }
 
-    .brand-mark h1 {
+    .brand-group h1 {
       margin: 0;
       font-family: var(--font-serif);
       font-weight: 400;
-      font-size: 28px;
+      font-size: 26px;
       line-height: 1;
-      letter-spacing: -0.01em;
-      color: var(--ink);
     }
 
-    .brand-mark h1 span {
-      font-style: italic;
-      color: var(--accent);
-    }
+    .brand-group h1 span { font-style: italic; color: var(--accent); }
 
-    .brand-sub {
-      font-size: 12px;
+    .flow-crumb {
+      font-size: 11.5px;
       color: var(--ink-muted);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      white-space: nowrap;
+      letter-spacing: 0.02em;
     }
 
-    .header-status {
+    .topbar-controls {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
-      justify-content: flex-end;
     }
 
-    .status-chip {
+    .chip {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
+      gap: 5px;
+      padding: 4px 9px;
       border-radius: 999px;
       background: var(--surface);
       border: 1px solid var(--rule);
@@ -125,168 +113,250 @@
       white-space: nowrap;
     }
 
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--ink-muted);
-      flex-shrink: 0;
-    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-muted); }
+    .chip.ok .dot { background: var(--pass); }
+    .chip.warn .dot { background: var(--warn); }
+    .chip.fail .dot { background: var(--fail); }
 
-    .status-chip.ok .status-dot { background: var(--pass); }
-    .status-chip.warn .status-dot { background: var(--warn); }
-    .status-chip.fail .status-dot { background: var(--fail); }
-
-    .header-link {
-      padding: 5px 11px;
+    .cost-meter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
       border-radius: var(--radius-sm);
+      background: var(--surface);
       border: 1px solid var(--rule);
+      font-family: var(--font-mono);
+      font-size: 11px;
       color: var(--ink-secondary);
-      text-decoration: none;
-      font-size: 12px;
-      transition: background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
     }
 
-    .header-link:hover {
-      background: var(--surface-raised);
+    .cost-bar {
+      width: 44px;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .cost-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--pass);
+      transition: width 0.25s ease;
+    }
+
+    .cost-bar-fill.high { background: var(--fail); }
+
+    .cap-input {
+      width: 44px;
+      padding: 2px 4px;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .runs-select {
+      max-width: 195px;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 12px;
+    }
+
+    /* Stepper Bar */
+    .stepper-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--rule);
+      overflow-x: auto;
+    }
+
+    .step-btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .step-btn:hover:not(:disabled) {
+      background: var(--surface);
       color: var(--ink);
     }
 
-    /* Main Workspace Layout */
-    .workspace {
-      display: grid;
-      grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
-      min-height: calc(100vh - 57px);
+    .step-btn.active {
+      background: var(--surface-raised);
+      border-color: var(--rule-strong);
+      color: var(--ink);
     }
 
-    /* Left Rail: Production Brief + Recent Cuts */
-    .composer-rail {
-      background: var(--bg-subtle);
-      border-right: 1px solid var(--rule);
-      display: flex;
-      flex-direction: column;
-      max-height: calc(100vh - 57px);
-      overflow-y: auto;
+    .step-btn.done .step-num {
+      background: var(--pass-soft);
+      color: var(--pass);
+      border-color: rgba(63, 179, 127, 0.35);
     }
 
-    .rail-section {
-      padding: 20px 22px;
-      border-bottom: 1px solid var(--rule);
+    .step-btn.active .step-num {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
     }
 
-    .section-head {
-      display: flex;
+    .step-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .step-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--rule-strong);
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .section-title {
-      margin: 0;
+      justify-content: center;
+      font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--ink-muted);
     }
 
-    .preset-row {
+    .step-arrow {
+      color: var(--ink-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      opacity: 0.5;
+    }
+
+    /* Main Content Container */
+    .shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 22px 24px 64px;
       display: flex;
-      gap: 6px;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Live Activity / Error Banner */
+    .status-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      font-size: 13px;
+    }
+
+    .status-banner.visible { display: flex; }
+    .status-banner.working { border-color: rgba(226, 163, 54, 0.4); background: rgba(226, 163, 54, 0.08); }
+    .status-banner.error { border-color: rgba(223, 91, 74, 0.45); background: var(--fail-soft); color: #f8b4aa; }
+    .status-banner.ok { border-color: rgba(63, 179, 127, 0.4); background: var(--pass-soft); color: #9ae5c2; }
+
+    .banner-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+    .spinner {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 2px solid rgba(226, 163, 54, 0.25);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sse-mini-log {
+      display: none;
+      background: #090a0c;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      max-height: 135px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+    }
+
+    .sse-mini-log.visible { display: block; }
+    .sse-line { display: flex; gap: 10px; padding: 2px 0; }
+    .sse-t { color: var(--ink-muted); }
+    .sse-ev { color: var(--accent); min-width: 115px; }
+
+    /* Cards & Grids */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
       flex-wrap: wrap;
       margin-bottom: 16px;
     }
 
-    .preset-btn {
-      appearance: none;
-      border: 1px solid var(--rule);
-      background: var(--surface);
+    .panel-title {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.1;
+    }
+
+    .panel-sub {
+      margin: 4px 0 0;
+      font-size: 13px;
       color: var(--ink-secondary);
-      font-family: var(--font-sans);
-      font-size: 11.5px;
-      padding: 5px 10px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
-    .preset-btn:hover {
-      background: var(--surface-raised);
-      color: var(--ink);
-      border-color: var(--rule-strong);
-    }
-
-    /* Mode Segmented Switch */
-    .mode-switch {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px;
-      padding: 3px;
-      background: var(--bg);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-      margin-bottom: 16px;
-    }
-
-    .mode-opt {
-      appearance: none;
-      border: none;
-      background: transparent;
-      color: var(--ink-muted);
-      font-family: var(--font-sans);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 7px 10px;
-      border-radius: 7px;
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-
-    .mode-opt.active {
-      background: var(--surface-raised);
-      color: var(--ink);
-    }
-
-    .mode-opt.active[data-mode="live"] {
-      background: var(--accent-soft);
-      color: var(--accent);
-    }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 
     /* Form Controls */
-    .field {
-      margin-bottom: 13px;
-    }
-
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
+    .field { display: flex; flex-direction: column; gap: 5px; }
     .field label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
       font-size: 12px;
       font-weight: 500;
       color: var(--ink-secondary);
-      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
     }
+    .field label .mono { font-family: var(--font-mono); color: var(--accent); }
 
-    .field label .mono-val {
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      color: var(--accent);
-    }
-
-    input[type="text"],
-    input[type="url"],
-    input[type="number"],
-    textarea,
-    select {
+    input[type="text"], input[type="url"], input[type="number"], textarea, select {
       width: 100%;
-      background: var(--surface);
+      background: var(--bg-subtle);
       border: 1px solid var(--rule);
       border-radius: var(--radius-sm);
       color: var(--ink);
@@ -294,237 +364,103 @@
       font-size: 13px;
       padding: 8px 10px;
       outline: none;
-      transition: border-color 0.15s ease, background 0.15s ease;
+      transition: border-color 0.15s ease;
     }
 
-    input:focus,
-    textarea:focus,
-    select:focus {
-      border-color: var(--accent);
-      background: var(--surface-raised);
-    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; line-height: 1.45; }
+    input[type="range"] { accent-color: var(--accent); cursor: pointer; }
 
-    textarea {
-      resize: vertical;
-      min-height: 62px;
-      line-height: 1.45;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-
-    .seg-group {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 4px;
-    }
-
-    .seg-group.three {
-      grid-template-columns: repeat(3, 1fr);
-    }
-
-    .seg-btn {
+    /* Buttons */
+    .btn {
       appearance: none;
-      border: 1px solid var(--rule);
-      background: var(--surface);
-      color: var(--ink-secondary);
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      padding: 6px 4px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .seg-btn:hover {
-      background: var(--surface-raised);
-      color: var(--ink);
-    }
-
-    .seg-btn.active {
-      background: var(--ink);
-      color: var(--bg);
-      border-color: var(--ink);
-      font-weight: 600;
-    }
-
-    details.constraints {
-      margin: 12px 0 16px;
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-      background: var(--surface);
-    }
-
-    details.constraints summary {
-      padding: 9px 12px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--ink-secondary);
-      cursor: pointer;
-      user-select: none;
-      list-style: none;
-      display: flex;
-      justify-content: space-between;
+      display: inline-flex;
       align-items: center;
-    }
-
-    details.constraints summary::after {
-      content: "+";
-      font-family: var(--font-mono);
-      color: var(--ink-muted);
-    }
-
-    details.constraints[open] summary::after {
-      content: "−";
-    }
-
-    .constraints-body {
-      padding: 4px 12px 12px;
-      border-top: 1px solid var(--rule);
-    }
-
-    /* Action Buttons */
-    .btn-row {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn-primary {
-      flex: 1;
-      appearance: none;
-      border: none;
-      background: var(--accent);
-      color: var(--accent-ink);
-      font-family: var(--font-sans);
-      font-size: 13.5px;
-      font-weight: 600;
-      padding: 11px 16px;
+      justify-content: center;
+      gap: 7px;
+      padding: 9px 15px;
       border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: filter 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      filter: brightness(1.06);
-    }
-
-    .btn-primary:active:not(:disabled) {
-      transform: translateY(1px);
-    }
-
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      appearance: none;
       border: 1px solid var(--rule-strong);
       background: var(--surface-raised);
       color: var(--ink);
       font-family: var(--font-sans);
-      font-size: 12.5px;
+      font-size: 13px;
       font-weight: 500;
-      padding: 9px 14px;
-      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.15s ease;
       text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      transition: all 0.14s ease;
+      white-space: nowrap;
     }
 
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--surface-hover);
+    .btn:hover:not(:disabled) { background: var(--surface-hover); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+    .btn-primary:hover:not(:disabled) { background: #ebb14a; }
+
+    .btn-pass {
+      background: var(--pass-soft);
+      border-color: rgba(63, 179, 127, 0.45);
+      color: var(--pass);
+      font-weight: 600;
     }
 
     .btn-danger {
-      appearance: none;
-      border: 1px solid rgba(223, 91, 74, 0.4);
       background: var(--fail-soft);
-      color: #f4998c;
-      font-family: var(--font-sans);
-      font-size: 12.5px;
-      font-weight: 600;
-      padding: 10px 14px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background 0.15s ease;
+      border-color: rgba(223, 91, 74, 0.45);
+      color: #f69d90;
     }
 
-    .btn-danger:hover {
-      background: rgba(223, 91, 74, 0.24);
-    }
+    .btn-sm { padding: 6px 11px; font-size: 12px; }
 
-    .form-error {
-      margin-top: 10px;
-      padding: 9px 11px;
-      border-radius: var(--radius-sm);
-      background: var(--fail-soft);
-      color: #f7aba0;
-      font-size: 12px;
-      display: none;
-    }
-
-    .form-error.visible { display: block; }
-
-    /* Recent Cuts List */
-    .runs-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .run-item {
+    .btn-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 9px 11px;
-      border-radius: var(--radius-sm);
-      background: var(--surface);
-      border: 1px solid transparent;
-      cursor: pointer;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .btn-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    /* Concept Pitch Cards */
+    .concept-card {
       text-align: left;
-      width: 100%;
+      padding: 15px 16px;
+      border-radius: var(--radius);
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      cursor: pointer;
       color: var(--ink);
       font-family: var(--font-sans);
-      transition: background 0.14s ease, border-color 0.14s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
 
-    .run-item:hover {
+    .concept-card:hover { background: var(--surface-raised); border-color: var(--rule-strong); }
+    .concept-card.selected {
       background: var(--surface-raised);
+      border-color: var(--accent);
     }
 
-    .run-item.selected {
-      background: var(--surface-raised);
-      border-color: var(--rule-strong);
+    .concept-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
     }
 
-    .run-item-left {
-      min-width: 0;
-    }
-
-    .run-item-name {
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .run-item-meta {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--ink-muted);
-      margin-top: 2px;
-    }
-
+    .concept-title { font-weight: 600; font-size: 14px; }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -532,809 +468,518 @@
       border-radius: 999px;
       font-family: var(--font-mono);
       font-size: 10.5px;
-      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
       background: var(--surface-hover);
       color: var(--ink-secondary);
-      flex-shrink: 0;
-    }
-
-    .badge.done, .badge.pass { background: var(--pass-soft); color: var(--pass); }
-    .badge.working { background: var(--accent-soft); color: var(--accent); }
-    .badge.failed, .badge.blocking { background: var(--fail-soft); color: #f59a8e; }
-    .badge.cancelled, .badge.warning { background: var(--warn-soft); color: var(--warn); }
-
-    /* Right Stage: Screening Room & Inspector */
-    .stage {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      overflow-y: auto;
-      max-height: calc(100vh - 57px);
-    }
-
-    .screening-wrap {
-      padding: 22px 28px 18px;
-      border-bottom: 1px solid var(--rule);
-    }
-
-    .screening-top {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-
-    .cut-heading {
-      min-width: 0;
-    }
-
-    .cut-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--ink-muted);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .cut-title {
-      margin: 3px 0 0;
-      font-family: var(--font-serif);
-      font-size: 30px;
-      font-weight: 400;
-      line-height: 1.08;
-      color: var(--ink);
-    }
-
-    .screening-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Cinema Monitor */
-    .monitor-frame {
-      position: relative;
-      width: 100%;
-      background: #08090b;
-      border: 1px solid var(--rule);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      min-height: 310px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: var(--shadow-elev);
-    }
-
-    .monitor-video {
-      width: 100%;
-      max-height: 460px;
-      background: #000;
-      display: none;
-    }
-
-    .monitor-video.visible {
-      display: block;
-    }
-
-    /* Idle Film Slate */
-    .slate-empty {
-      padding: 40px 28px;
-      text-align: center;
-      max-width: 560px;
-    }
-
-    .slate-empty h2 {
-      margin: 0 0 8px;
-      font-family: var(--font-serif);
-      font-weight: 400;
-      font-size: 32px;
-      line-height: 1.1;
-      color: var(--ink);
-    }
-
-    .slate-empty p {
-      margin: 0 0 20px;
-      color: var(--ink-secondary);
-      font-size: 13.5px;
-    }
-
-    .slate-actions {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    /* Live Pipeline Progress View inside Monitor */
-    .pipeline-live {
-      width: 100%;
-      padding: 24px 26px;
-      display: none;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    .pipeline-live.visible {
-      display: flex;
-    }
-
-    .agent-stepper {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-
-    .agent-step {
-      padding: 12px 14px;
-      border-radius: var(--radius);
-      background: var(--surface);
-      border: 1px solid var(--rule);
-      transition: border-color 0.2s ease, background 0.2s ease;
-    }
-
-    .agent-step.active {
-      background: var(--surface-raised);
-      border-color: rgba(226, 163, 54, 0.45);
-    }
-
-    .agent-step.done {
-      border-color: rgba(63, 179, 127, 0.35);
-    }
-
-    .agent-num {
-      font-family: var(--font-mono);
-      font-size: 10.5px;
-      color: var(--ink-muted);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .agent-step.active .agent-num { color: var(--accent); }
-    .agent-step.done .agent-num { color: var(--pass); }
-
-    .agent-name {
-      font-size: 13.5px;
-      font-weight: 600;
-      margin-top: 3px;
-    }
-
-    .agent-detail {
-      font-size: 11.5px;
-      color: var(--ink-muted);
-      margin-top: 2px;
-    }
-
-    .live-log {
-      background: rgba(14, 15, 17, 0.72);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      max-height: 175px;
-      overflow-y: auto;
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .log-line {
-      display: flex;
-      gap: 10px;
-      color: var(--ink-secondary);
-      line-height: 1.4;
-    }
-
-    .log-time { color: var(--ink-muted); flex-shrink: 0; }
-    .log-type { color: var(--accent); flex-shrink: 0; min-width: 116px; }
-    .log-type.err { color: var(--fail); }
-    .log-type.ok { color: var(--pass); }
-    .log-msg { color: var(--ink); word-break: break-word; }
-
-    /* Technical Readout Strip */
-    .telemetry-strip {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .metric-cell {
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      background: var(--surface);
-      border: 1px solid var(--rule);
-    }
-
-    .metric-label {
-      font-size: 10.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--ink-muted);
-    }
-
-    .metric-val {
-      margin-top: 3px;
-      font-family: var(--font-mono);
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--ink);
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
+    .badge.pass { background: var(--pass-soft); color: var(--pass); }
+    .badge.accent { background: var(--accent-soft); color: var(--accent); }
+    .badge.fail { background: var(--fail-soft); color: #f69d90; }
 
-    .budget-bar {
-      margin-top: 6px;
-      height: 3px;
-      border-radius: 2px;
-      background: rgba(255, 255, 255, 0.08);
-      overflow: hidden;
-    }
-
-    .budget-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--accent);
-      transition: width 0.25s ease;
-    }
-
-    /* Inspector Tabs */
-    .inspector {
-      padding: 0 28px 36px;
-      flex: 1;
-    }
-
-    .tabs-bar {
-      display: flex;
-      gap: 22px;
-      border-bottom: 1px solid var(--rule);
-      margin-bottom: 18px;
-      overflow-x: auto;
-    }
-
-    .tab-btn {
-      appearance: none;
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
-      padding: 13px 2px 11px;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--ink-muted);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.15s ease, border-color 0.15s ease;
-    }
-
-    .tab-btn:hover { color: var(--ink); }
-    .tab-btn.active {
-      color: var(--ink);
-      border-bottom-color: var(--accent);
-    }
-
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* Storyboard Timeline Track */
-    .timeline-track {
-      display: flex;
-      gap: 4px;
-      width: 100%;
-      margin-bottom: 16px;
-      padding: 6px;
-      background: var(--surface);
-      border: 1px solid var(--rule);
-      border-radius: var(--radius);
-    }
-
-    .track-seg {
-      min-width: 36px;
-      padding: 8px 9px;
-      border-radius: 6px;
-      background: var(--surface-raised);
-      border: 1px solid var(--rule);
-      overflow: hidden;
-    }
-
-    .track-seg.failed {
-      background: var(--fail-soft);
-      border-color: rgba(223, 91, 74, 0.45);
-    }
-
-    .track-seg-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 10.5px;
-      color: var(--accent);
-    }
-
-    .track-seg-beat {
-      font-size: 11.5px;
-      color: var(--ink);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-top: 2px;
-    }
-
-    .repair-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .shots-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 12px;
-    }
-
-    .shot-card {
-      padding: 14px 15px;
-      border-radius: var(--radius);
-      background: var(--surface);
-      border: 1px solid var(--rule);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .shot-card.failed {
-      border-color: rgba(223, 91, 74, 0.45);
-    }
-
-    .shot-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .shot-id-wrap {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .shot-id-wrap input[type="checkbox"] {
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-
-    .shot-id {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--ink);
-    }
-
-    .shot-beat {
-      font-size: 12px;
-      color: var(--accent);
-      font-weight: 500;
-    }
-
-    .shot-prompt {
-      font-size: 12.5px;
-      color: var(--ink-secondary);
-      margin: 0;
-    }
-
-    .shot-vo {
-      padding: 7px 10px;
-      border-left: 2px solid var(--accent);
-      background: rgba(255, 255, 255, 0.025);
-      font-size: 12.5px;
-      color: var(--ink);
-    }
-
-    .shot-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--ink-muted);
-    }
-
-    /* Creative Bible Layout */
-    .bible-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .info-block {
-      padding: 16px 18px;
-      border-radius: var(--radius);
-      background: var(--surface);
-      border: 1px solid var(--rule);
-    }
-
-    .info-block.full {
-      grid-column: 1 / -1;
-    }
-
-    .info-block h3 {
-      margin: 0 0 10px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      color: var(--ink-muted);
-    }
-
-    .thesis-quote {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: 24px;
-      line-height: 1.25;
-      color: var(--ink);
-    }
-
-    .swatch-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
+    .swatch-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .swatch {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
+      padding: 3px 8px;
+      border-radius: 5px;
       background: var(--bg);
       border: 1px solid var(--rule);
       font-family: var(--font-mono);
       font-size: 11px;
     }
+    .swatch-box { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.2); }
 
-    .swatch-chip {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .kv-list {
-      display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 6px 12px;
-      font-size: 12.5px;
-    }
-
-    .kv-k { color: var(--ink-muted); }
-    .kv-v { color: var(--ink); }
-
-    .pill-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .tag-pill {
-      padding: 3px 9px;
-      border-radius: var(--radius-sm);
-      background: var(--surface-raised);
+    /* Editable Shot-by-Shot Table */
+    .sheet-table-wrap {
+      overflow-x: auto;
       border: 1px solid var(--rule);
-      font-size: 11.5px;
-      color: var(--ink-secondary);
+      border-radius: var(--radius);
+      background: var(--bg-subtle);
     }
 
-    /* Tables */
-    .data-table {
+    table.sheet-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12.5px;
+      min-width: 920px;
     }
 
-    .data-table th {
+    table.sheet-table th {
       text-align: left;
-      padding: 8px 10px;
+      padding: 9px 10px;
       font-size: 11px;
-      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.07em;
       color: var(--ink-muted);
       border-bottom: 1px solid var(--rule);
+      background: var(--surface);
     }
 
-    .data-table td {
-      padding: 8px 10px;
+    table.sheet-table td {
+      padding: 8px 8px;
       border-bottom: 1px solid var(--rule);
-      color: var(--ink-secondary);
       vertical-align: top;
     }
 
-    .data-table td.mono {
-      font-family: var(--font-mono);
-      font-size: 11.5px;
-      color: var(--ink);
+    table.sheet-table input, table.sheet-table select, table.sheet-table textarea {
+      font-size: 12px;
+      padding: 6px 8px;
     }
 
-    .empty-note {
-      padding: 26px 18px;
-      text-align: center;
-      color: var(--ink-muted);
-      border: 1px dashed var(--rule);
+    /* Preview Stack Cards & Side-by-Side Comparison */
+    .stack-card {
+      text-align: left;
+      padding: 14px 16px;
       border-radius: var(--radius);
-      font-size: 13px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .stack-card:hover { background: var(--surface-raised); border-color: var(--rule-strong); }
+    .stack-card.selected { background: var(--accent-soft); border-color: var(--accent); }
+
+    .version-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .version-card.winner { border-color: var(--pass); }
+
+    .version-video {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      display: block;
     }
 
-    .error-banner {
-      margin-top: 12px;
-      padding: 11px 14px;
+    .version-body {
+      padding: 13px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      padding: 8px 10px;
       border-radius: var(--radius-sm);
-      background: var(--fail-soft);
-      border: 1px solid rgba(223, 91, 74, 0.35);
-      color: #f7aba0;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+    }
+    .metric-k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
+    .metric-v { font-family: var(--font-mono); font-size: 13px; font-weight: 600; margin-top: 2px; }
+
+    .step-view { display: none; }
+    .step-view.active { display: block; }
+
+    .gate-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
       font-size: 12.5px;
-      display: none;
     }
 
-    .error-banner.visible { display: block; }
+    .mode-pill-switch {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 3px;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-sm);
+    }
 
-    @media (max-width: 1040px) {
-      .workspace { grid-template-columns: 1fr; }
-      .composer-rail, .stage { max-height: none; overflow: visible; }
-      .composer-rail { border-right: none; border-bottom: 1px solid var(--rule); }
-      .telemetry-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .bible-grid { grid-template-columns: 1fr; }
-      .agent-stepper { grid-template-columns: 1fr; }
+    .mode-pill {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .mode-pill.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+    @media (max-width: 900px) {
+      .grid-2, .grid-3, .grid-4, .metrics-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <header class="studio-header">
-    <div class="brand-mark">
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand-group">
       <h1>Launch<span>Cut</span></h1>
-      <span class="brand-sub">Rubric-Gated GTM Video Studio</span>
+      <span class="flow-crumb">Brand → Concept → Shot Sheet → Previews → Final</span>
     </div>
-    <div class="header-status" id="healthBar">
-      <span class="status-chip" id="chipLive"><span class="status-dot"></span>Checking APIs…</span>
-      <span class="status-chip" id="chipFfmpeg"><span class="status-dot"></span>ffmpeg</span>
-      <span class="status-chip" id="chipTesseract"><span class="status-dot"></span>ocr</span>
-      <span class="status-chip" id="chipJobs"><span class="status-dot"></span>0 active</span>
-      <a class="header-link" href="/docs" target="_blank" rel="noopener">API Docs</a>
+    <div class="topbar-controls">
+      <span class="chip" id="chipApis"><span class="dot"></span>Checking…</span>
+      <span class="chip" id="chipTools"><span class="dot"></span>ffmpeg</span>
+      <div class="cost-meter" id="costMeter" style="display:none;">
+        <span>Spent <strong id="spentVal">$0.00</strong></span>
+        <div class="cost-bar"><div class="cost-bar-fill" id="costFill"></div></div>
+        <span>cap $</span>
+        <input type="number" step="0.5" min="0" max="500" class="cap-input" id="headerCapInput" aria-label="USD Budget Cap" />
+      </div>
+      <select class="runs-select" id="runsSelect" aria-label="Recent runs">
+        <option value="">Recent runs…</option>
+      </select>
+      <button type="button" class="btn btn-primary btn-sm" id="btnNewVideo">+ New Video</button>
     </div>
   </header>
 
-  <main class="workspace">
-    <!-- Left Rail: Production Brief & History -->
-    <aside class="composer-rail">
-      <section class="rail-section">
-        <div class="section-head">
-          <h2 class="section-title">Production Brief</h2>
-          <span class="badge" id="modeBadge">Live APIs</span>
-        </div>
+  <!-- 5-Step Interactive Navigation -->
+  <nav class="stepper-bar" aria-label="Production workflow steps">
+    <button type="button" class="step-btn active" data-step="brand" id="nav-brand">
+      <span class="step-num">1</span> Brand &amp; Goal
+    </button>
+    <span class="step-arrow">→</span>
+    <button type="button" class="step-btn" data-step="concept" id="nav-concept" disabled>
+      <span class="step-num">2</span> Concept &amp; Bible
+    </button>
+    <span class="step-arrow">→</span>
+    <button type="button" class="step-btn" data-step="sheet" id="nav-sheet" disabled>
+      <span class="step-num">3</span> Script &amp; Shot Sheet
+    </button>
+    <span class="step-arrow">→</span>
+    <button type="button" class="step-btn" data-step="previews" id="nav-previews" disabled>
+      <span class="step-num">4</span> Previews
+    </button>
+    <span class="step-arrow">→</span>
+    <button type="button" class="step-btn" data-step="final" id="nav-final" disabled>
+      <span class="step-num">5</span> Final Cut
+    </button>
+  </nav>
 
-        <div class="mode-switch" role="group" aria-label="Execution mode">
-          <button type="button" class="mode-opt active" data-mode="live" id="btnModeLive">Live APIs</button>
-          <button type="button" class="mode-opt" data-mode="mock" id="btnModeMock">Offline Mock ($0)</button>
-        </div>
+  <main class="shell">
+    <!-- Status & Live SSE Feedback -->
+    <div class="status-banner" id="statusBanner" role="status">
+      <div class="banner-left">
+        <div class="spinner" id="bannerSpinner" style="display:none;"></div>
+        <span id="bannerText"></span>
+      </div>
+      <button type="button" class="btn btn-danger btn-sm" id="btnCancelJob" style="display:none;">Cancel</button>
+    </div>
+    <div class="sse-mini-log" id="sseMiniLog"></div>
 
-        <div class="preset-row">
-          <button type="button" class="preset-btn" id="presetMockDemo">Load Mock Smoke Test</button>
-          <button type="button" class="preset-btn" id="presetLiveDemo">Load Live Brand Brief</button>
-        </div>
-
-        <form id="briefForm">
-          <div class="field">
-            <label for="brandName">Brand Name</label>
-            <input id="brandName" type="text" required placeholder="e.g. Kestrel Roasters" value="Kestrel Roasters" />
+    <!-- STEP 1: BRAND & GOAL -->
+    <section class="step-view active" id="view-brand">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">1. Brand &amp; Campaign Brief</h2>
+            <p class="panel-sub">Start by giving brand info, goals, and verified facts. AI researches your site and pitches 4 concepts before any script or video money is spent.</p>
           </div>
-
-          <div class="field">
-            <label for="brandUrl">Brand URL</label>
-            <input id="brandUrl" type="url" required placeholder="https://example.com" value="https://kestrelroasters.example.com" />
-          </div>
-
-          <div class="field">
-            <label for="campaignGoal">Campaign Goal</label>
-            <textarea id="campaignGoal" required placeholder="What should this launch cut achieve?">Drive single-origin coffee subscription trials with grounded sourcing proof.</textarea>
-          </div>
-
-          <div class="field">
-            <label for="durationRange">
-              <span>Target Duration</span>
-              <span class="mono-val" id="durationLabel">15s</span>
-            </label>
-            <input id="durationRange" type="range" min="6" max="60" step="1" value="15" />
-          </div>
-
-          <div class="field">
-            <label>Aspect Ratio</label>
-            <div class="seg-group" id="aspectGroup">
-              <button type="button" class="seg-btn active" data-val="16:9">16:9</button>
-              <button type="button" class="seg-btn" data-val="9:16">9:16</button>
-              <button type="button" class="seg-btn" data-val="1:1">1:1</button>
-              <button type="button" class="seg-btn" data-val="4:5">4:5</button>
+          <div class="btn-group">
+            <div class="mode-pill-switch">
+              <button type="button" class="mode-pill active" id="modeLive">Live APIs</button>
+              <button type="button" class="mode-pill" id="modeMock">Offline Mock ($0)</button>
             </div>
           </div>
+        </div>
 
-          <div class="field">
-            <label>Audio Mode</label>
-            <div class="seg-group three" id="audioGroup">
-              <button type="button" class="seg-btn active" data-val="vo">VO</button>
-              <button type="button" class="seg-btn" data-val="foley">Foley</button>
-              <button type="button" class="seg-btn" data-val="both">Both</button>
-            </div>
-          </div>
+        <div class="btn-group" style="margin-bottom:16px;">
+          <button type="button" class="btn btn-sm" id="presetNike">Preset: Nike (Live)</button>
+          <button type="button" class="btn btn-sm" id="presetFellow">Preset: Fellow Stagg EKG (Live)</button>
+          <button type="button" class="btn btn-sm" id="presetKestrel">Preset: Kestrel Roasters (Mock $0)</button>
+        </div>
 
-          <div class="field-row">
+        <form id="brandForm" class="space-y-4">
+          <div class="grid-2" style="margin-bottom:14px;">
             <div class="field">
-              <label for="capUsd">USD Cap</label>
-              <input id="capUsd" type="number" min="0" max="500" step="0.5" value="5.0" />
+              <label for="inBrand">Brand Name</label>
+              <input id="inBrand" type="text" required placeholder="e.g. Nike" value="Nike" />
             </div>
             <div class="field">
-              <label for="fpsSelect">FPS / Quality</label>
-              <select id="fpsSelect">
-                <option value="24|preview">24 fps · Preview</option>
-                <option value="24|final">24 fps · Final</option>
-                <option value="30|preview">30 fps · Preview</option>
-                <option value="30|final">30 fps · Final</option>
+              <label for="inUrl">Brand Website URL</label>
+              <input id="inUrl" type="url" required placeholder="https://www.nike.com" value="https://www.nike.com" />
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:14px;">
+            <label for="inGoal">Campaign Goal</label>
+            <textarea id="inGoal" rows="2" required placeholder="What should this launch video accomplish?">Inspire everyday athletes to lace up and move with Nike running innovation and kinetic energy.</textarea>
+          </div>
+
+          <div class="grid-4" style="margin-bottom:14px;">
+            <div class="field">
+              <label for="inDuration"><span>Duration</span><span class="mono" id="lblDuration">12s</span></label>
+              <input id="inDuration" type="range" min="6" max="60" value="12" />
+            </div>
+            <div class="field">
+              <label for="inAspect">Aspect Ratio</label>
+              <select id="inAspect">
+                <option value="16:9">16:9 Landscape</option>
+                <option value="9:16">9:16 Vertical (Reels/TikTok)</option>
+                <option value="1:1">1:1 Square</option>
+                <option value="4:5">4:5 Social Feed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="inAudio">Audio Mode</label>
+              <select id="inAudio">
+                <option value="both">VO + Foley / Music</option>
+                <option value="vo">Voiceover Only</option>
+                <option value="foley">Foley / Music Only</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="inCap">USD Spend Cap ($)</label>
+              <input id="inCap" type="number" step="0.5" min="0" max="500" value="5.0" />
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:14px;">
+            <div class="field">
+              <label for="inFacts">Verified Product Facts (one per line — strongly improves copy)</label>
+              <textarea id="inFacts" rows="3" placeholder="ZoomX foam returns responsive energy on every stride&#10;Engineered mesh upper for lightweight breathability"></textarea>
+            </div>
+            <div class="field">
+              <label for="inDirection">Creative Direction / Must-Say / Offer (optional)</label>
+              <textarea id="inDirection" rows="3" placeholder="Dawn neighborhood energy, tactile 35mm feel, end on clean brand mark"></textarea>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label for="inOffer">Promotional Offer (optional)</label>
+              <input id="inOffer" type="text" placeholder="e.g. Free 30-day wear test" />
+            </div>
+            <div class="field">
+              <label for="inMustSay">Must-Say Phrases (comma-separated)</label>
+              <input id="inMustSay" type="text" placeholder="e.g. Just Do It" />
+            </div>
+            <div class="field">
+              <label for="inFps">Frame Rate</label>
+              <select id="inFps">
+                <option value="24">24 fps (Cinema)</option>
+                <option value="30">30 fps (Smooth Social)</option>
               </select>
             </div>
           </div>
 
-          <details class="constraints">
-            <summary>Creative Constraints &amp; Facts (Optional)</summary>
-            <div class="constraints-body">
-              <div class="field">
-                <label for="offerInput">Promotional Offer</label>
-                <input id="offerInput" type="text" placeholder="e.g. First bag 25% off" />
-              </div>
-              <div class="field">
-                <label for="factsInput">Verified Facts (one per line)</label>
-                <textarea id="factsInput" placeholder="Small-batch roasted within 24 hours of shipping&#10;100% traceable direct-trade micro-lots"></textarea>
-              </div>
-              <div class="field">
-                <label for="mustSayInput">Must-Say Phrases (one per line)</label>
-                <textarea id="mustSayInput" placeholder="Start your morning ritual"></textarea>
-              </div>
-              <div class="field">
-                <label for="directionInput">Director Notes</label>
-                <input id="directionInput" type="text" placeholder="e.g. Tactile 35mm macro feel, dry wit" />
-              </div>
-              <div class="field">
-                <label for="inspirationUrl">Inspiration URL</label>
-                <input id="inspirationUrl" type="url" placeholder="https://..." />
-              </div>
-            </div>
-          </details>
-
-          <div class="btn-row">
-            <button type="submit" class="btn-primary" id="btnStartCut">Direct &amp; Render Cut</button>
-            <button type="button" class="btn-danger" id="btnCancelCut" style="display:none;">Cancel</button>
+          <div class="btn-bar">
+            <span style="font-size:12px; color:var(--ink-muted);">Step 1 runs Agent 1 only (brand scrape + 4 concepts + Creative Bible). Video rendering starts only after you approve Step 3.</span>
+            <button type="submit" class="btn btn-primary" id="btnRunResearch">Research Brand &amp; Pitch 4 Concepts →</button>
           </div>
-          <div class="form-error" id="formError" role="alert"></div>
         </form>
-      </section>
+      </div>
+    </section>
 
-      <section class="rail-section" style="border-bottom:none; flex:1;">
-        <div class="section-head">
-          <h2 class="section-title">Recent Cuts</h2>
-          <button type="button" class="preset-btn" id="btnRefreshRuns">Refresh</button>
-        </div>
-        <div class="runs-list" id="runsList">
-          <div class="empty-note">No cuts yet. Direct your first cut above.</div>
-        </div>
-      </section>
-    </aside>
-
-    <!-- Right Stage: Screening Monitor & Inspector -->
-    <section class="stage">
-      <div class="screening-wrap">
-        <div class="screening-top">
-          <div class="cut-heading">
-            <div class="cut-eyebrow" id="cutEyebrow">SCREENING ROOM · READY</div>
-            <h2 class="cut-title" id="cutTitle">New Production Cut</h2>
+    <!-- STEP 2: CONCEPT & CREATIVE BIBLE (HITL) -->
+    <section class="step-view" id="view-concept">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">2. Concept Selection &amp; Creative Bible</h2>
+            <p class="panel-sub">Pick one of the 4 orthogonal concepts below, refine the Creative Bible or verified facts, then send it to the Script &amp; Shot Sheet Director.</p>
           </div>
-          <div class="screening-actions">
-            <span class="badge" id="cutStatusBadge">idle</span>
-            <a class="btn-secondary" id="btnDownloadMp4" href="#" download style="display:none;">Download MP4</a>
+          <div class="btn-group">
+            <button type="button" class="btn btn-sm" id="btnRegenConcepts">Regenerate Concepts</button>
           </div>
         </div>
 
-        <div class="monitor-frame" id="monitorFrame">
-          <video class="monitor-video" id="screeningVideo" controls playsinline></video>
+        <div id="scrapedSummary" style="margin-bottom:16px; padding:12px 14px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule); font-size:12.5px;"></div>
 
-          <div class="slate-empty" id="slateEmpty">
-            <h2>Zero hard templates.<br />Three rubric-gated agents.</h2>
-            <p>
-              LaunchCut researches your brand, synthesizes a bespoke CreativeBible, directs a speakability-checked ShotSheet, and renders + QAs a stitched MP4 in one pass.
-            </p>
-            <div class="slate-actions">
-              <button type="button" class="btn-primary" style="flex:0 1 auto;" id="btnQuickMock">Run 15s Mock Smoke Test ($0)</button>
-              <button type="button" class="btn-secondary" id="btnFocusLive">Configure Live Cut</button>
-            </div>
+        <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Choose a Concept Direction</h3>
+        <div class="grid-2" id="conceptsGrid" style="margin-bottom:18px;"></div>
+
+        <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Refine Creative Bible (Editable Before Scripting)</h3>
+        <div class="grid-2" style="margin-bottom:12px;">
+          <div class="field">
+            <label for="edThesis">Concept Thesis</label>
+            <textarea id="edThesis" rows="2"></textarea>
           </div>
-
-          <div class="pipeline-live" id="pipelineLive">
-            <div class="agent-stepper">
-              <div class="agent-step" id="stepAgent1">
-                <div class="agent-num">Stage 01</div>
-                <div class="agent-name">Research &amp; CreativeBible</div>
-                <div class="agent-detail" id="step1Detail">Scraping brand &amp; 4 orthogonal pitches</div>
-              </div>
-              <div class="agent-step" id="stepAgent2">
-                <div class="agent-num">Stage 02</div>
-                <div class="agent-name">Director Script &amp; ShotSheet</div>
-                <div class="agent-detail" id="step2Detail">Pure script rules &amp; timing physics</div>
-              </div>
-              <div class="agent-step" id="stepAgent3">
-                <div class="agent-num">Stage 03</div>
-                <div class="agent-name">Producer Render &amp; QA</div>
-                <div class="agent-detail" id="step3Detail">Overlapped media, FFmpeg stitch &amp; QA</div>
-              </div>
-            </div>
-            <div class="live-log" id="liveLog"></div>
+          <div class="field">
+            <label for="edWorld">Visual World</label>
+            <textarea id="edWorld" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="grid-3" style="margin-bottom:12px;">
+          <div class="field">
+            <label for="edArc">Narrative Arc Name</label>
+            <input id="edArc" type="text" />
+          </div>
+          <div class="field">
+            <label for="edLighting">Lighting Style</label>
+            <input id="edLighting" type="text" />
+          </div>
+          <div class="field">
+            <label for="edCamera">Camera Grammar</label>
+            <input id="edCamera" type="text" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="edAudioStrategy">Sonic / Audio Strategy</label>
+            <input id="edAudioStrategy" type="text" />
+          </div>
+          <div class="field">
+            <label for="edBibleFacts">Additional Verified Facts (one per line)</label>
+            <textarea id="edBibleFacts" rows="2"></textarea>
           </div>
         </div>
 
-        <div class="error-banner" id="runErrorBanner"></div>
-
-        <div class="telemetry-strip">
-          <div class="metric-cell">
-            <div class="metric-label">Duration</div>
-            <div class="metric-val" id="mDuration">—</div>
-          </div>
-          <div class="metric-cell">
-            <div class="metric-label">Format</div>
-            <div class="metric-val" id="mFormat">—</div>
-          </div>
-          <div class="metric-cell">
-            <div class="metric-label">Shots</div>
-            <div class="metric-val" id="mShots">—</div>
-          </div>
-          <div class="metric-cell">
-            <div class="metric-label">Loudness</div>
-            <div class="metric-val" id="mLufs">—</div>
-          </div>
-          <div class="metric-cell">
-            <div class="metric-label">QA Score</div>
-            <div class="metric-val" id="mScore">—</div>
-          </div>
-          <div class="metric-cell">
-            <div class="metric-label">Spend / Cap</div>
-            <div class="metric-val" id="mSpend">$0.00 / $5.00</div>
-            <div class="budget-bar"><div class="budget-fill" id="mBudgetFill"></div></div>
-          </div>
+        <div class="btn-bar">
+          <button type="button" class="btn" id="btnSaveConcept">Save Concept Edits</button>
+          <button type="button" class="btn btn-primary" id="btnApproveConcept">Approve Concept &amp; Direct Shot Sheet →</button>
         </div>
       </div>
+    </section>
 
-      <div class="inspector">
-        <div class="tabs-bar" role="tablist">
-          <button type="button" class="tab-btn active" data-tab="storyboard" role="tab">ShotSheet &amp; Storyboard</button>
-          <button type="button" class="tab-btn" data-tab="bible" role="tab">Creative Bible</button>
-          <button type="button" class="tab-btn" data-tab="qa" role="tab">QA &amp; Rubric Gates</button>
-          <button type="button" class="tab-btn" data-tab="ledger" role="tab">Cost Ledger &amp; Events</button>
+    <!-- STEP 3: SCRIPT & SHOT-BY-SHOT SHEET EDITOR (HITL) -->
+    <section class="step-view" id="view-sheet">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">3. Script &amp; Shot-by-Shot Editor</h2>
+            <p class="panel-sub">Review and edit every shot's beat, duration, engine, visual prompt, camera move, and voiceover line. Pure script rules validate every change live.</p>
+          </div>
+          <div class="btn-group">
+            <span class="badge" id="sheetGateBadge">checking</span>
+            <span class="chip" id="sheetDurChip">0.0s / 12.0s</span>
+            <button type="button" class="btn btn-sm" id="btnAddShot">+ Add Shot</button>
+            <button type="button" class="btn btn-sm" id="btnAiRewriteSheet">AI Rewrite Sheet</button>
+          </div>
         </div>
 
-        <div class="tab-panel active" id="tab-storyboard">
-          <div class="empty-note">Select or launch a cut to inspect its ShotSheet timeline and shot-level prompts.</div>
+        <div id="sheetGateDetails" style="margin-bottom:14px;"></div>
+
+        <div class="grid-2" style="margin-bottom:14px;">
+          <div class="field">
+            <label for="edEndTitle">End Card Title</label>
+            <input id="edEndTitle" type="text" placeholder="Brand name" />
+          </div>
+          <div class="field">
+            <label for="edEndSubtitle">End Card Subtitle / CTA (optional)</label>
+            <input id="edEndSubtitle" type="text" placeholder="e.g. Shop now at example.com" />
+          </div>
         </div>
-        <div class="tab-panel" id="tab-bible">
-          <div class="empty-note">Bespoke CreativeBible, visual palette, sonic identity, and concept pitches appear here after Stage 01.</div>
+
+        <div class="sheet-table-wrap">
+          <table class="sheet-table">
+            <thead>
+              <tr>
+                <th style="width:52px;">Shot</th>
+                <th style="width:130px;">Beat</th>
+                <th style="width:76px;">Sec</th>
+                <th style="width:130px;">Engine</th>
+                <th style="width:135px;">Camera Move</th>
+                <th>Visual Prompt</th>
+                <th style="width:210px;">Voiceover Line</th>
+                <th style="width:130px;">On-Screen Text</th>
+                <th style="width:42px;"></th>
+              </tr>
+            </thead>
+            <tbody id="sheetTableBody"></tbody>
+          </table>
         </div>
-        <div class="tab-panel" id="tab-qa">
-          <div class="empty-note">Deterministic Media QA (ffprobe, LUFS, OCR, Whisper sync) and blocking rubric evaluations appear here.</div>
+
+        <div class="btn-bar">
+          <button type="button" class="btn" id="btnSaveSheet">Save Edits &amp; Validate Rules</button>
+          <button type="button" class="btn btn-primary" id="btnApproveSheet">Approve Shot Sheet → Previews</button>
         </div>
-        <div class="tab-panel" id="tab-ledger">
-          <div class="empty-note">Itemized provider cost ledger and SSE event stream appear here.</div>
+      </div>
+    </section>
+
+    <!-- STEP 4: MULTI-OPTION PREVIEWS & A/B COMPARISON (HITL) -->
+    <section class="step-view" id="view-previews">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">4. Preview Options &amp; Side-by-Side Comparison</h2>
+            <p class="panel-sub">Select 1–4 preview stacks (different AI video models, hybrid motion cards, or $0 pacing animatic), compare them side-by-side, and pick your winner.</p>
+          </div>
+          <div class="btn-group">
+            <span class="chip" id="previewEstChip">Selected est: $0.00</span>
+            <button type="button" class="btn btn-primary" id="btnRenderPreviews" disabled>Render Selected Previews</button>
+          </div>
+        </div>
+
+        <div class="grid-2" id="presetsGrid" style="margin-bottom:16px;"></div>
+
+        <details style="margin-bottom:18px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--bg-subtle); padding:10px 14px;">
+          <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-secondary); font-weight:500;">+ Add Custom Model Stack</summary>
+          <div class="grid-3" style="margin-top:12px;">
+            <div class="field">
+              <label for="custLabel">Stack Label</label>
+              <input id="custLabel" type="text" placeholder="e.g. Kling v4 + Hybrid" />
+            </div>
+            <div class="field">
+              <label for="custVideoModel">fal.ai Video Model ID</label>
+              <input id="custVideoModel" type="text" value="kling/v4/flash/text-to-video" />
+            </div>
+            <div class="field">
+              <label for="custVoiceModel">fal.ai Voice Model ID</label>
+              <input id="custVoiceModel" type="text" value="fal-ai/elevenlabs/tts/eleven-v3" />
+            </div>
+          </div>
+          <div style="margin-top:10px;">
+            <button type="button" class="btn btn-sm" id="btnAddCustomStack">Add Stack to Selection</button>
+          </div>
+        </details>
+
+        <h3 style="margin:0 0 12px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Rendered Previews (<span id="previewCount">0</span>)</h3>
+        <div class="grid-2" id="versionsGrid"></div>
+
+        <div class="btn-bar">
+          <span style="font-size:12px; color:var(--ink-muted);">Pick a winning preview above to unlock full-quality Final Cut rendering.</span>
+          <button type="button" class="btn btn-primary" id="btnGoFinal" disabled>Proceed to Final Cut →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 5: FINAL CUT -->
+    <section class="step-view" id="view-final">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">5. Final Production Cut</h2>
+            <p class="panel-sub" id="finalSub">Render the winning preview stack at full Final quality, verify deterministic Media QA, and download your master MP4.</p>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-primary" id="btnRenderFinal">Render Final Cut</button>
+            <a class="btn btn-pass" id="btnDownloadFinal" href="#" download style="display:none;">Download Master MP4</a>
+          </div>
+        </div>
+
+        <div id="finalPlayerWrap" style="display:none; margin-bottom:18px;">
+          <div style="border-radius:var(--radius); overflow:hidden; border:1px solid var(--rule); background:#000; margin-bottom:14px;">
+            <video id="finalVideo" controls playsinline style="width:100%; max-height:460px; display:block; background:#000;"></video>
+          </div>
+          <div class="metrics-row" id="finalMetrics"></div>
+        </div>
+
+        <div id="finalEmpty" style="padding:36px 20px; text-align:center; border:1px dashed var(--rule); border-radius:var(--radius); color:var(--ink-muted); margin-bottom:18px;">
+          Click <strong>Render Final Cut</strong> above to produce the final full-quality stitched master MP4.
+        </div>
+
+        <div class="grid-2">
+          <div style="padding:14px 16px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule);">
+            <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Media QA &amp; Rubric Summary</h3>
+            <div id="finalQaBox" style="font-size:12.5px; color:var(--ink-secondary);">No final QA report yet.</div>
+          </div>
+          <div style="padding:14px 16px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule);">
+            <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Itemized Cost Ledger</h3>
+            <div id="finalLedgerBox" style="font-size:12px; color:var(--ink-secondary);">No metered entries yet.</div>
+          </div>
         </div>
       </div>
     </section>
@@ -1342,815 +987,783 @@
 
   <script>
     const ACTOR_ID = "studio";
+    const STEPS = ["brand", "concept", "sheet", "previews", "final"];
+
     const state = {
-      mock: false,
-      aspect: "16:9",
-      audioMode: "vo",
-      currentRunId: null,
-      currentRun: null,
+      run: null,
       runs: [],
+      view: "brand",
+      mock: false,
+      presets: [],
+      selectedStackIds: new Set(),
+      customStacks: [],
+      draftShots: [],
       sse: null,
-      events: [],
-      liveReady: false,
     };
 
     const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    const fmtUsd = (v) => { const n = Number(v || 0); return "$" + n.toFixed(n > 0 && n < 0.01 ? 4 : 2); };
 
-    function esc(str) {
-      return String(str ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;");
-    }
-
-    function fmtUsd(v) {
-      const n = Number(v || 0);
-      return "$" + n.toFixed(n > 0 && n < 0.01 ? 4 : 2);
-    }
-
-    function fmtTime(iso) {
-      if (!iso) return "";
-      try {
-        return new Date(iso).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      } catch {
-        return "";
-      }
-    }
-
-    async function apiFetch(path, opts = {}) {
+    async function api(path, opts = {}) {
       const headers = Object.assign({ "X-Actor-Id": ACTOR_ID }, opts.headers || {});
-      if (opts.body && !headers["Content-Type"]) {
-        headers["Content-Type"] = "application/json";
-      }
+      if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
       const res = await fetch(path, { ...opts, headers });
       const text = await res.text();
       let data = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = { detail: text }; }
       if (!res.ok) {
-        const msg = data?.detail
-          ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))
-          : `HTTP ${res.status}`;
+        const msg = data?.detail ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : `HTTP ${res.status}`;
         throw new Error(msg);
       }
       return data;
     }
 
-    function setMode(isMock) {
-      state.mock = isMock;
-      $("btnModeLive").classList.toggle("active", !isMock);
-      $("btnModeMock").classList.toggle("active", isMock);
-      const badge = $("modeBadge");
-      badge.textContent = isMock ? "Offline Mock ($0)" : "Live APIs";
-      badge.className = "badge " + (isMock ? "done" : "working");
+    function setBanner(kind, text, showCancel = false) {
+      const b = $("statusBanner");
+      if (!text) {
+        b.className = "status-banner";
+        $("bannerSpinner").style.display = "none";
+        $("btnCancelJob").style.display = "none";
+        return;
+      }
+      b.className = `status-banner visible ${kind}`;
+      $("bannerText").textContent = text;
+      $("bannerSpinner").style.display = kind === "working" ? "block" : "none";
+      $("btnCancelJob").style.display = showCancel ? "inline-flex" : "none";
     }
 
-    function showFormError(msg) {
-      const el = $("formError");
-      if (!msg) {
-        el.classList.remove("visible");
-        el.textContent = "";
-      } else {
-        el.textContent = msg;
-        el.classList.add("visible");
+    function logSse(ev) {
+      const box = $("sseMiniLog");
+      box.classList.add("visible");
+      const t = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour12: false }) : "";
+      const detail = ev.data ? JSON.stringify(ev.data).slice(0, 140) : "";
+      const row = document.createElement("div");
+      row.className = "sse-line";
+      row.innerHTML = `<span class="sse-t">${esc(t)}</span><span class="sse-ev">${esc(ev.type)}</span><span>${esc(ev.stage || "")} ${esc(detail)}</span>`;
+      box.appendChild(row);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function closeSse() {
+      if (state.sse) { state.sse.close(); state.sse = null; }
+    }
+
+    function subscribeSse(runId, onTerminal) {
+      closeSse();
+      $("sseMiniLog").innerHTML = "";
+      const src = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
+      state.sse = src;
+      const types = ["stage_started", "rubric_evaluation", "shot_progress", "cost_update", "warning", "stage_completed", "run_completed", "run_cancelled", "run_failed"];
+      types.forEach((t) => {
+        src.addEventListener(t, async (msg) => {
+          let ev = { type: t, timestamp: new Date().toISOString(), data: {} };
+          try { ev = JSON.parse(msg.data); } catch {}
+          logSse(ev);
+          if (t === "shot_progress" || t === "stage_started") {
+            setBanner("working", `Running ${ev.stage || "step"}… ${ev.data?.label || ev.data?.shot_id || ""}`, true);
+          }
+          if (t === "cost_update" && ev.data?.actual_usd !== undefined && state.run) {
+            state.run.cost_ledger.actual_usd = ev.data.actual_usd;
+            renderCostMeter();
+          }
+          if (t === "run_completed" || t === "run_cancelled" || t === "run_failed") {
+            closeSse();
+            await loadRuns();
+            const fresh = await api(`/api/runs/${encodeURIComponent(runId)}`);
+            state.run = fresh;
+            if (fresh.status === "failed" || fresh.error) {
+              setBanner("error", fresh.error || "Step failed");
+            } else if (fresh.status === "cancelled") {
+              setBanner("error", "Step cancelled by user.");
+            } else {
+              setBanner("ok", `Step completed — ready on "${fresh.step}".`);
+            }
+            if (onTerminal) await onTerminal(fresh);
+            renderAll();
+          }
+        });
+      });
+    }
+
+    function maxReachedStepIndex(run) {
+      if (!run) return 0;
+      if (run.render_manifest?.stitched_path || run.winning_version_id || run.step === "final") return 4;
+      if (run.versions?.length || run.step === "previews") return 3;
+      if (run.shot_sheet || run.step === "sheet") return 3; // allow clicking Previews once sheet exists
+      if (run.creative_bible || run.concepts?.length || run.step === "concept") return 1;
+      return 0;
+    }
+
+    function setView(step) {
+      state.view = step;
+      document.querySelectorAll(".step-view").forEach((el) => el.classList.remove("active"));
+      $(`view-${step}`).classList.add("active");
+      renderStepper();
+      if (step === "previews") loadPresets();
+    }
+
+    function renderStepper() {
+      const reachedIdx = maxReachedStepIndex(state.run);
+      const currentStepIdx = state.run ? STEPS.indexOf(state.run.step || "brand") : 0;
+      STEPS.forEach((s, i) => {
+        const btn = $(`nav-${s}`);
+        btn.disabled = i > reachedIdx;
+        btn.classList.toggle("active", state.view === s);
+        btn.classList.toggle("done", Boolean(state.run && i < currentStepIdx));
+      });
+    }
+
+    function renderCostMeter() {
+      const meter = $("costMeter");
+      if (!state.run) { meter.style.display = "none"; return; }
+      meter.style.display = "inline-flex";
+      const spent = Number(state.run.cost_ledger?.actual_usd || 0);
+      const cap = Number(state.run.cost_ledger?.cap_usd ?? state.run.input?.cap_usd ?? 5);
+      $("spentVal").textContent = fmtUsd(spent);
+      $("headerCapInput").value = cap;
+      const pct = Math.min(100, cap > 0 ? (spent / cap) * 100 : 0);
+      const fill = $("costFill");
+      fill.style.width = `${pct}%`;
+      fill.classList.toggle("high", pct > 85);
+    }
+
+    function renderAll() {
+      renderStepper();
+      renderCostMeter();
+      if (state.run) {
+        renderConceptStep();
+        renderSheetStep();
+        renderPreviewsStep();
+        renderFinalStep();
       }
     }
 
+    // ---- STEP 2: CONCEPT & BIBLE ----
+    function renderConceptStep() {
+      const r = state.run;
+      if (!r?.creative_bible) return;
+
+      const res = r.research || {};
+      const colorsHtml = (res.brand_colors || []).slice(0, 6).map((hex) =>
+        `<span class="swatch"><span class="swatch-box" style="background:${esc(hex)}"></span>${esc(hex)}</span>`
+      ).join("");
+      $("scrapedSummary").innerHTML = `
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+          <strong>Scraped from ${esc(res.brand_url || r.input.brand_url)}</strong>
+          <span style="font-family:var(--font-mono); color:var(--ink-muted);">${(res.verified_claims || []).length} claims · ${(res.product_facts || []).length} facts · ${(res.product_photos || []).length} photos</span>
+        </div>
+        <div style="color:var(--ink-secondary);">${(res.verified_claims || []).slice(0, 2).map(esc).join(" · ") || "No claims scraped yet."}</div>
+        ${colorsHtml ? `<div class="swatch-row">${colorsHtml}</div>` : ""}
+      `;
+
+      const selectedId = r.selected_concept_id || (r.concepts?.[0]?.id ?? null);
+      $("conceptsGrid").innerHTML = (r.concepts || []).map((c) => `
+        <button type="button" class="concept-card ${c.id === selectedId ? "selected" : ""}" data-cid="${esc(c.id)}">
+          <div class="concept-top">
+            <span class="concept-title">${esc(c.title)}</span>
+            <span class="badge ${c.id === selectedId ? "accent" : ""}">div ${Number(c.diversity_score || 0).toFixed(2)}</span>
+          </div>
+          <div style="font-size:12.5px; color:var(--ink-secondary);">${esc(c.thesis)}</div>
+          <div style="font-size:11.5px; color:var(--ink-muted);">Arc: ${esc(c.narrative_arc)} · World: ${esc(c.visual_world)}</div>
+        </button>
+      `).join("");
+
+      $("conceptsGrid").querySelectorAll(".concept-card").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const updated = await api(`/api/runs/${encodeURIComponent(r.run_id)}/concept`, {
+              method: "PATCH",
+              body: JSON.stringify({ selected_concept_id: btn.dataset.cid }),
+            });
+            state.run = updated;
+            renderConceptStep();
+            setBanner("ok", `Selected concept pitch "${updated.creative_bible.narrative_structure.arc_name}".`);
+          } catch (err) {
+            setBanner("error", err.message);
+          }
+        });
+      });
+
+      const b = r.creative_bible;
+      $("edThesis").value = b.concept_thesis || "";
+      $("edWorld").value = b.visual_language?.world || "";
+      $("edArc").value = b.narrative_structure?.arc_name || "";
+      $("edLighting").value = b.visual_language?.lighting_style || "";
+      $("edCamera").value = b.camera_grammar?.dominant_style || "";
+      $("edAudioStrategy").value = b.sonic_identity?.audio_strategy || "";
+      $("edBibleFacts").value = (r.input?.facts || []).join("\n");
+    }
+
+    // ---- STEP 3: SHOT-BY-SHOT EDITOR ----
+    function renderSheetStep() {
+      const r = state.run;
+      const sheet = r?.shot_sheet;
+      if (!sheet) return;
+      state.draftShots = JSON.parse(JSON.stringify(sheet.shots || []));
+      $("edEndTitle").value = sheet.end_card_title || r.input.brand_name || "";
+      $("edEndSubtitle").value = sheet.end_card_subtitle || "";
+      renderSheetRows();
+      renderSheetGate();
+    }
+
+    function renderSheetRows() {
+      const target = Number(state.run?.shot_sheet?.target_duration_sec || state.run?.input?.target_duration_sec || 12);
+      const sum = state.draftShots.reduce((a, s) => a + Number(s.duration_sec || 0), 0);
+      $("sheetDurChip").textContent = `${sum.toFixed(2)}s / ${target.toFixed(2)}s`;
+
+      $("sheetTableBody").innerHTML = state.draftShots.map((s, idx) => `
+        <tr data-idx="${idx}">
+          <td style="font-family:var(--font-mono); font-size:12px; padding-top:14px;">${esc(s.id)}</td>
+          <td><input type="text" data-k="beat" value="${esc(s.beat)}" /></td>
+          <td><input type="number" step="0.25" min="1" max="15" data-k="duration_sec" value="${Number(s.duration_sec).toFixed(2)}" /></td>
+          <td>
+            <select data-k="engine">
+              ${["ai_video", "image_to_video", "motion_card", "manim"].map((eng) => `<option value="${eng}" ${s.engine === eng ? "selected" : ""}>${eng}</option>`).join("")}
+            </select>
+          </td>
+          <td><input type="text" data-k="camera_move" value="${esc(s.camera_move || "")}" /></td>
+          <td><textarea rows="2" data-k="visual_prompt">${esc(s.visual_prompt || "")}</textarea></td>
+          <td><textarea rows="2" data-k="vo_line">${esc(s.vo_line || "")}</textarea></td>
+          <td><input type="text" data-k="on_screen_text" value="${esc(s.on_screen_text || "")}" placeholder="(optional)" /></td>
+          <td><button type="button" class="btn btn-danger btn-sm" data-del="${idx}" title="Remove shot">×</button></td>
+        </tr>
+      `).join("");
+
+      $("sheetTableBody").querySelectorAll("tr").forEach((tr) => {
+        const idx = Number(tr.dataset.idx);
+        tr.querySelectorAll("[data-k]").forEach((inp) => {
+          inp.addEventListener("input", () => {
+            const k = inp.dataset.k;
+            state.draftShots[idx][k] = k === "duration_sec" ? Number(inp.value || 1) : (inp.value || (k === "vo_line" || k === "on_screen_text" ? null : ""));
+            const total = state.draftShots.reduce((a, x) => a + Number(x.duration_sec || 0), 0);
+            const tgt = Number(state.run?.shot_sheet?.target_duration_sec || 12);
+            $("sheetDurChip").textContent = `${total.toFixed(2)}s / ${tgt.toFixed(2)}s`;
+          });
+        });
+        tr.querySelector("[data-del]")?.addEventListener("click", () => {
+          if (state.draftShots.length <= 1) return;
+          state.draftShots.splice(idx, 1);
+          renderSheetRows();
+        });
+      });
+    }
+
+    function renderSheetGate() {
+      const qa = state.run?.qa_report;
+      const badge = $("sheetGateBadge");
+      const box = $("sheetGateDetails");
+      if (!qa) {
+        badge.className = "badge";
+        badge.textContent = "unvalidated";
+        box.innerHTML = "";
+        return;
+      }
+      badge.className = "badge " + (qa.passed ? "pass" : "fail");
+      badge.textContent = qa.passed ? `Rules Passed · Orig ${Number(qa.originality_score || 0).toFixed(1)} / Coh ${Number(qa.bible_coherence_score || 0).toFixed(1)}` : `${(qa.blocking_errors || []).length} Blocking Rule Issue(s)`;
+
+      const errs = qa.blocking_errors || [];
+      if (!errs.length) {
+        box.innerHTML = `<div style="padding:10px 12px; border-radius:var(--radius-sm); background:var(--pass-soft); color:#9ae5c2; font-size:12.5px;">All pure script rules passed (claim grounding, speakability budget, timing math, schema, anti-garbled text). Ready for Previews.</div>`;
+      } else {
+        box.innerHTML = `<div style="padding:10px 14px; border-radius:var(--radius-sm); background:var(--fail-soft); color:#f8b4aa; font-size:12.5px;"><strong>Fix before rendering:</strong><ul class="gate-list">${errs.map((e) => `<li><code>${esc(e.code)}</code> (${esc(e.shot_id || "sheet")}): ${esc(e.message)}</li>`).join("")}</ul></div>`;
+      }
+    }
+
+    async function saveSheetDraft() {
+      const sheet = JSON.parse(JSON.stringify(state.run.shot_sheet));
+      sheet.shots = state.draftShots.map((s, idx) => ({ ...s, index: idx }));
+      sheet.end_card_title = $("edEndTitle").value.trim() || null;
+      sheet.end_card_subtitle = $("edEndSubtitle").value.trim() || null;
+      const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/sheet`, {
+        method: "PATCH",
+        body: JSON.stringify({ shot_sheet: sheet }),
+      });
+      state.run = updated;
+      renderSheetStep();
+      return updated;
+    }
+
+    // ---- STEP 4: MULTI-OPTION PREVIEWS ----
+    async function loadPresets() {
+      const q = state.run ? `?run_id=${encodeURIComponent(state.run.run_id)}` : "";
+      try {
+        const res = await api(`/api/studio/presets${q}`);
+        state.presets = res.presets || [];
+        if (state.selectedStackIds.size === 0 && state.presets.length) {
+          // Default to mock_pacing in mock mode, or kling_flash + hybrid_motion in live mode
+          if (state.run?.input?.mock) state.selectedStackIds.add("mock_pacing");
+          else state.selectedStackIds.add("kling_flash");
+        }
+        renderPreviewsStep();
+      } catch (err) {
+        setBanner("error", `Failed to load preview stacks: ${err.message}`);
+      }
+    }
+
+    function allStacks() {
+      return [...state.presets, ...state.customStacks];
+    }
+
+    function renderPreviewsStep() {
+      const stacks = allStacks();
+      $("presetsGrid").innerHTML = stacks.map((st) => {
+        const sel = state.selectedStackIds.has(st.id);
+        return `
+          <button type="button" class="stack-card ${sel ? "selected" : ""}" data-stack-id="${esc(st.id)}">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <strong>${esc(st.label)}</strong>
+              <span class="badge ${sel ? "accent" : ""}">${sel ? "Selected" : fmtUsd(st.estimated_usd ?? 0)}</span>
+            </div>
+            <div style="font-size:12px; color:var(--ink-secondary);">${esc(st.description || st.video_model)}</div>
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--ink-muted);">video: ${esc(st.video_model)} · est ${fmtUsd(st.estimated_usd ?? 0)}</div>
+          </button>
+        `;
+      }).join("");
+
+      $("presetsGrid").querySelectorAll(".stack-card").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.stackId;
+          if (state.selectedStackIds.has(id)) state.selectedStackIds.delete(id);
+          else if (state.selectedStackIds.size < 4) state.selectedStackIds.add(id);
+          renderPreviewsStep();
+        });
+      });
+
+      const chosen = stacks.filter((s) => state.selectedStackIds.has(s.id));
+      const estTotal = chosen.reduce((a, s) => a + Number(s.estimated_usd || 0), 0);
+      $("previewEstChip").textContent = `Selected (${chosen.length}): est ${fmtUsd(estTotal)}`;
+      $("btnRenderPreviews").disabled = chosen.length === 0 || state.run?.status === "working";
+
+      const previews = (state.run?.versions || []).filter((v) => v.tier === "preview");
+      $("previewCount").textContent = String(previews.length);
+
+      if (!previews.length) {
+        $("versionsGrid").innerHTML = `<div style="grid-column:1/-1; padding:28px; text-align:center; border:1px dashed var(--rule); border-radius:var(--radius); color:var(--ink-muted);">Select 1–4 preview options above and click <strong>Render Selected Previews</strong> to compare cuts side-by-side.</div>`;
+      } else {
+        $("versionsGrid").innerHTML = previews.map((v) => {
+          const isWin = v.is_winner || v.version_id === state.run?.winning_version_id;
+          const qa = v.qa_report || {};
+          const vUrl = `/api/runs/${encodeURIComponent(state.run.run_id)}/versions/${encodeURIComponent(v.version_id)}/video`;
+          return `
+            <article class="version-card ${isWin ? "winner" : ""}">
+              ${v.render_manifest?.stitched_path
+                ? `<video class="version-video" controls playsinline preload="metadata" src="${vUrl}"></video>`
+                : `<div class="version-video" style="display:flex; align-items:center; justify-content:center; color:var(--ink-muted); font-size:12px;">${esc(v.error || v.status)}</div>`}
+              <div class="version-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                  <strong>${esc(v.label)}</strong>
+                  <span class="badge ${isWin ? "pass" : (v.status === "done" ? "accent" : "fail")}">${isWin ? "★ Winner" : v.status}</span>
+                </div>
+                <div style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-muted);">
+                  Spend: ${fmtUsd(v.usd)} · LUFS: ${qa.loudness_lufs != null ? Number(qa.loudness_lufs).toFixed(1) : "—"} · Orig/Coh: ${qa.originality_score != null ? `${Number(qa.originality_score).toFixed(1)}/${Number(qa.bible_coherence_score).toFixed(1)}` : "—"}
+                </div>
+                <div class="btn-group">
+                  <button type="button" class="btn btn-sm ${isWin ? "btn-pass" : "btn-primary"}" data-pick="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
+                    ${isWin ? "★ Selected Winner" : "Pick Winner"}
+                  </button>
+                  ${v.render_manifest?.stitched_path ? `<a class="btn btn-sm" href="${vUrl}" download="${esc(v.version_id)}.mp4">Download</a>` : ""}
+                </div>
+              </div>
+            </article>
+          `;
+        }).join("");
+
+        $("versionsGrid").querySelectorAll("[data-pick]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            try {
+              const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/versions/${encodeURIComponent(btn.dataset.pick)}/pick`, { method: "POST" });
+              state.run = updated;
+              setBanner("ok", "Winner selected! You can now render the full-quality Final Cut in Step 5.");
+              renderAll();
+            } catch (err) {
+              setBanner("error", err.message);
+            }
+          });
+        });
+      }
+
+      $("btnGoFinal").disabled = !previews.some((v) => v.status === "done");
+    }
+
+    // ---- STEP 5: FINAL CUT ----
+    function renderFinalStep() {
+      const r = state.run;
+      if (!r) return;
+      const win = (r.versions || []).find((v) => v.version_id === r.winning_version_id) || (r.versions || []).find((v) => v.tier === "preview" && v.status === "done");
+      $("finalSub").textContent = win
+        ? `Winner selected: "${win.label}" (${win.stack?.video_model || "default"}). Render at full Final quality and verify deterministic Media QA.`
+        : "Render the approved Shot Sheet at full Final quality and verify deterministic Media QA.";
+
+      const hasFinal = Boolean(r.render_manifest?.stitched_path);
+      $("finalPlayerWrap").style.display = hasFinal ? "block" : "none";
+      $("finalEmpty").style.display = hasFinal ? "none" : "block";
+      $("btnDownloadFinal").style.display = hasFinal ? "inline-flex" : "none";
+
+      if (hasFinal) {
+        const url = `/api/runs/${encodeURIComponent(r.run_id)}/video?t=${encodeURIComponent(r.updated_at || Date.now())}`;
+        const v = $("finalVideo");
+        if (v.dataset.src !== url) { v.src = url; v.dataset.src = url; }
+        $("btnDownloadFinal").href = `/api/runs/${encodeURIComponent(r.run_id)}/video`;
+        $("btnDownloadFinal").download = `${(r.input.brand_name || r.run_id).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-final.mp4`;
+
+        const qa = r.qa_report || {};
+        $("finalMetrics").innerHTML = [
+          ["Duration", qa.ffprobe_summary?.duration_sec ? `${Number(qa.ffprobe_summary.duration_sec).toFixed(2)}s` : `${r.input.target_duration_sec}s`],
+          ["Resolution", qa.ffprobe_summary?.width ? `${qa.ffprobe_summary.width}×${qa.ffprobe_summary.height}` : r.input.aspect],
+          ["Loudness", qa.loudness_lufs != null ? `${Number(qa.loudness_lufs).toFixed(1)} LUFS` : "—"],
+          ["Total Spend", `${fmtUsd(r.cost_ledger?.actual_usd)} / ${fmtUsd(r.cost_ledger?.cap_usd)}`],
+        ].map(([k, val]) => `<div class="metric"><div class="metric-k">${k}</div><div class="metric-v">${val}</div></div>`).join("");
+      }
+
+      const qa = r.qa_report;
+      if (qa) {
+        $("finalQaBox").innerHTML = `
+          <div style="margin-bottom:8px;">
+            <span class="badge ${qa.passed ? "pass" : "fail"}">${qa.passed ? "QA Passed" : `${(qa.blocking_errors || []).length} Blocking`}</span>
+            <span style="margin-left:8px; font-family:var(--font-mono);">Orig ${Number(qa.originality_score || 0).toFixed(1)} · Coh ${Number(qa.bible_coherence_score || 0).toFixed(1)} · Peak ${qa.peak_dbtp != null ? `${Number(qa.peak_dbtp).toFixed(1)} dBTP` : "—"}</span>
+          </div>
+          ${(qa.blocking_errors || []).length ? `<ul class="gate-list">${qa.blocking_errors.map((e) => `<li><code>${esc(e.code)}</code> (${esc(e.shot_id || "—")}): ${esc(e.message)}</li>`).join("")}</ul>` : "Zero blocking Media QA issues detected."}
+        `;
+      }
+
+      const entries = r.cost_ledger?.entries || [];
+      $("finalLedgerBox").innerHTML = entries.length
+        ? entries.map((e) => `<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--rule); font-family:var(--font-mono);"><span>${esc(e.stage)} · ${esc(e.what)}</span><span>${fmtUsd(e.actual_usd)}</span></div>`).join("")
+        : "No metered provider charges recorded.";
+    }
+
+    // ---- DATA LOADING ----
     async function loadHealth() {
       try {
-        const [health, jobs] = await Promise.all([
-          apiFetch("/api/health"),
-          apiFetch("/api/jobs"),
-        ]);
-        const liveOk = Boolean(health.api_keys?.live_ready);
-        state.liveReady = liveOk;
-        const chipLive = $("chipLive");
-        chipLive.className = "status-chip " + (liveOk ? "ok" : "warn");
-        chipLive.innerHTML = `<span class="status-dot"></span>${liveOk ? "OpenRouter + fal.ai ready" : "Mock mode only"}`;
-
-        const ffOk = Boolean(health.tools?.ffmpeg && health.tools?.ffprobe);
-        $("chipFfmpeg").className = "status-chip " + (ffOk ? "ok" : "fail");
-        $("chipFfmpeg").innerHTML = `<span class="status-dot"></span>ffmpeg ${ffOk ? "ok" : "missing"}`;
-
-        const ocrOk = Boolean(health.tools?.tesseract);
-        $("chipTesseract").className = "status-chip " + (ocrOk ? "ok" : "warn");
-        $("chipTesseract").innerHTML = `<span class="status-dot"></span>ocr ${ocrOk ? "ok" : "off"}`;
-
-        const activeCount = (jobs.jobs || []).filter((j) => j.state === "running" || j.state === "queued").length;
-        $("chipJobs").className = "status-chip " + (activeCount > 0 ? "warn" : "ok");
-        $("chipJobs").innerHTML = `<span class="status-dot"></span>${activeCount} active`;
-      } catch (err) {
-        $("chipLive").className = "status-chip fail";
-        $("chipLive").innerHTML = `<span class="status-dot"></span>API offline`;
+        const h = await api("/api/health");
+        const live = Boolean(h.api_keys?.live_ready);
+        $("chipApis").className = "chip " + (live ? "ok" : "warn");
+        $("chipApis").innerHTML = `<span class="dot"></span>${live ? "OpenRouter + fal.ai ready" : "Mock mode only"}`;
+        const ff = Boolean(h.tools?.ffmpeg && h.tools?.ffprobe);
+        $("chipTools").className = "chip " + (ff ? "ok" : "fail");
+        $("chipTools").innerHTML = `<span class="dot"></span>ffmpeg ${ff ? "ok" : "missing"} · ocr ${h.tools?.tesseract ? "ok" : "off"}`;
+      } catch {
+        $("chipApis").className = "chip fail";
+        $("chipApis").innerHTML = `<span class="dot"></span>API offline`;
       }
     }
 
     async function loadRuns() {
       try {
-        const res = await apiFetch("/api/runs?limit=30");
+        const res = await api("/api/runs?limit=40");
         state.runs = res.runs || [];
-        renderRunsList();
-        if (!state.currentRunId && state.runs.length > 0) {
-          await selectRun(state.runs[0].run_id);
-        }
-      } catch (err) {
-        console.error("Failed to load runs:", err);
-      }
+        const sel = $("runsSelect");
+        const cur = state.run?.run_id || "";
+        sel.innerHTML = `<option value="">Recent runs (${state.runs.length})…</option>` + state.runs.map((r) =>
+          `<option value="${esc(r.run_id)}" ${r.run_id === cur ? "selected" : ""}>${esc(r.input?.brand_name || r.run_id)} · ${esc(r.step || r.status)} · ${fmtUsd(r.cost_ledger?.actual_usd)}</option>`
+        ).join("");
+      } catch {}
     }
 
-    function renderRunsList() {
-      const container = $("runsList");
-      if (!state.runs.length) {
-        container.innerHTML = `<div class="empty-note">No cuts yet. Direct your first cut above.</div>`;
-        return;
-      }
-      container.innerHTML = state.runs.map((r) => {
-        const inp = r.input || {};
-        const spend = fmtUsd(r.cost_ledger?.actual_usd || 0);
-        const modeTag = inp.mock ? "mock" : "live";
-        return `
-          <button type="button" class="run-item ${r.run_id === state.currentRunId ? "selected" : ""}" data-run-id="${esc(r.run_id)}">
-            <div class="run-item-left">
-              <div class="run-item-name">${esc(inp.brand_name || r.run_id)}</div>
-              <div class="run-item-meta">${esc(inp.aspect || "16:9")} · ${esc(inp.target_duration_sec || 15)}s · ${modeTag} · ${spend}</div>
-            </div>
-            <span class="badge ${esc(r.status)}">${esc(r.status)}</span>
-          </button>
-        `;
-      }).join("");
-
-      container.querySelectorAll(".run-item").forEach((btn) => {
-        btn.addEventListener("click", () => selectRun(btn.dataset.runId));
-      });
-    }
-
-    async function selectRun(runId) {
+    async function openRun(runId) {
       closeSse();
-      state.currentRunId = runId;
-      state.events = [];
-      renderRunsList();
-      try {
-        const run = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
-        state.currentRun = run;
-        renderRun(run);
-        if (run.status === "working") {
-          subscribeSse(runId);
-        }
-      } catch (err) {
-        showFormError(`Failed to load run: ${err.message}`);
+      setBanner("", "");
+      $("sseMiniLog").classList.remove("visible");
+      const r = await api(`/api/runs/${encodeURIComponent(runId)}`);
+      state.run = r;
+      // Populate Step 1 form for reference
+      $("inBrand").value = r.input.brand_name || "";
+      $("inUrl").value = r.input.brand_url || "";
+      $("inGoal").value = r.input.goal || "";
+      $("inDuration").value = r.input.target_duration_sec || 12;
+      $("lblDuration").textContent = `${r.input.target_duration_sec || 12}s`;
+      $("inAspect").value = r.input.aspect || "16:9";
+      $("inAudio").value = r.input.audio_mode || "both";
+      $("inCap").value = r.input.cap_usd ?? 5;
+      $("inFacts").value = (r.input.facts || []).join("\n");
+      $("inDirection").value = r.input.user_direction || "";
+      $("inOffer").value = r.input.offer || "";
+      $("inMustSay").value = (r.input.must_say || []).join(", ");
+      setMode(Boolean(r.input.mock));
+
+      // Infer best landing step (handles older runs without explicit step)
+      let targetStep = r.step || "brand";
+      if (targetStep === "brand") {
+        if (r.render_manifest?.stitched_path) targetStep = "final";
+        else if (r.versions?.length) targetStep = "previews";
+        else if (r.shot_sheet) targetStep = "sheet";
+        else if (r.creative_bible) targetStep = "concept";
       }
+      renderAll();
+      setView(targetStep);
+      await loadRuns();
     }
 
-    function closeSse() {
-      if (state.sse) {
-        state.sse.close();
-        state.sse = null;
-      }
+    function setMode(isMock) {
+      state.mock = isMock;
+      $("modeLive").classList.toggle("active", !isMock);
+      $("modeMock").classList.toggle("active", isMock);
     }
 
-    function resetAgentSteps() {
-      ["stepAgent1", "stepAgent2", "stepAgent3"].forEach((id) => {
-        $(id).classList.remove("active", "done");
-      });
-      $("step1Detail").textContent = "Scraping brand & 4 orthogonal pitches";
-      $("step2Detail").textContent = "Pure script rules & timing physics";
-      $("step3Detail").textContent = "Overlapped media, FFmpeg stitch & QA";
-    }
+    // ---- EVENT WIRING ----
+    $("modeLive").addEventListener("click", () => setMode(false));
+    $("modeMock").addEventListener("click", () => setMode(true));
+    $("inDuration").addEventListener("input", (e) => { $("lblDuration").textContent = `${e.target.value}s`; });
 
-    function updateStageVisual(stage, evType, detailText) {
-      const s = String(stage || "").toLowerCase();
-      let idx = 0;
-      if (s.includes("research") || s.includes("bible") || s.includes("agent1") || s.includes("concept")) idx = 1;
-      else if (s.includes("director") || s.includes("script") || s.includes("shot") || s.includes("agent2") || s.includes("sound")) idx = 2;
-      else if (s.includes("producer") || s.includes("render") || s.includes("stitch") || s.includes("qa") || s.includes("agent3") || s.includes("repair")) idx = 3;
+    STEPS.forEach((s) => {
+      $(`nav-${s}`).addEventListener("click", () => { if (!$(`nav-${s}`).disabled) setView(s); });
+    });
 
-      if (idx === 1) {
-        $("stepAgent1").classList.add(evType === "stage_completed" ? "done" : "active");
-        if (evType === "stage_completed") $("stepAgent1").classList.remove("active");
-        if (detailText) $("step1Detail").textContent = detailText;
-      } else if (idx === 2) {
-        $("stepAgent1").classList.add("done");
-        $("stepAgent1").classList.remove("active");
-        $("stepAgent2").classList.add(evType === "stage_completed" ? "done" : "active");
-        if (evType === "stage_completed") $("stepAgent2").classList.remove("active");
-        if (detailText) $("step2Detail").textContent = detailText;
-      } else if (idx === 3) {
-        $("stepAgent1").classList.add("done");
-        $("stepAgent1").classList.remove("active");
-        $("stepAgent2").classList.add("done");
-        $("stepAgent2").classList.remove("active");
-        $("stepAgent3").classList.add(evType === "stage_completed" ? "done" : "active");
-        if (evType === "stage_completed") $("stepAgent3").classList.remove("active");
-        if (detailText) $("step3Detail").textContent = detailText;
-      }
-    }
-
-    function appendLiveEvent(ev) {
-      state.events.push(ev);
-      const log = $("liveLog");
-      const line = document.createElement("div");
-      line.className = "log-line";
-      const typeClass = ev.type === "run_failed" || ev.type === "warning" ? "err" : (ev.type === "run_completed" || ev.type === "stage_completed" ? "ok" : "");
-      const summary = summarizeEventData(ev);
-      line.innerHTML = `
-        <span class="log-time">${esc(fmtTime(ev.timestamp))}</span>
-        <span class="log-type ${typeClass}">${esc(ev.type)}</span>
-        <span class="log-msg">${esc(summary)}</span>
-      `;
-      log.appendChild(line);
-      log.scrollTop = log.scrollHeight;
-      updateStageVisual(ev.stage, ev.type, summary);
-
-      if (ev.type === "cost_update" && ev.data) {
-        const actual = Number(ev.data.actual_usd ?? ev.data.total_usd ?? 0);
-        const cap = Number(state.currentRun?.cost_ledger?.cap_usd ?? $("capUsd").value ?? 5);
-        $("mSpend").textContent = `${fmtUsd(actual)} / ${fmtUsd(cap)}`;
-        $("mBudgetFill").style.width = `${Math.min(100, cap > 0 ? (actual / cap) * 100 : 0)}%`;
-      }
-
-      renderLedgerTab(state.currentRun);
-    }
-
-    function summarizeEventData(ev) {
-      const stage = ev.stage ? `[${ev.stage}] ` : "";
-      const d = ev.data || {};
-      if (d.error) return `${stage}${d.error}`;
-      if (d.message) return `${stage}${d.message}`;
-      if (d.shot_id && d.status) return `${stage}${d.shot_id}: ${d.status}`;
-      if (d.what && d.actual_usd !== undefined) return `${stage}${d.what} (${fmtUsd(d.actual_usd)})`;
-      if (d.passed !== undefined) return `${stage}rubric passed=${d.passed}`;
-      const keys = Object.keys(d);
-      if (!keys.length) return `${stage}${ev.type}`;
-      return stage + keys.slice(0, 4).map((k) => `${k}=${typeof d[k] === "object" ? JSON.stringify(d[k]) : d[k]}`).join(" · ");
-    }
-
-    function subscribeSse(runId) {
+    $("btnNewVideo").addEventListener("click", () => {
       closeSse();
-      $("liveLog").innerHTML = "";
-      resetAgentSteps();
-      $("stepAgent1").classList.add("active");
-      $("slateEmpty").style.display = "none";
-      $("screeningVideo").classList.remove("visible");
-      $("pipelineLive").classList.add("visible");
-      $("btnCancelCut").style.display = "inline-block";
-      $("btnStartCut").disabled = true;
+      state.run = null;
+      state.draftShots = [];
+      state.selectedStackIds.clear();
+      $("runsSelect").value = "";
+      $("sseMiniLog").classList.remove("visible");
+      setBanner("", "");
+      renderAll();
+      setView("brand");
+      $("inBrand").focus();
+    });
 
-      const src = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
-      state.sse = src;
+    $("runsSelect").addEventListener("change", (e) => {
+      if (e.target.value) openRun(e.target.value);
+    });
 
-      const eventTypes = [
-        "stage_started",
-        "rubric_evaluation",
-        "shot_progress",
-        "cost_update",
-        "warning",
-        "stage_completed",
-        "run_completed",
-        "run_cancelled",
-        "run_failed",
-      ];
-
-      eventTypes.forEach((evType) => {
-        src.addEventListener(evType, async (msg) => {
-          let payload = { type: evType, timestamp: new Date().toISOString(), data: {} };
-          try { payload = JSON.parse(msg.data); } catch {}
-          appendLiveEvent(payload);
-
-          if (evType === "stage_completed") {
-            try {
-              const fresh = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
-              state.currentRun = fresh;
-              renderInspectorTabs(fresh);
-            } catch {}
-          }
-
-          if (evType === "run_completed" || evType === "run_cancelled" || evType === "run_failed") {
-            closeSse();
-            $("btnCancelCut").style.display = "none";
-            $("btnStartCut").disabled = false;
-            await loadHealth();
-            await loadRuns();
-            try {
-              const finalRun = await apiFetch(`/api/runs/${encodeURIComponent(runId)}`);
-              state.currentRun = finalRun;
-              renderRun(finalRun);
-            } catch {}
-          }
-        });
-      });
-
-      src.onerror = () => {
-        // EventSource auto-reconnects unless closed on terminal events
-      };
-    }
-
-    function renderRun(run) {
-      if (!run) return;
-      const inp = run.input || {};
-      const status = run.status || "idle";
-      const isWorking = status === "working";
-
-      $("cutEyebrow").textContent = `${run.run_id} · ${inp.mock ? "OFFLINE MOCK" : "LIVE PRODUCTION"}`;
-      $("cutTitle").textContent = inp.brand_name || run.run_id;
-
-      const badge = $("cutStatusBadge");
-      badge.textContent = status;
-      badge.className = "badge " + status;
-
-      $("btnCancelCut").style.display = isWorking ? "inline-block" : "none";
-      $("btnStartCut").disabled = isWorking;
-
-      // Error banner
-      const errBanner = $("runErrorBanner");
-      if (run.error) {
-        errBanner.textContent = run.error;
-        errBanner.classList.add("visible");
-      } else {
-        errBanner.classList.remove("visible");
-        errBanner.textContent = "";
-      }
-
-      // Monitor state: video vs live pipeline vs empty
-      const hasVideo = Boolean(run.render_manifest?.stitched_path);
-      const vid = $("screeningVideo");
-      const dl = $("btnDownloadMp4");
-
-      if (isWorking) {
-        $("slateEmpty").style.display = "none";
-        vid.classList.remove("visible");
-        $("pipelineLive").classList.add("visible");
-        dl.style.display = "none";
-      } else if (hasVideo) {
-        $("slateEmpty").style.display = "none";
-        $("pipelineLive").classList.remove("visible");
-        const videoUrl = `/api/runs/${encodeURIComponent(run.run_id)}/video?t=${encodeURIComponent(run.updated_at || Date.now())}`;
-        if (vid.dataset.src !== videoUrl) {
-          vid.src = videoUrl;
-          vid.dataset.src = videoUrl;
-        }
-        vid.classList.add("visible");
-        dl.href = `/api/runs/${encodeURIComponent(run.run_id)}/video`;
-        dl.download = `${(inp.brand_name || run.run_id).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${run.run_id}.mp4`;
-        dl.style.display = "inline-flex";
-      } else {
-        vid.classList.remove("visible");
-        $("pipelineLive").classList.remove("visible");
-        $("slateEmpty").style.display = "block";
-        dl.style.display = "none";
-      }
-
-      // Telemetry strip
-      const dur = run.qa_report?.ffprobe_summary?.duration_sec ?? run.shot_sheet?.target_duration_sec ?? inp.target_duration_sec;
-      $("mDuration").textContent = dur ? `${Number(dur).toFixed(2)}s` : "—";
-      $("mFormat").textContent = `${inp.aspect || "16:9"} · ${inp.fps || 24}fps`;
-      $("mShots").textContent = run.shot_sheet?.shots ? `${run.shot_sheet.shots.length} shots` : "—";
-      $("mLufs").textContent = run.qa_report?.loudness_lufs != null ? `${Number(run.qa_report.loudness_lufs).toFixed(1)} LUFS` : "—";
-      if (run.qa_report) {
-        const orig = Number(run.qa_report.originality_score || 0).toFixed(1);
-        const coh = Number(run.qa_report.bible_coherence_score || 0).toFixed(1);
-        $("mScore").textContent = `${orig} / ${coh}`;
-      } else {
-        $("mScore").textContent = "—";
-      }
-
-      const actual = Number(run.cost_ledger?.actual_usd || 0);
-      const cap = Number(run.cost_ledger?.cap_usd ?? inp.cap_usd ?? 5);
-      $("mSpend").textContent = `${fmtUsd(actual)} / ${fmtUsd(cap)}`;
-      $("mBudgetFill").style.width = `${Math.min(100, cap > 0 ? (actual / cap) * 100 : 0)}%`;
-
-      renderInspectorTabs(run);
-    }
-
-    function renderInspectorTabs(run) {
-      renderStoryboardTab(run);
-      renderBibleTab(run);
-      renderQaTab(run);
-      renderLedgerTab(run);
-    }
-
-    function renderStoryboardTab(run) {
-      const el = $("tab-storyboard");
-      const sheet = run?.shot_sheet;
-      if (!sheet || !sheet.shots?.length) {
-        el.innerHTML = `<div class="empty-note">ShotSheet has not been generated for this cut yet.</div>`;
-        return;
-      }
-
-      const failedSet = new Set(run.qa_report?.failed_shot_ids || []);
-      const totalDur = sheet.shots.reduce((acc, s) => acc + Number(s.duration_sec || 0), 0) || 1;
-      let cursor = 0;
-
-      const trackHtml = sheet.shots.map((s) => {
-        const pct = Math.max(6, (Number(s.duration_sec) / totalDur) * 100);
-        const start = cursor.toFixed(1);
-        cursor += Number(s.duration_sec || 0);
-        return `
-          <div class="track-seg ${failedSet.has(s.id) ? "failed" : ""}" style="flex: 0 0 ${pct.toFixed(2)}%;">
-            <div class="track-seg-top"><span>${esc(s.id)}</span><span>${Number(s.duration_sec).toFixed(1)}s</span></div>
-            <div class="track-seg-beat">${esc(s.beat)}</div>
-          </div>
-        `;
-      }).join("");
-
-      const cardsHtml = sheet.shots.map((s) => {
-        const isFail = failedSet.has(s.id);
-        return `
-          <article class="shot-card ${isFail ? "failed" : ""}">
-            <div class="shot-head">
-              <div class="shot-id-wrap">
-                <input type="checkbox" class="shot-select" value="${esc(s.id)}" ${isFail ? "checked" : ""} aria-label="Select ${esc(s.id)} for repair" />
-                <span class="shot-id">${esc(s.id)}</span>
-                <span class="shot-beat">${esc(s.beat)}</span>
-              </div>
-              <span class="badge ${isFail ? "failed" : ""}">${esc(s.engine)} · ${Number(s.duration_sec).toFixed(2)}s</span>
-            </div>
-            <p class="shot-prompt">${esc(s.visual_prompt)}</p>
-            ${s.vo_line ? `<div class="shot-vo">“${esc(s.vo_line)}”</div>` : ""}
-            <div class="shot-meta">
-              ${s.on_screen_text ? `<span>TXT: ${esc(s.on_screen_text)}</span>` : ""}
-              ${s.camera_move ? `<span>CAM: ${esc(s.camera_move)}</span>` : ""}
-              ${s.lens_mm ? `<span>${esc(s.lens_mm)}mm</span>` : ""}
-              <span>TRANS: ${esc(s.transition)}</span>
-            </div>
-          </article>
-        `;
-      }).join("");
-
-      el.innerHTML = `
-        <div class="timeline-track">${trackHtml}</div>
-        <div class="repair-bar">
-          <div class="shot-meta">
-            <span>Total: ${totalDur.toFixed(2)}s / ${Number(sheet.target_duration_sec).toFixed(2)}s</span>
-            <span>·</span>
-            <span>Audio: ${esc(sheet.audio_mode)}</span>
-            <span>·</span>
-            <span>Font: ${esc(sheet.theme?.font_family || "Roboto")}</span>
-          </div>
-          <button type="button" class="btn-secondary" id="btnRepairSelected">Repair Selected Shots</button>
-        </div>
-        <div class="shots-grid">${cardsHtml}</div>
-      `;
-
-      $("btnRepairSelected")?.addEventListener("click", async () => {
-        const ids = Array.from(el.querySelectorAll(".shot-select:checked")).map((c) => c.value);
-        if (!ids.length) {
-          showFormError("Select at least one shot checkbox to run targeted repair.");
-          return;
-        }
-        showFormError("");
-        try {
-          await apiFetch(`/api/runs/${encodeURIComponent(run.run_id)}/repair`, {
-            method: "POST",
-            body: JSON.stringify({ failed_shot_ids: ids }),
-          });
-          subscribeSse(run.run_id);
-        } catch (err) {
-          showFormError(`Repair failed: ${err.message}`);
-        }
-      });
-    }
-
-    function renderBibleTab(run) {
-      const el = $("tab-bible");
-      const bible = run?.creative_bible;
-      if (!bible) {
-        el.innerHTML = `<div class="empty-note">CreativeBible has not been synthesized for this cut yet.</div>`;
-        return;
-      }
-
-      const palette = (bible.visual_language?.color_palette || []).map((hex) => `
-        <span class="swatch"><span class="swatch-chip" style="background:${esc(hex)};"></span>${esc(hex)}</span>
-      `).join("");
-
-      const beats = (bible.narrative_structure?.beats || []).map((b) => `
-        <tr>
-          <td class="mono">${esc(b.name)}</td>
-          <td>${esc(b.purpose)}</td>
-          <td class="mono">${Number(b.duration_hint_sec || 0).toFixed(1)}s</td>
-          <td>${esc(b.emotional_shift || "—")}</td>
-        </tr>
-      `).join("");
-
-      const concepts = (run.concepts || []).map((c) => `
-        <tr>
-          <td class="mono">${esc(c.title)}</td>
-          <td>${esc(c.thesis)}</td>
-          <td>${esc(c.visual_world)}</td>
-          <td class="mono">${Number(c.diversity_score || 0).toFixed(2)}</td>
-        </tr>
-      `).join("");
-
-      const antiCliches = (bible.anti_cliche_list || []).map((x) => `<span class="tag-pill">${esc(x)}</span>`).join("");
-
-      el.innerHTML = `
-        <div class="bible-grid">
-          <div class="info-block full">
-            <h3>Concept Thesis</h3>
-            <p class="thesis-quote">${esc(bible.concept_thesis)}</p>
-          </div>
-
-          <div class="info-block">
-            <h3>Visual Language</h3>
-            <div class="kv-list">
-              <span class="kv-k">World</span><span class="kv-v">${esc(bible.visual_language?.world)}</span>
-              <span class="kv-k">Lighting</span><span class="kv-v">${esc(bible.visual_language?.lighting_style)}</span>
-              <span class="kv-k">Grade</span><span class="kv-v">${esc(bible.visual_language?.texture_and_grade || "—")}</span>
-            </div>
-            ${palette ? `<div class="swatch-row">${palette}</div>` : ""}
-          </div>
-
-          <div class="info-block">
-            <h3>Camera, Type &amp; Sonic Identity</h3>
-            <div class="kv-list">
-              <span class="kv-k">Camera</span><span class="kv-v">${esc(bible.camera_grammar?.dominant_style)} (${esc(bible.camera_grammar?.lens_range_mm)})</span>
-              <span class="kv-k">Typography</span><span class="kv-v">${esc(bible.typography_and_layout?.font_family)} · ${esc(bible.typography_and_layout?.motion_feel)}</span>
-              <span class="kv-k">Audio</span><span class="kv-v">${esc(bible.sonic_identity?.audio_strategy)}</span>
-              <span class="kv-k">Voice</span><span class="kv-v">${esc(bible.sonic_identity?.voice_casting?.energy)} · ${esc(bible.sonic_identity?.voice_casting?.pace)} · ${esc(bible.sonic_identity?.voice_casting?.accent)}</span>
-            </div>
-          </div>
-
-          <div class="info-block full">
-            <h3>Narrative Arc — ${esc(bible.narrative_structure?.arc_name || "")} (${esc(bible.narrative_structure?.ending_strategy || "cta")})</h3>
-            <table class="data-table">
-              <thead><tr><th>Beat</th><th>Purpose</th><th>Hint</th><th>Shift</th></tr></thead>
-              <tbody>${beats || `<tr><td colspan="4">No beats recorded.</td></tr>`}</tbody>
-            </table>
-          </div>
-
-          ${antiCliches ? `
-            <div class="info-block full">
-              <h3>Brief-Specific Anti-Cliché Guardrails</h3>
-              <div class="pill-list">${antiCliches}</div>
-            </div>
-          ` : ""}
-
-          ${concepts ? `
-            <div class="info-block full">
-              <h3>Divergent Concept Pitches (${run.concepts.length})</h3>
-              <table class="data-table">
-                <thead><tr><th>Title</th><th>Thesis</th><th>Visual World</th><th>Diversity</th></tr></thead>
-                <tbody>${concepts}</tbody>
-              </table>
-            </div>
-          ` : ""}
-        </div>
-      `;
-    }
-
-    function renderQaTab(run) {
-      const el = $("tab-qa");
-      const qa = run?.qa_report;
-      if (!qa) {
-        el.innerHTML = `<div class="empty-note">Media &amp; script QA report will appear once production finishes.</div>`;
-        return;
-      }
-
-      const issues = [...(qa.blocking_errors || []), ...(qa.warnings || [])];
-      const issuesHtml = issues.length
-        ? `<table class="data-table">
-            <thead><tr><th>Severity</th><th>Code</th><th>Shot</th><th>Message</th></tr></thead>
-            <tbody>${issues.map((i) => `
-              <tr>
-                <td><span class="badge ${esc(i.severity)}">${esc(i.severity)}</span></td>
-                <td class="mono">${esc(i.code)}</td>
-                <td class="mono">${esc(i.shot_id || "—")}</td>
-                <td>${esc(i.message)}</td>
-              </tr>
-            `).join("")}</tbody>
-          </table>`
-        : `<div class="empty-note" style="border-style:solid;">Zero blocking errors or warnings detected.</div>`;
-
-      const ocrHtml = (qa.ocr_checks || []).length
-        ? `<table class="data-table">
-            <thead><tr><th>Shot</th><th>Expected Text</th><th>Observed (Tesseract)</th><th>Similarity</th><th>Status</th></tr></thead>
-            <tbody>${qa.ocr_checks.map((o) => `
-              <tr>
-                <td class="mono">${esc(o.shot_id)}</td>
-                <td>${esc(o.expected_text)}</td>
-                <td>${esc(o.observed_text || "(none)")}</td>
-                <td class="mono">${(Number(o.similarity || 0) * 100).toFixed(0)}%</td>
-                <td><span class="badge ${o.passed ? "pass" : "failed"}">${o.passed ? "pass" : "fail"}</span></td>
-              </tr>
-            `).join("")}</tbody>
-          </table>`
-        : "";
-
-      el.innerHTML = `
-        <div class="bible-grid">
-          <div class="info-block full">
-            <h3>QA Verdict</h3>
-            <div class="pill-list" style="align-items:center; gap:12px;">
-              <span class="badge ${qa.passed ? "pass" : "failed"}">${qa.passed ? "PASSED" : "BLOCKED"}</span>
-              <span class="tag-pill">Originality: ${Number(qa.originality_score || 0).toFixed(1)} / 10</span>
-              <span class="tag-pill">Bible Coherence: ${Number(qa.bible_coherence_score || 0).toFixed(1)} / 10</span>
-              ${qa.loudness_lufs != null ? `<span class="tag-pill">Loudness: ${Number(qa.loudness_lufs).toFixed(1)} LUFS</span>` : ""}
-              ${qa.peak_dbtp != null ? `<span class="tag-pill">Peak: ${Number(qa.peak_dbtp).toFixed(1)} dBTP</span>` : ""}
-            </div>
-          </div>
-
-          <div class="info-block full">
-            <h3>Issues &amp; Guardrails (${issues.length})</h3>
-            ${issuesHtml}
-          </div>
-
-          ${ocrHtml ? `
-            <div class="info-block full">
-              <h3>On-Screen Text OCR Verification</h3>
-              ${ocrHtml}
-            </div>
-          ` : ""}
-        </div>
-      `;
-    }
-
-    function renderLedgerTab(run) {
-      const el = $("tab-ledger");
-      const entries = run?.cost_ledger?.entries || [];
-      const costRows = entries.length
-        ? `<table class="data-table">
-            <thead><tr><th>Stage</th><th>Provider / Model</th><th>Action</th><th>Cache</th><th>Actual USD</th></tr></thead>
-            <tbody>${entries.map((e) => `
-              <tr>
-                <td class="mono">${esc(e.stage)}</td>
-                <td class="mono">${esc(e.provider)} · ${esc(e.model)}</td>
-                <td>${esc(e.what)}</td>
-                <td>${e.cache_hit ? `<span class="badge pass">hit</span>` : "miss"}</td>
-                <td class="mono">${fmtUsd(e.actual_usd)}</td>
-              </tr>
-            `).join("")}</tbody>
-          </table>`
-        : `<div class="empty-note">No metered provider entries recorded for this cut.</div>`;
-
-      const eventRows = state.events.length
-        ? `<table class="data-table">
-            <thead><tr><th>Time</th><th>Event</th><th>Stage</th><th>Details</th></tr></thead>
-            <tbody>${state.events.slice().reverse().map((ev) => `
-              <tr>
-                <td class="mono">${esc(fmtTime(ev.timestamp))}</td>
-                <td class="mono">${esc(ev.type)}</td>
-                <td class="mono">${esc(ev.stage || "—")}</td>
-                <td>${esc(summarizeEventData(ev))}</td>
-              </tr>
-            `).join("")}</tbody>
-          </table>`
-        : `<div class="empty-note">Live SSE events will log here while a cut is running.</div>`;
-
-      el.innerHTML = `
-        <div class="bible-grid">
-          <div class="info-block full">
-            <h3>Cost Ledger (${fmtUsd(run?.cost_ledger?.actual_usd || 0)} / ${fmtUsd(run?.cost_ledger?.cap_usd ?? 5)})</h3>
-            ${costRows}
-          </div>
-          <div class="info-block full">
-            <h3>Session SSE Events (${state.events.length})</h3>
-            ${eventRows}
-          </div>
-        </div>
-      `;
-    }
-
-    async function launchCut() {
-      showFormError("");
-      const [fpsStr, renderMode] = $("fpsSelect").value.split("|");
-      const facts = $("factsInput").value.split("\n").map((s) => s.trim()).filter(Boolean);
-      const mustSay = $("mustSayInput").value.split("\n").map((s) => s.trim()).filter(Boolean);
-
-      const payload = {
-        brand_name: $("brandName").value.trim(),
-        brand_url: $("brandUrl").value.trim(),
-        goal: $("campaignGoal").value.trim(),
-        target_duration_sec: Number($("durationRange").value),
-        aspect: state.aspect,
-        fps: Number(fpsStr),
-        audio_mode: state.audioMode,
-        cap_usd: Number($("capUsd").value || 5.0),
-        render_mode: renderMode,
-        mock: state.mock,
-        facts,
-        must_say: mustSay,
-      };
-      const offer = $("offerInput").value.trim();
-      const dir = $("directionInput").value.trim();
-      const insp = $("inspirationUrl").value.trim();
-      if (offer) payload.offer = offer;
-      if (dir) payload.user_direction = dir;
-      if (insp) payload.inspiration_url = insp;
-
-      $("btnStartCut").disabled = true;
+    $("headerCapInput").addEventListener("change", async (e) => {
+      if (!state.run) return;
       try {
-        const created = await apiFetch("/api/runs", {
-          method: "POST",
-          body: JSON.stringify(payload),
+        const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/cap`, {
+          method: "PATCH",
+          body: JSON.stringify({ cap_usd: Number(e.target.value || 0) }),
         });
-        state.currentRunId = created.run_id;
-        state.currentRun = created;
-        state.events = [];
-        renderRun(created);
-
-        await apiFetch(`/api/runs/${encodeURIComponent(created.run_id)}/start`, {
-          method: "POST",
-        });
-        created.status = "working";
-        renderRun(created);
-        subscribeSse(created.run_id);
-        await loadRuns();
-        await loadHealth();
+        state.run = updated;
+        renderCostMeter();
+        setBanner("ok", `Updated USD budget cap to ${fmtUsd(updated.cost_ledger.cap_usd)}.`);
       } catch (err) {
-        $("btnStartCut").disabled = false;
-        showFormError(err.message);
-      }
-    }
-
-    // Wire UI controls
-    $("btnModeLive").addEventListener("click", () => setMode(false));
-    $("btnModeMock").addEventListener("click", () => setMode(true));
-
-    $("durationRange").addEventListener("input", (e) => {
-      $("durationLabel").textContent = `${e.target.value}s`;
-    });
-
-    $("aspectGroup").querySelectorAll(".seg-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        $("aspectGroup").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.aspect = btn.dataset.val;
-      });
-    });
-
-    $("audioGroup").querySelectorAll(".seg-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        $("audioGroup").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.audioMode = btn.dataset.val;
-      });
-    });
-
-    document.querySelectorAll(".tab-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-        btn.classList.add("active");
-        $(`tab-${btn.dataset.tab}`).classList.add("active");
-      });
-    });
-
-    $("briefForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      launchCut();
-    });
-
-    $("btnCancelCut").addEventListener("click", async () => {
-      if (!state.currentRunId) return;
-      try {
-        await apiFetch(`/api/runs/${encodeURIComponent(state.currentRunId)}/cancel`, { method: "POST" });
-      } catch (err) {
-        showFormError(`Cancel failed: ${err.message}`);
+        setBanner("error", err.message);
       }
     });
 
-    $("btnRefreshRuns").addEventListener("click", () => {
-      loadRuns();
-      loadHealth();
+    $("btnCancelJob").addEventListener("click", async () => {
+      if (!state.run) return;
+      try { await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/cancel`, { method: "POST" }); } catch {}
     });
 
-    function fillMockPreset() {
-      setMode(true);
-      $("brandName").value = "Kestrel Roasters";
-      $("brandUrl").value = "https://kestrelroasters.example.com";
-      $("campaignGoal").value = "Drive single-origin coffee subscription trials with grounded sourcing proof.";
-      $("durationRange").value = "15";
-      $("durationLabel").textContent = "15s";
-      $("capUsd").value = "5.0";
-      $("factsInput").value = "Small-batch roasted within 24 hours of shipping\n100% traceable direct-trade micro-lots";
-    }
-
-    function fillLivePreset() {
+    // Quick Presets
+    $("presetNike").addEventListener("click", () => {
       setMode(false);
-      $("brandName").value = "Linear";
-      $("brandUrl").value = "https://linear.app";
-      $("campaignGoal").value = "Launch cut highlighting speed and craft for modern product engineering teams.";
-      $("durationRange").value = "12";
-      $("durationLabel").textContent = "12s";
-      $("capUsd").value = "3.0";
-      $("factsInput").value = "";
+      $("inBrand").value = "Nike";
+      $("inUrl").value = "https://www.nike.com";
+      $("inGoal").value = "Inspire everyday athletes to lace up and move with Nike running innovation and kinetic energy.";
+      $("inFacts").value = "ZoomX responsive foam engineered for high energy return\nLightweight breathable mesh upper built for daily miles";
+      $("inOffer").value = "";
+      $("inDuration").value = "12"; $("lblDuration").textContent = "12s";
+    });
+    $("presetFellow").addEventListener("click", () => {
+      setMode(false);
+      $("inBrand").value = "Fellow";
+      $("inUrl").value = "https://fellowproducts.com";
+      $("inGoal").value = "Drive Stagg EKG electric pour-over kettle purchases by showcasing precision temperature control and minimalist countertop craft.";
+      $("inFacts").value = "To-the-degree variable temperature control from 135°F to 212°F\nPrecision gooseneck pour spout for balanced extraction";
+      $("inOffer").value = "";
+      $("inDuration").value = "12"; $("lblDuration").textContent = "12s";
+    });
+    $("presetKestrel").addEventListener("click", () => {
+      setMode(true);
+      $("inBrand").value = "Kestrel Roasters";
+      $("inUrl").value = "https://kestrelroasters.example.com";
+      $("inGoal").value = "Drive single-origin coffee subscription trials with grounded sourcing proof.";
+      $("inFacts").value = "Small-batch roasted within 24 hours of shipping\n100% traceable direct-trade micro-lots";
+      $("inOffer").value = "First bag 25% off";
+      $("inDuration").value = "15"; $("lblDuration").textContent = "15s";
+    });
+
+    // Step 1 Submit -> Create Run + Step 1 Research
+    $("brandForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setBanner("working", "Creating run & researching brand (Agent 1)…", true);
+      try {
+        const facts = $("inFacts").value.split("\n").map((s) => s.trim()).filter(Boolean);
+        const mustSay = $("inMustSay").value.split(",").map((s) => s.trim()).filter(Boolean);
+        const payload = {
+          brand_name: $("inBrand").value.trim(),
+          brand_url: $("inUrl").value.trim(),
+          goal: $("inGoal").value.trim(),
+          target_duration_sec: Number($("inDuration").value),
+          aspect: $("inAspect").value,
+          fps: Number($("inFps").value),
+          audio_mode: $("inAudio").value,
+          cap_usd: Number($("inCap").value || 5),
+          render_mode: "preview",
+          mock: state.mock,
+          facts,
+          must_say: mustSay,
+        };
+        if ($("inOffer").value.trim()) payload.offer = $("inOffer").value.trim();
+        if ($("inDirection").value.trim()) payload.user_direction = $("inDirection").value.trim();
+
+        const created = await api("/api/runs", { method: "POST", body: JSON.stringify(payload) });
+        state.run = created;
+        await api(`/api/runs/${encodeURIComponent(created.run_id)}/step/research`, { method: "POST" });
+        await loadRuns();
+        subscribeSse(created.run_id, (fresh) => {
+          if (fresh.creative_bible) setView("concept");
+        });
+      } catch (err) {
+        setBanner("error", err.message);
+      }
+    });
+
+    // Step 2: Save Concept / Regenerate / Approve -> Direct
+    async function saveConceptEdits() {
+      const facts = $("edBibleFacts").value.split("\n").map((s) => s.trim()).filter(Boolean);
+      const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/concept`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          concept_thesis: $("edThesis").value,
+          world: $("edWorld").value,
+          arc_name: $("edArc").value,
+          lighting_style: $("edLighting").value,
+          camera_style: $("edCamera").value,
+          audio_strategy: $("edAudioStrategy").value,
+          facts,
+        }),
+      });
+      state.run = updated;
+      return updated;
     }
 
-    $("presetMockDemo").addEventListener("click", fillMockPreset);
-    $("presetLiveDemo").addEventListener("click", fillLivePreset);
-    $("btnQuickMock").addEventListener("click", () => {
-      fillMockPreset();
-      launchCut();
+    $("btnSaveConcept").addEventListener("click", async () => {
+      try {
+        await saveConceptEdits();
+        setBanner("ok", "Concept & Creative Bible edits saved.");
+        renderAll();
+      } catch (err) { setBanner("error", err.message); }
     });
-    $("btnFocusLive").addEventListener("click", () => {
-      fillLivePreset();
-      $("brandName").focus();
+
+    $("btnRegenConcepts").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Regenerating brand research & 4 concepts (Agent 1)…", true);
+      try {
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/research`, { method: "POST" });
+        subscribeSse(state.run.run_id, () => setView("concept"));
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    $("btnApproveConcept").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Saving concept & directing Script + Shot Sheet (Agent 2)…", true);
+      try {
+        await saveConceptEdits();
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/direct`, { method: "POST" });
+        subscribeSse(state.run.run_id, (fresh) => {
+          if (fresh.shot_sheet) setView("sheet");
+        });
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    // Step 3: Shot-by-Shot Sheet Actions
+    $("btnAddShot").addEventListener("click", () => {
+      const nextNum = state.draftShots.length + 1;
+      state.draftShots.push({
+        id: `s${nextNum}`,
+        index: nextNum - 1,
+        beat: "new_beat",
+        duration_sec: 3.0,
+        engine: "ai_video",
+        visual_prompt: "Describe visual motion and framing matching CreativeBible.",
+        negative_prompt: "",
+        camera_move: "smooth lateral glide",
+        camera_angle: "eye_level",
+        transition: "cut",
+        product_hero: false,
+        on_screen_text: null,
+        vo_line: "",
+      });
+      renderSheetRows();
+    });
+
+    $("btnSaveSheet").addEventListener("click", async () => {
+      try {
+        const updated = await saveSheetDraft();
+        setBanner(updated.qa_report?.passed ? "ok" : "error", updated.qa_report?.passed ? "Shot Sheet saved — all pure script rules passed!" : "Shot Sheet saved — fix blocking script rule issues shown below.");
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    $("btnAiRewriteSheet").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Rewriting Script & Shot Sheet with Agent 2…", true);
+      try {
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/direct`, { method: "POST" });
+        subscribeSse(state.run.run_id, () => setView("sheet"));
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    $("btnApproveSheet").addEventListener("click", async () => {
+      try {
+        await saveSheetDraft();
+        setBanner("ok", "Shot Sheet approved! Pick 1–4 preview stacks to render side-by-side.");
+        setView("previews");
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    // Step 4: Previews Actions
+    $("btnAddCustomStack").addEventListener("click", () => {
+      const label = $("custLabel").value.trim() || `Custom Stack ${state.customStacks.length + 1}`;
+      const id = `custom_${Date.now().toString(36)}`;
+      const stack = {
+        id,
+        label,
+        description: `Custom: ${$("custVideoModel").value.trim()} + ${$("custVoiceModel").value.trim()}`,
+        video_model: $("custVideoModel").value.trim() || "kling/v4/flash/text-to-video",
+        voice_model: $("custVoiceModel").value.trim() || "fal-ai/elevenlabs/tts/eleven-v3",
+        hybrid_motion_cards: false,
+        mock: false,
+        estimated_usd: 1.4,
+      };
+      state.customStacks.push(stack);
+      if (state.selectedStackIds.size < 4) state.selectedStackIds.add(id);
+      $("custLabel").value = "";
+      renderPreviewsStep();
+    });
+
+    $("btnRenderPreviews").addEventListener("click", async () => {
+      const chosen = allStacks().filter((s) => state.selectedStackIds.has(s.id)).map((s) => ({
+        id: s.id,
+        label: s.label,
+        video_model: s.video_model,
+        voice_model: s.voice_model,
+        hybrid_motion_cards: Boolean(s.hybrid_motion_cards),
+        mock: Boolean(s.mock),
+      }));
+      if (!chosen.length || !state.run) return;
+      setBanner("working", `Rendering ${chosen.length} preview stack(s) side-by-side…`, true);
+      try {
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/previews`, {
+          method: "POST",
+          body: JSON.stringify({ stacks: chosen }),
+        });
+        subscribeSse(state.run.run_id, () => setView("previews"));
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    $("btnGoFinal").addEventListener("click", () => setView("final"));
+
+    // Step 5: Render Final Cut
+    $("btnRenderFinal").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Rendering full-quality Final Cut & Media QA…", true);
+      try {
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/final`, {
+          method: "POST",
+          body: JSON.stringify({ version_id: state.run.winning_version_id }),
+        });
+        subscribeSse(state.run.run_id, () => setView("final"));
+      } catch (err) { setBanner("error", err.message); }
     });
 
     // Boot
-    setMode(false);
     loadHealth();
     loadRuns();
-    setInterval(loadHealth, 12000);
+    setInterval(loadHealth, 15000);
   </script>
 </body>
 </html>

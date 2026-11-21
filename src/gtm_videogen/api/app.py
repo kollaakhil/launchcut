@@ -93,6 +93,9 @@ def create_app(
     application.state.rate_limiter = limiter
 
     application.include_router(router)
+    from gtm_videogen.api.studio_steps import studio_router
+
+    application.include_router(studio_router)
 
     studio_html_path = Path(__file__).with_name("studio.html")
 
