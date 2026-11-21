@@ -126,6 +126,10 @@ class VisionQualityCritic:
                 cmd = [
                     self.settings.ffmpeg_bin,
                     "-y",
+                    "-threads",
+                    "1",
+                    "-filter_threads",
+                    "1",
                     "-ss",
                     f"{mid:.2f}",
                     "-i",

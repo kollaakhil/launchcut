@@ -2,6 +2,8 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2 \
+    OMP_NUM_THREADS=1 \
     UV_LINK_MODE=copy \
     PORT=8000 \
     GTM_FONTS_DIR=/app/assets/fonts \
@@ -29,4 +31,4 @@ RUN mkdir -p /app/.data
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run --no-sync gtm-videogen serve --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec /app/.venv/bin/gtm-videogen serve --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -386,6 +386,7 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             "precision_sheet_v2": True,
             "precision_sheet_v3": True,
             "render_ram_hardened": True,
+            "low_ram_ffmpeg": True,
             "veo3_flagship": True,
             "taste_cloning": True,
             "auto_polish": True,

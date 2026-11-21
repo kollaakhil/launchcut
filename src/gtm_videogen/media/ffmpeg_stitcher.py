@@ -60,13 +60,18 @@ def _pinned_h264_flags(
     if eff_threads is None:
         raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
         eff_threads = max(1, int(raw_t)) if raw_t.isdigit() else 2
+    eff_preset = "ultrafast" if eff_threads <= 1 else preset
     flags = [
         "-threads",
+        str(eff_threads),
+        "-filter_threads",
+        str(eff_threads),
+        "-filter_complex_threads",
         str(eff_threads),
         "-c:v",
         "libx264",
         "-preset",
-        preset,
+        eff_preset,
         "-crf",
         "20",
         "-profile:v",
@@ -88,6 +93,13 @@ def _pinned_h264_flags(
         "-r",
         str(fps),
     ]
+    if eff_threads <= 1:
+        flags.extend(
+            [
+                "-x264-params",
+                "rc-lookahead=10:ref=1:bframes=0:sync-lookahead=0:threads=1",
+            ]
+        )
     return flags
 
 

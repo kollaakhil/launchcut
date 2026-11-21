@@ -250,6 +250,12 @@ async def render_kinetic_card_mp4(
     cmd = [
         ffmpeg_bin,
         "-y",
+        "-threads",
+        ff_threads,
+        "-filter_threads",
+        ff_threads,
+        "-filter_complex_threads",
+        ff_threads,
         "-f",
         "rawvideo",
         "-vcodec",
@@ -279,9 +285,14 @@ async def render_kinetic_card_mp4(
         "-c:v",
         "libx264",
         "-preset",
-        "ultrafast" if even_w <= 860 else "veryfast",
+        "ultrafast" if (ff_threads == "1" or even_w <= 860) else "veryfast",
         "-crf",
         "19",
+        *(
+            ["-x264-params", "rc-lookahead=10:ref=1:bframes=0:sync-lookahead=0:threads=1"]
+            if ff_threads == "1"
+            else []
+        ),
         "-profile:v",
         "high",
         "-level:v",
