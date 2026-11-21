@@ -68,29 +68,29 @@ rules and zero hardcoded visual/story/audio templates.
 Always call your tools in order:
 1. `fit_shot_timings_tool` with the beat durations to get exact durations summing to target_duration_sec.
 2. `select_voice_tool` to cast an attribute-matched voice avoiding CreativeHistory repeats.
-3. `save_director_artifacts_tool` with valid JSON for `shot_sheet_json`, `sound_plan_json`, and `script_json`.
+3. `save_director_artifacts_tool` with valid compact JSON for `shot_sheet_json` and `sound_plan_json` (leave `script_json` empty `""` — it is auto-built from `shot_sheet.shots[].vo_line` so you save output tokens for rich shot details!).
 
-Required ShotSheet fields (every shot MUST include hyper-precise, model-ready direction):
+Required ShotSheet fields (every shot MUST include crisp, high-signal, model-ready direction — 1 concise concrete phrase/sentence per field):
 - `id` (e.g. "s1"), `index` (0-based int), `beat` (from CreativeBible), `duration_sec` (exact fitted float)
 - `engine`: "ai_video" | "image_to_video" | "motion_card" | "manim" (use "image_to_video" + `product_hero: true` + `reference_image` ONLY when scraped product photos exist)
-- `visual_prompt`: concise master summary of the shot matching CreativeBible world & lighting (never ask AI video to render dense text)
-- `still_prompt`: **IMAGE MODEL SPEC (Flux Schnell / Kontext)** — exact static photographic composition: foreground/midground/background placement, subject geometry, camera height, framing rule (e.g., rule of thirds, negative space), and focal depth — ZERO motion verbs
-- `motion_prompt`: **VIDEO MODEL SPEC (Kling v4 / Veo 3)** — exact temporal choreography from 0.0s to end: camera trajectory, subject physics & micro-motion (e.g., rising steam, sliding light glint across anodized aluminum, fabric ripple), continuous motion from frame 1 so `freezedetect` passes, zero morphing
-- `subject_and_materials`: exact tactile anchor for cross-shot continuity (object geometry, matte/brushed/glass surface finishes, wardrobe/props, exact brand color hexes)
-- `environment`: concrete physical location, architectural surfaces, background depth elements, and atmosphere
-- `lighting_rig`: exact studio/natural lighting blueprint (key light angle & softness, fill ratio, rim/accent color temperature in Kelvin, shadow density)
-- `lens_mm`: integer cinema focal length (e.g., `24` wide environmental, `35` editorial, `50` natural, `85` intimate hero portrait, `100` macro product detail)
-- `camera_move`: dynamic camera move from CreativeBible `camera_grammar.allowed_moves` (e.g. "slow 8-degree orbital push-in", "smooth lateral dolly glide")
+- `visual_prompt`: concise 1-sentence master summary matching CreativeBible world & lighting (never ask AI video to render dense text)
+- `still_prompt`: **IMAGE MODEL SPEC (Flux Schnell / Kontext)** — 1 crisp sentence of static photographic framing (foreground/midground/background, subject geometry, focal depth, zero motion verbs)
+- `motion_prompt`: **VIDEO MODEL SPEC (Kling v4 / Veo 3)** — 1 crisp sentence of temporal camera & subject physics from 0s to end (continuous motion from frame 1, zero morphing)
+- `subject_and_materials`: concrete tactile anchor (object geometry, surface finish, exact brand hexes)
+- `environment`: physical location, surfaces, and background depth
+- `lighting_rig`: key angle, fill ratio, Kelvin rim/accent light
+- `lens_mm`: integer focal length (`24`, `35`, `50`, `85`, or `100`)
+- `camera_move`: dynamic move from CreativeBible (e.g. "slow 8-deg orbital push-in")
 - `camera_angle`: e.g. "low_angle_hero", "eye_level", "three_quarter_close_up", "overhead_macro"
-- `motion_curve`: pacing curve (e.g. "ease-in-out silky glide", "snappy whip into steady hold", "linear micro-push")
-- `color_grade`: color temperature, contrast curve, and highlight/shadow tint (e.g. "5400K neutral highlights, deep obsidian shadows, warm amber specular accent")
+- `motion_curve`: e.g. "ease-in-out glide", "linear micro-push"
+- `color_grade`: e.g. "5400K neutral highlights, deep obsidian shadows, warm amber specular"
 - `transition`: "cut" | "j_cut" | "match_cut" | "crossfade" | "whip" | "smash_cut" | "fade_black"
-- `sfx_note`: **AUDIO FOLEY SPEC (Mirelo / ElevenLabs SFX)** — exact acoustic texture, material contact sound, and timing within the shot (e.g. "crisp dry mechanical keycap click at 0.3s over subtle warm room air tone")
-- `vo_line`: concise spoken line grounded ONLY in verified facts/claims (required when audio_mode is "vo" or "both", fitting comfortably inside `duration_sec` at ~2.5 words/sec)
-- `vo_delivery`: **VOICE ACTING SPEC (ElevenLabs v3)** — vocal pacing, mic proximity, emotional register, and pause/emphasis note (e.g. "close-mic calm editorial authority, slight breath before final phrase")
-- `theme` / `shot_sheet.theme`: match CreativeBible `typography_and_layout.font_family` and `visual_language.color_palette`.
-- `shot_sheet.end_card_title`: ALWAYS set to the brand name (and optional `end_card_subtitle` for a crisp brand tagline/offer — NEVER nav copy like "Log in" or "Sign up") so `motion_card` end frames display clean brand typography instead of beat names.
-- Editorial pacing & sound craft: use variable launch-film rhythm (punchy 2.0-2.8s opening hook -> lush 3.5-5.0s hero product reveal -> crisp proof beat -> calm 2.5-3.0s brand resolve; use `j_cut` transitions where voiceover anticipates the next cut). In `sound_plan.music_cue.prompt`, specify BPM, exact instruments, and a 3-act arc (minimal rhythmic pulse in the hook -> harmonic lift on the hero reveal -> clean resonant tail on the closing logo).
+- `sfx_note`: **AUDIO FOLEY SPEC** — 1 crisp acoustic texture + timing (e.g. "crisp mechanical keycap click at 0.3s over soft room air")
+- `vo_line`: concise spoken line grounded ONLY in verified facts/claims (~2.5 words/sec)
+- `vo_delivery`: **VOICE ACTING SPEC** — concise vocal pacing & mic proximity cue
+- `theme` / `shot_sheet.theme`: match CreativeBible font and palette.
+- `shot_sheet.end_card_title`: ALWAYS set to the brand name (optional crisp `end_card_subtitle`, NEVER nav copy).
+- Pacing & sound arc: variable rhythm (punchy hook -> lush hero reveal -> crisp proof -> calm resolve; use `j_cut` where VO leads the cut). In `sound_plan.music_cue.prompt`, specify BPM, instruments, and a 3-act arc.
 If `save_director_artifacts_tool` reports any `blocking_errors`, fix them and call `save_director_artifacts_tool` again before finishing.
 """
 
@@ -499,7 +499,10 @@ def _build_agent2_tools(
                             at_sec=round(cursor, 3),
                             duration_sec=shot.duration_sec,
                             text=shot.vo_line.strip(),
-                            delivery_note=creative_bible.sonic_identity.voice_casting.delivery_style,
+                            delivery_note=(
+                                (shot.vo_delivery or "").strip()
+                                or creative_bible.sonic_identity.voice_casting.delivery_style
+                            ),
                         )
                     )
                 cursor += shot.duration_sec
