@@ -67,16 +67,23 @@ def select_supported_aspect(
     return supported[0] if supported else requested
 
 
+def _is_valid_image_ref(value: str | None) -> bool:
+    return bool(value and value.startswith(("http://", "https://", "data:image/")))
+
+
 def build_fal_video_payload(
     shot: Shot,
     aspect: AspectRatio,
     fps: int,
     model: str = "",
+    *,
+    raw_prompt: str | None = None,
+    generate_audio: bool = False,
 ) -> dict[str, Any]:
     """Build fal.ai video queue submission payload honoring requested aspect ratio."""
     from gtm_videogen.models.prompt_compiler import compile_video_prompt
 
-    compiled_prompt = compile_video_prompt(shot)
+    compiled_prompt = (raw_prompt or "").strip() or compile_video_prompt(shot)
     low_model = model.strip().lower()
     if "kling/v4" in low_model:
         dur_int = max(3, min(20, int(round(float(shot.duration_sec)))))
@@ -86,18 +93,12 @@ def build_fal_video_payload(
             "resolution": "720p",
         }
         has_start = bool(
-            shot.engine == "image_to_video"
-            and shot.reference_image
-            and shot.reference_image.startswith(("http://", "https://"))
+            shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image)
         )
         if has_start:
             payload["start_image_url"] = shot.reference_image
             # Full Kling v4 Pro I2V (non-flash) supports Start -> End keyframe bridging!
-            if (
-                "flash" not in low_model
-                and shot.end_reference_image
-                and shot.end_reference_image.startswith(("http://", "https://"))
-            ):
+            if "flash" not in low_model and _is_valid_image_ref(shot.end_reference_image):
                 payload["end_image_url"] = shot.end_reference_image
         else:
             payload["aspect_ratio"] = select_supported_aspect(aspect)
@@ -111,16 +112,12 @@ def build_fal_video_payload(
             "aspect_ratio": select_supported_aspect(aspect),
             "duration": veo_dur,
             "resolution": "720p",
-            "generate_audio": False,
+            "generate_audio": bool(generate_audio),
             "auto_fix": True,
         }
         if shot.negative_prompt:
             payload["negative_prompt"] = shot.negative_prompt
-        if (
-            shot.engine == "image_to_video"
-            and shot.reference_image
-            and shot.reference_image.startswith(("http://", "https://"))
-        ):
+        if shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image):
             payload["image_url"] = shot.reference_image
         return payload
 
@@ -287,20 +284,24 @@ class VideoProvider:
         shot: Shot,
         aspect: AspectRatio,
         fps: int,
+        raw_prompt: str | None = None,
+        generate_audio: bool = False,
     ) -> str:
         assert self._clip_cache is not None
         return self._clip_cache.make_key(
             {
                 "provider": provider,
                 "model": model,
-                "prompt": shot.visual_prompt,
+                "prompt": (raw_prompt or "").strip() or shot.visual_prompt,
                 "negative_prompt": shot.negative_prompt,
                 "camera_move": shot.camera_move,
                 "camera_angle": shot.camera_angle,
                 "aspect": aspect,
                 "fps": fps,
                 "duration_sec": round(float(shot.duration_sec), 3),
-                "reference_image": shot.reference_image or "",
+                "reference_image": (shot.reference_image or "")[:128],
+                "end_reference_image": (shot.end_reference_image or "")[:128],
+                "generate_audio": bool(generate_audio),
             }
         )
 
@@ -312,6 +313,9 @@ class VideoProvider:
         cancel: CancellationToken | None = None,
         provider: str | None = None,
         model: str | None = None,
+        *,
+        raw_prompt: str | None = None,
+        generate_audio: bool = False,
     ) -> RenderedClip:
         """Generate (or retrieve cached) video clip for a shot."""
         if cancel is not None:
@@ -333,6 +337,8 @@ class VideoProvider:
                 shot=shot,
                 aspect=aspect,
                 fps=fps,
+                raw_prompt=raw_prompt,
+                generate_audio=generate_audio,
             )
             hit = self._clip_cache.get(cache_key)
             if hit is not None and hit.artifact_path is not None:
@@ -377,7 +383,14 @@ class VideoProvider:
 
             if chosen_provider == "fal":
                 video_url, reported_usd = await self._run_fal(
-                    client, shot, aspect, fps, chosen_model, cancel
+                    client,
+                    shot,
+                    aspect,
+                    fps,
+                    chosen_model,
+                    cancel,
+                    raw_prompt=raw_prompt,
+                    generate_audio=generate_audio,
                 )
             elif chosen_provider == "openrouter":
                 video_url, reported_usd = await self._run_openrouter(
@@ -484,6 +497,9 @@ class VideoProvider:
         fps: int,
         model: str,
         cancel: CancellationToken | None,
+        *,
+        raw_prompt: str | None = None,
+        generate_audio: bool = False,
     ) -> tuple[str, float | None]:
         headers = {"Content-Type": "application/json"}
         if self.settings.fal_key:
@@ -491,9 +507,7 @@ class VideoProvider:
 
         target_model = model.lstrip("/")
         has_ref = bool(
-            shot.engine == "image_to_video"
-            and shot.reference_image
-            and shot.reference_image.startswith(("http://", "https://"))
+            shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image)
         )
         if has_ref and target_model.endswith("/text-to-video"):
             target_model = target_model[: -len("/text-to-video")] + "/image-to-video"
@@ -501,7 +515,14 @@ class VideoProvider:
             target_model = "fal-ai/veo3/image-to-video"
 
         submit_url = f"https://queue.fal.run/{target_model}"
-        payload = build_fal_video_payload(shot, aspect, fps, model=target_model)
+        payload = build_fal_video_payload(
+            shot,
+            aspect,
+            fps,
+            model=target_model,
+            raw_prompt=raw_prompt,
+            generate_audio=generate_audio,
+        )
         submitted = await client.post_json(submit_url, json=payload, headers=headers, cancel=cancel)
         if not isinstance(submitted, dict):
             raise VideoProviderError(f"fal returned non-object submit payload: {submitted!r}")

@@ -868,8 +868,324 @@
     }
     .film-fix-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 
+    /* Guided JSON Director Studio Styles */
+    .workspace-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--rule-strong);
+      margin-left: 8px;
+    }
+    .ws-tab {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .ws-tab:hover { color: var(--ink); }
+    .ws-tab.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+    .dir-shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 22px 24px 72px;
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .dir-shell.active { display: flex; }
+    .dir-hero-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 18px 22px;
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(600px 240px at 90% 0%, rgba(226, 163, 54, 0.14), transparent 70%),
+        var(--surface);
+      border: 1px solid var(--rule-strong);
+    }
+    .dir-hero-banner h2 {
+      margin: 0 0 4px;
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 30px;
+      line-height: 1.08;
+    }
+    .dir-hero-banner h2 span { color: var(--accent); font-style: italic; }
+    .dir-hero-banner p { margin: 0; color: var(--ink-secondary); font-size: 13.5px; max-width: 680px; }
+    .recipe-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .recipe-card {
+      text-align: left;
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .recipe-card:hover { border-color: var(--rule-strong); background: var(--surface-raised); }
+    .recipe-card.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .recipe-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+    }
+    .recipe-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+    .recipe-desc { font-size: 11.5px; color: var(--ink-muted); line-height: 1.35; }
+    .visual-group-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+      margin: 12px 0 7px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .visual-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+      gap: 8px;
+    }
+    .vcard {
+      appearance: none;
+      text-align: left;
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-sm);
+      padding: 9px 11px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .vcard:hover { border-color: var(--rule-strong); background: var(--surface-raised); }
+    .vcard.active { border-color: var(--accent); background: var(--accent-soft); }
+    .vcard-title { font-size: 12.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .vcard-sub { font-size: 11px; color: var(--ink-muted); line-height: 1.32; }
+    .swatch-row { display: inline-flex; gap: 3px; }
+    .swatch-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.22); }
+    .dur-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .seg-pill {
+      appearance: none;
+      padding: 7px 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--rule-strong);
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .seg-pill:hover { color: var(--ink); border-color: var(--accent); }
+    .seg-pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .act-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .act-tab {
+      appearance: none;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--rule);
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .act-tab.active {
+      background: var(--surface-raised);
+      border-color: var(--accent);
+      color: var(--ink);
+    }
+    .chain-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--pass-soft);
+      color: var(--pass);
+    }
+    .beat-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .beat-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .beat-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .beat-time {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .beat-field-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+    .beat-textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 6px 8px;
+      resize: vertical;
+      min-height: 50px;
+    }
+    .beat-textarea:focus { outline: none; border-color: var(--accent); }
+    .chip-rail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .tweak-chip {
+      appearance: none;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--rule-strong);
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    .tweak-chip:hover {
+      border-color: var(--accent);
+      color: var(--ink);
+      background: var(--accent-soft);
+    }
+    .json-pre {
+      background: #090a0d;
+      border: 1px solid var(--rule-strong);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #d8e4f0;
+      overflow: auto;
+      max-height: 400px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .kf-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .kf-card {
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .kf-card img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+      background: #0d0e11;
+    }
+    .kf-caption {
+      padding: 6px 9px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+    .world-lock-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      font-size: 12px;
+      color: var(--ink-secondary);
+    }
+    .world-lock-bar strong { color: var(--ink); }
+
+    @media (max-width: 1120px) {
+      .beat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     @media (max-width: 900px) {
-      .grid-2, .grid-3, .grid-4, .metrics-row, .asset-bar, .archetype-row { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .grid-4, .metrics-row, .asset-bar, .archetype-row, .beat-grid, .recipe-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -878,7 +1194,11 @@
   <header class="topbar">
     <div class="brand-group">
       <h1>Launch<span>Cut</span></h1>
-      <span class="flow-crumb">Brand → Concept → Sheet → Stills → Previews &amp; QA → Final</span>
+      <div class="workspace-switch" role="tablist" aria-label="Studio mode">
+        <button type="button" class="ws-tab active" id="wsTabDirector" role="tab" aria-selected="true">✦ JSON Director (10s–30s)</button>
+        <button type="button" class="ws-tab" id="wsTabCommercial" role="tab" aria-selected="false">🎬 Commercial Studio (6-Step)</button>
+      </div>
+      <span class="flow-crumb" id="flowCrumb">Spark → Visual Direction → 2s Beat JSON → Render</span>
     </div>
     <div class="topbar-controls">
       <span class="chip" id="chipApis"><span class="dot"></span>Checking…</span>
@@ -896,8 +1216,195 @@
     </div>
   </header>
 
-  <!-- 6-Step Interactive Navigation -->
-  <nav class="stepper-bar" aria-label="Production workflow steps">
+  <!-- NEW: GUIDED STRUCTURED JSON DIRECTOR WORKSPACE (10s / 20s / 30s) -->
+  <main class="dir-shell active" id="directorWorkspace">
+    <div class="dir-hero-banner">
+      <div>
+        <h2>Guided <span>JSON Director</span></h2>
+        <p>Describe your idea in one sentence, pick your visual look cards, and LaunchCut compiles a director-grade structured JSON blueprint — for seamless 10s, 20s, or 30s chained videos.</p>
+      </div>
+      <div class="btn-group">
+        <select class="runs-select" id="dirSavedSelect" aria-label="Saved blueprints">
+          <option value="">Saved blueprints…</option>
+        </select>
+        <div class="mode-pill-switch">
+          <button type="button" class="mode-pill active" id="dirModeLive">Live AI</button>
+          <button type="button" class="mode-pill" id="dirModeMock">Instant ($0)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-banner" id="dirBanner" role="status">
+      <div class="banner-left">
+        <div class="spinner" id="dirSpinner" style="display:none;"></div>
+        <span id="dirBannerText"></span>
+      </div>
+    </div>
+
+    <!-- Step 1 & 2: Guided Spark + Visual Direction Builder -->
+    <section class="panel" id="dirBuilderPanel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">1. Idea, Duration &amp; Visual Direction</h3>
+          <p class="panel-sub">Start with a 1-click cinematic recipe or write a casual sentence — zero prompt engineering required.</p>
+        </div>
+        <div class="dur-row">
+          <button type="button" class="seg-pill active" data-dir-dur="10">10s · 1 Act</button>
+          <button type="button" class="seg-pill" data-dir-dur="20">20s · 2 Acts</button>
+          <button type="button" class="seg-pill" data-dir-dur="30">30s · 3 Acts</button>
+        </div>
+      </div>
+
+      <div class="visual-group-label"><span>Quick Concept Recipes (1-click fill)</span></div>
+      <div class="recipe-grid" id="dirRecipesGrid"></div>
+
+      <div class="grid-2" style="margin-top:10px;">
+        <div class="field">
+          <label for="dirIdeaInput">Your Idea (plain English — 1–2 sentences)</label>
+          <textarea id="dirIdeaInput" rows="3" placeholder="e.g. A giant human hand drops glowing liquid gold onto a gray miniature city, turning it into a living mountain village sealed inside a glass jar…"></textarea>
+        </div>
+        <div class="field">
+          <label>Format, Continuity &amp; Optional Brand Reveal</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <select id="dirAspectSelect" aria-label="Aspect ratio">
+              <option value="16:9">16:9 Cinema Wide</option>
+              <option value="9:16">9:16 Vertical Reels/Shorts</option>
+              <option value="1:1">1:1 Square Feed</option>
+            </select>
+            <select id="dirFormatSelect" aria-label="Format mode">
+              <option value="continuous">Continuous Cinematic Film</option>
+              <option value="hybrid_launch">Hybrid Launch (30s · Act 2 = Real UI)</option>
+            </select>
+            <select id="dirContinuitySelect" aria-label="Continuity engine">
+              <option value="last_frame_chain">Last-Frame Chaining (Pixel-Exact)</option>
+              <option value="parallel_bridge">Parallel Keyframe Bridge (3× Faster)</option>
+            </select>
+            <input type="text" id="dirBrandName" placeholder="Optional Brand / Product Name" />
+          </div>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            <input type="text" id="dirBrandTagline" placeholder="Optional tagline (for Hybrid UI / End-card)" style="flex:1; min-width:180px;" />
+            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-secondary); cursor:pointer;">
+              <input type="checkbox" id="dirAddEndcard" /> +2.5s Brand End-Card
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="visual-group-label"><span>2. World &amp; Material Style</span></div>
+      <div class="visual-cards" id="dirWorldsGrid"></div>
+
+      <div class="visual-group-label"><span>3. Camera &amp; Lens Feel</span></div>
+      <div class="visual-cards" id="dirCamerasGrid"></div>
+
+      <div class="visual-group-label"><span>4. Lighting &amp; Color Mood</span></div>
+      <div class="visual-cards" id="dirLightingsGrid"></div>
+
+      <div class="visual-group-label"><span>5. Motion &amp; Sound Feel</span></div>
+      <div class="visual-cards" id="dirMotionsGrid"></div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--rule);">
+        <span style="font-size:12px; color:var(--ink-muted);" id="dirBuilderHint">Compiles into a locked visual-invariants JSON prompt with 2-second choreographed beats.</span>
+        <button type="button" class="btn btn-primary" id="btnDirCompile">✦ Compile Structured JSON Blueprint</button>
+      </div>
+    </section>
+
+    <!-- Step 3: Interactive 2-Second Beat Storyboard + Compiled JSON Blueprint -->
+    <section class="panel" id="dirBoardPanel" style="display:none;">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title" id="dirBpTitle">Blueprint</h3>
+          <p class="panel-sub" id="dirBpSubtitle">Edit any 2-second beat in plain English or click a refinement chip — the structured JSON updates automatically.</p>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn btn-sm" id="btnDirSaveEdits">Save Manual Edits</button>
+          <button type="button" class="btn btn-sm" id="btnDirCopyJson">📋 Copy Prompt JSON</button>
+        </div>
+      </div>
+
+      <div class="world-lock-bar" id="dirWorldLockBar"></div>
+
+      <div class="visual-group-label" style="margin-top:12px;"><span>1-Click Plain-English Refinements</span></div>
+      <div class="chip-rail" id="dirChipsRail"></div>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <input type="text" id="dirCustomTweak" placeholder="Or type any plain-English tweak (e.g. 'Turn the 4-6s mountain into an ocean harbor with glowing whales')…" style="flex:1;" />
+        <button type="button" class="btn btn-sm" id="btnDirApplyTweak">Apply Tweak</button>
+      </div>
+
+      <div class="act-tabs" id="dirActTabs"></div>
+      <div class="beat-grid" id="dirBeatsGrid"></div>
+
+      <div class="world-lock-bar" id="dirFinalFrameBar" style="margin-top:12px; border-color:rgba(226,163,54,0.35);"></div>
+
+      <details id="dirJsonDrawer" style="margin-top:14px;">
+        <summary style="cursor:pointer; font-family:var(--font-mono); font-size:12px; color:var(--accent); font-weight:600;">
+          &lt;/&gt; View / Copy Compiled Model-Native JSON Prompt
+        </summary>
+        <div style="display:flex; gap:8px; margin:8px 0;">
+          <button type="button" class="btn btn-sm" id="btnJsonScopeMaster">Full Master JSON</button>
+          <button type="button" class="btn btn-sm" id="btnJsonScopeAct">Active Act JSON</button>
+        </div>
+        <pre class="json-pre" id="dirJsonPreview"></pre>
+      </details>
+    </section>
+
+    <!-- Step 4: Continuity Keyframes + Render Engine + Final Cinema Player -->
+    <section class="panel" id="dirRenderPanel" style="display:none;">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Render &amp; Continuity Control</h3>
+          <p class="panel-sub">Optionally lock cheap anchor keyframes first (~$0.01–$0.05), then render with Last-Frame Chaining or Parallel Bridging.</p>
+        </div>
+        <span class="chip" id="dirCostBadge">Est. $0.00</span>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:12px;">
+        <div class="field">
+          <label for="dirEngineSelect">Video Engine</label>
+          <select id="dirEngineSelect"></select>
+        </div>
+        <div class="field">
+          <label for="dirRenderContinuity">Multi-Act Continuity</label>
+          <select id="dirRenderContinuity">
+            <option value="last_frame_chain">Last-Frame Chaining (Pixel-Exact)</option>
+            <option value="parallel_bridge">Parallel Keyframe Bridge (3× Faster)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Audio &amp; Brand Assets</label>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding-top:4px;">
+            <label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="dirNativeAudio" checked /> Native Audio (Veo 3)
+            </label>
+            <label class="btn btn-sm" style="cursor:pointer;">
+              + Product Photo <input type="file" id="dirUploadProduct" accept="image/*" style="display:none;" />
+            </label>
+            <label class="btn btn-sm" style="cursor:pointer;">
+              + Logo <input type="file" id="dirUploadLogo" accept="image/*" style="display:none;" />
+            </label>
+          </div>
+          <div id="dirAssetStatus" style="font-size:11px; color:var(--ink-muted); margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn" id="btnDirKeyframes">1. Preview Continuity Keyframes</button>
+        <button type="button" class="btn btn-primary" id="btnDirRender">2. ▶ Render Final Video</button>
+      </div>
+
+      <div class="kf-strip" id="dirKeyframesStrip"></div>
+
+      <div id="dirPlayerWrap" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--rule);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <strong style="font-size:15px;">Final Master Cut</strong>
+          <a class="btn btn-primary btn-sm" id="dirDownloadLink" download="launchcut_hero.mp4">⬇ Download MP4</a>
+        </div>
+        <video id="dirVideoPlayer" controls playsinline style="width:100%; max-height:540px; border-radius:10px; background:#000; border:1px solid var(--rule-strong);"></video>
+      </div>
+    </section>
+  </main>
+
+  <!-- 6-Step Interactive Navigation (Commercial Studio) -->
+  <nav class="stepper-bar" id="commercialStepper" aria-label="Production workflow steps" style="display:none;">
     <button type="button" class="step-btn active" data-step="brand" id="nav-brand">
       <span class="step-num">1</span> Brand &amp; Assets
     </button>
@@ -923,7 +1430,7 @@
     </button>
   </nav>
 
-  <main class="shell">
+  <main class="shell" id="commercialWorkspace" style="display:none;">
     <!-- Calm Status Banner + Collapsible Activity Log -->
     <div class="status-banner" id="statusBanner" role="status">
       <div class="banner-left">
@@ -2751,9 +3258,629 @@
       } catch (err) { setBanner("error", err.message); }
     });
 
+    // =========================================================================
+    // GUIDED STRUCTURED JSON DIRECTOR (10s / 20s / 30s) CONTROLLER
+    // =========================================================================
+    const dirState = {
+      presets: null,
+      blueprint: null,
+      durationSec: 10,
+      recipeId: null,
+      worldPreset: "miniature_diorama",
+      cameraPreset: "macro_tilt_shift",
+      lightingPreset: "volumetric_gold",
+      motionPreset: "asmr_tactile",
+      activeActIdx: 0,
+      jsonScope: "master", // "master" | "act"
+      mockMode: false,
+      pollTimer: null,
+    };
+
+    function switchWorkspace(mode) {
+      const isDir = mode === "director";
+      $("wsTabDirector").classList.toggle("active", isDir);
+      $("wsTabDirector").setAttribute("aria-selected", String(isDir));
+      $("wsTabCommercial").classList.toggle("active", !isDir);
+      $("wsTabCommercial").setAttribute("aria-selected", String(!isDir));
+      $("directorWorkspace").classList.toggle("active", isDir);
+      $("commercialStepper").style.display = isDir ? "none" : "flex";
+      $("commercialWorkspace").style.display = isDir ? "none" : "flex";
+      $("flowCrumb").textContent = isDir
+        ? "Spark → Visual Direction → 2s Beat JSON → Render"
+        : "Brand → Concept → Sheet → Stills → Previews & QA → Final";
+    }
+
+    $("wsTabDirector").addEventListener("click", () => switchWorkspace("director"));
+    $("wsTabCommercial").addEventListener("click", () => switchWorkspace("commercial"));
+
+    // Selecting a legacy commercial run automatically focuses Commercial Studio
+    $("runsSelect").addEventListener("change", () => {
+      if ($("runsSelect").value) switchWorkspace("commercial");
+    });
+
+    function setDirBanner(kind, text, spinning = false) {
+      const el = $("dirBanner");
+      if (!text) {
+        el.className = "status-banner";
+        el.style.display = "none";
+        return;
+      }
+      el.className = `status-banner visible ${kind}`;
+      el.style.display = "flex";
+      $("dirBannerText").textContent = text;
+      $("dirSpinner").style.display = spinning ? "inline-block" : "none";
+    }
+
+    function setDirMockMode(isMock) {
+      dirState.mockMode = Boolean(isMock);
+      $("dirModeLive").classList.toggle("active", !dirState.mockMode);
+      $("dirModeMock").classList.toggle("active", dirState.mockMode);
+      if (dirState.mockMode && $("dirEngineSelect")) {
+        $("dirEngineSelect").value = "mock";
+        updateDirCostBadge();
+      }
+    }
+
+    $("dirModeLive").addEventListener("click", () => setDirMockMode(false));
+    $("dirModeMock").addEventListener("click", () => setDirMockMode(true));
+
+    document.querySelectorAll("[data-dir-dur]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        dirState.durationSec = Number(btn.dataset.dirDur) || 10;
+        document.querySelectorAll("[data-dir-dur]").forEach((b) =>
+          b.classList.toggle("active", Number(b.dataset.dirDur) === dirState.durationSec)
+        );
+        const acts = dirState.durationSec === 10 ? 1 : dirState.durationSec === 20 ? 2 : 3;
+        $("dirBuilderHint").textContent =
+          acts === 1
+            ? "Compiles 1 continuous 10s Hero Act (5 two-second beats + locked final frame)."
+            : `Compiles ${acts} chained 10s Acts (${dirState.durationSec}s total) sharing 1 locked World JSON with seamless Act-to-Act handoff.`;
+      });
+    });
+
+    function renderVisualCardGrid(containerId, items, selectedId, onPick, withSwatches = false) {
+      const wrap = $(containerId);
+      if (!wrap) return;
+      wrap.innerHTML = items
+        .map((item) => {
+          const swatches =
+            withSwatches && item.lighting && Array.isArray(item.lighting.color_palette)
+              ? `<span class="swatch-row">${item.lighting.color_palette
+                  .slice(0, 4)
+                  .map((c) => `<span class="swatch-dot" style="background:${esc(c)};"></span>`)
+                  .join("")}</span>`
+              : "";
+          return `<button type="button" class="vcard ${item.id === selectedId ? "active" : ""}" data-vid="${esc(item.id)}">
+            <span class="vcard-title"><span>${esc(item.label)}</span>${swatches}</span>
+            <span class="vcard-sub">${esc(item.tagline || "")}</span>
+          </button>`;
+        })
+        .join("");
+      wrap.querySelectorAll(".vcard").forEach((btn) => {
+        btn.addEventListener("click", () => onPick(btn.dataset.vid));
+      });
+    }
+
+    function renderDirectorPresetGrids() {
+      const p = dirState.presets;
+      if (!p) return;
+
+      // Concept recipes
+      const rGrid = $("dirRecipesGrid");
+      rGrid.innerHTML = (p.recipes || [])
+        .map(
+          (r) => `<button type="button" class="recipe-card ${dirState.recipeId === r.id ? "active" : ""}" data-rid="${esc(r.id)}">
+            <span class="recipe-badge">${esc(r.badge)}</span>
+            <span class="recipe-title">${esc(r.title)}</span>
+            <span class="recipe-desc">${esc(r.idea.slice(0, 92))}…</span>
+          </button>`
+        )
+        .join("");
+      rGrid.querySelectorAll(".recipe-card").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const rec = (p.recipes || []).find((x) => x.id === btn.dataset.rid);
+          if (!rec) return;
+          dirState.recipeId = rec.id;
+          $("dirIdeaInput").value = rec.idea;
+          dirState.worldPreset = rec.world_preset;
+          dirState.cameraPreset = rec.camera_preset;
+          dirState.lightingPreset = rec.lighting_preset;
+          dirState.motionPreset = rec.motion_preset;
+          renderDirectorPresetGrids();
+        });
+      });
+
+      renderVisualCardGrid("dirWorldsGrid", p.worlds || [], dirState.worldPreset, (id) => {
+        dirState.worldPreset = id;
+        renderDirectorPresetGrids();
+      });
+      renderVisualCardGrid("dirCamerasGrid", p.cameras || [], dirState.cameraPreset, (id) => {
+        dirState.cameraPreset = id;
+        renderDirectorPresetGrids();
+      });
+      renderVisualCardGrid("dirLightingsGrid", p.lightings || [], dirState.lightingPreset, (id) => {
+        dirState.lightingPreset = id;
+        renderDirectorPresetGrids();
+      }, true);
+      renderVisualCardGrid("dirMotionsGrid", p.motions || [], dirState.motionPreset, (id) => {
+        dirState.motionPreset = id;
+        renderDirectorPresetGrids();
+      });
+
+      // Refinement chips
+      const chipRail = $("dirChipsRail");
+      chipRail.innerHTML = (p.refinement_chips || [])
+        .map(
+          (c) =>
+            `<button type="button" class="tweak-chip" data-instr="${esc(c.instruction)}">✦ ${esc(c.label)}</button>`
+        )
+        .join("");
+      chipRail.querySelectorAll(".tweak-chip").forEach((btn) => {
+        btn.addEventListener("click", () => applyDirectorRefine(btn.dataset.instr));
+      });
+
+      // Engine selector
+      const engSel = $("dirEngineSelect");
+      if (engSel && !engSel.options.length) {
+        engSel.innerHTML = (p.engines || [])
+          .map(
+            (e) =>
+              `<option value="${esc(e.id)}">${esc(e.label)} — ~$${Number(e.est_usd_per_act || 0).toFixed(2)}/act</option>`
+          )
+          .join("");
+        if (!p.has_fal_key) {
+          engSel.value = "mock";
+          setDirMockMode(true);
+        }
+      }
+    }
+
+    function updateDirCostBadge() {
+      const bp = dirState.blueprint;
+      const p = dirState.presets;
+      if (!bp || !p) return;
+      const engId = $("dirEngineSelect").value || bp.engine;
+      const meta = (p.engines || []).find((e) => e.id === engId);
+      const aiActs = (bp.acts || []).filter((a) => a.mode === "cinematic_sequence").length;
+      const est = meta ? Number(meta.est_usd_per_act || 0) * aiActs : Number(bp.estimated_usd || 0);
+      $("dirCostBadge").textContent =
+        est <= 0 ? "Est. $0.00 (Offline Animatic)" : `Est. ~$${est.toFixed(2)} (${aiActs} AI Act${aiActs === 1 ? "" : "s"})`;
+    }
+
+    $("dirEngineSelect").addEventListener("change", updateDirCostBadge);
+
+    function renderDirectorBlueprintView() {
+      const bp = dirState.blueprint;
+      if (!bp) return;
+      $("dirBoardPanel").style.display = "block";
+      $("dirRenderPanel").style.display = "block";
+
+      $("dirBpTitle").textContent = `${bp.title} · ${bp.duration_sec}s (${bp.acts.length} Act${bp.acts.length === 1 ? "" : "s"})`;
+      $("dirBpSubtitle").textContent = bp.status_message || "Edit any 2-second beat or click a refinement chip.";
+
+      $("dirWorldLockBar").innerHTML = `
+        <span><strong>Style:</strong> ${esc(bp.style)}</span>
+        <span>· <strong>Camera:</strong> ${esc(bp.camera?.style || "")} (${esc(bp.camera?.lens_mm || 85)}mm, ${esc(bp.camera?.depth_of_field || "")})</span>
+        <span>· <strong>Lighting:</strong> ${esc(bp.lighting?.style || "")}</span>
+        <span>· <strong>Motion:</strong> ${esc(bp.motion?.feel || "")}</span>
+      `;
+
+      if (dirState.activeActIdx >= bp.acts.length) dirState.activeActIdx = 0;
+
+      // Act tabs
+      const tabsEl = $("dirActTabs");
+      tabsEl.innerHTML = bp.acts
+        .map(
+          (a, i) => `<button type="button" class="act-tab ${i === dirState.activeActIdx ? "active" : ""}" data-act-idx="${i}">
+            <span>${esc(a.title)} (${esc(a.time_range)})</span>
+            ${a.continues_from_prev ? '<span class="chain-pill">↳ pixel-chained</span>' : ""}
+            ${a.mode === "kinetic_ui_showcase" ? '<span class="chain-pill">$0 Kinetic UI</span>' : ""}
+          </button>`
+        )
+        .join("");
+      tabsEl.querySelectorAll(".act-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          dirState.activeActIdx = Number(btn.dataset.actIdx) || 0;
+          renderDirectorBlueprintView();
+        });
+      });
+
+      // Active Act 2-second Beat Cards
+      const act = bp.acts[dirState.activeActIdx];
+      const beatsEl = $("dirBeatsGrid");
+      beatsEl.innerHTML = (act.timeline || [])
+        .map(
+          (b, bIdx) => `<div class="beat-card" data-bidx="${bIdx}">
+            <div class="beat-head">
+              <span class="beat-time">${esc(b.time)}</span>
+              <button type="button" class="film-fix-btn" data-tweak-beat="${bIdx}">✦ Tweak beat</button>
+            </div>
+            <div>
+              <div class="beat-field-label">Scene</div>
+              <textarea class="beat-textarea" data-field="scene" data-bidx="${bIdx}">${esc(b.scene)}</textarea>
+            </div>
+            <div>
+              <div class="beat-field-label">Action &amp; Physics</div>
+              <textarea class="beat-textarea" data-field="action" data-bidx="${bIdx}">${esc(b.action)}</textarea>
+            </div>
+            <div>
+              <div class="beat-field-label">Camera</div>
+              <textarea class="beat-textarea" data-field="camera" data-bidx="${bIdx}" style="min-height:38px;">${esc(b.camera)}</textarea>
+            </div>
+            <div>
+              <div class="beat-field-label">Sound / Foley</div>
+              <textarea class="beat-textarea" data-field="sound" data-bidx="${bIdx}" style="min-height:34px;">${esc(b.sound || "")}</textarea>
+            </div>
+          </div>`
+        )
+        .join("");
+
+      beatsEl.querySelectorAll("[data-tweak-beat]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const bIdx = Number(btn.dataset.tweakBeat);
+          const note = window.prompt(
+            `How should we refine Act ${act.act_number}, Beat ${act.timeline[bIdx]?.time || bIdx}?`,
+            "Add more dramatic tactile detail and smoother camera glide"
+          );
+          if (note && note.trim()) {
+            applyDirectorRefine(note.trim(), act.act_number, bIdx);
+          }
+        });
+      });
+
+      $("dirFinalFrameBar").innerHTML = `
+        <span><strong>Locked Final Frame (Act ${act.act_number}):</strong> ${esc(act.final_frame?.subject || "")}</span>
+        <span>· <strong>Composition:</strong> ${esc(act.final_frame?.composition || "")}</span>
+        <span>· <strong>Hold:</strong> ${esc(act.final_frame?.hold || "")}</span>
+      `;
+
+      // Compiled JSON Drawer
+      const jsonObj =
+        dirState.jsonScope === "act"
+          ? (bp.compiled_act_jsons || [])[dirState.activeActIdx] || bp.compiled_master_json
+          : bp.compiled_master_json;
+      $("dirJsonPreview").textContent = JSON.stringify(jsonObj, null, 2);
+
+      // Sync render controls
+      if (bp.engine && $("dirEngineSelect").querySelector(`option[value="${CSS.escape(bp.engine)}"]`)) {
+        $("dirEngineSelect").value = bp.engine;
+      }
+      $("dirRenderContinuity").value = bp.continuity_mode || "last_frame_chain";
+      $("dirNativeAudio").checked = Boolean(bp.native_audio);
+      updateDirCostBadge();
+
+      const assetBits = [];
+      if (bp.product_image_url) assetBits.push("Product Photo ✓");
+      if (bp.brand_logo_url) assetBits.push("Brand Logo ✓");
+      $("dirAssetStatus").textContent = assetBits.join(" · ");
+
+      // Continuity Keyframes strip (deduplicate shared chained handoff frames)
+      const kfCards = [];
+      const seenKfUrls = new Set();
+      const ts = Date.now();
+      const actsArr = bp.acts || [];
+      actsArr.forEach((a, idx) => {
+        if (a.start_keyframe_media_url && !seenKfUrls.has(a.start_keyframe_media_url)) {
+          seenKfUrls.add(a.start_keyframe_media_url);
+          const label = idx === 0 ? "Opening Frame" : `Act ${a.act_number} Start`;
+          kfCards.push(
+            `<div class="kf-card"><img src="${esc(a.start_keyframe_media_url)}?t=${ts}" alt="${esc(label)}" /><div class="kf-caption"><span>${esc(label)}</span><span>${esc(a.time_range.split("-")[0])}s</span></div></div>`
+          );
+        }
+        if (a.end_keyframe_media_url && !seenKfUrls.has(a.end_keyframe_media_url)) {
+          seenKfUrls.add(a.end_keyframe_media_url);
+          const isLast = idx === actsArr.length - 1;
+          const nextChained = !isLast && actsArr[idx + 1]?.continues_from_prev;
+          const label = isLast
+            ? "Final Hero Lock"
+            : nextChained
+              ? `Act ${a.act_number} → ${a.act_number + 1} Handoff`
+              : `Act ${a.act_number} End`;
+          kfCards.push(
+            `<div class="kf-card"><img src="${esc(a.end_keyframe_media_url)}?t=${ts}" alt="${esc(label)}" /><div class="kf-caption"><span>${esc(label)}</span><span>${esc(a.time_range.split("-")[1] || "")}</span></div></div>`
+          );
+        }
+      });
+      $("dirKeyframesStrip").innerHTML = kfCards.join("");
+
+      // Final Video Player
+      if (bp.final_video_url) {
+        $("dirPlayerWrap").style.display = "block";
+        const srcUrl = `${bp.final_video_url}?t=${ts}`;
+        const vid = $("dirVideoPlayer");
+        if (vid.dataset.loadedSrc !== bp.final_video_url || bp.status === "done") {
+          vid.src = srcUrl;
+          vid.dataset.loadedSrc = bp.final_video_url;
+        }
+        $("dirDownloadLink").href = bp.final_video_url;
+        $("dirDownloadLink").download = `${(bp.title || "launchcut").toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${bp.duration_sec}s.mp4`;
+      } else {
+        $("dirPlayerWrap").style.display = "none";
+      }
+    }
+
+    async function loadDirectorPresetsAndList() {
+      try {
+        const [presets, listData] = await Promise.all([
+          api("/api/director/presets"),
+          api("/api/director/blueprints"),
+        ]);
+        dirState.presets = presets;
+        renderDirectorPresetGrids();
+        // Pre-populate the first concept recipe text so users immediately see an inspiring example
+        if (!$("dirIdeaInput").value.trim() && presets.recipes && presets.recipes.length) {
+          const first = presets.recipes[0];
+          dirState.recipeId = first.id;
+          $("dirIdeaInput").value = first.idea;
+          renderDirectorPresetGrids();
+        }
+        refreshDirectorSavedSelect(listData.blueprints || []);
+      } catch (err) {
+        console.warn("Director presets load warning:", err);
+      }
+    }
+
+    function refreshDirectorSavedSelect(list) {
+      const sel = $("dirSavedSelect");
+      if (!sel) return;
+      const cur = dirState.blueprint?.blueprint_id || "";
+      sel.innerHTML =
+        `<option value="">Saved blueprints (${list.length})…</option>` +
+        list
+          .map(
+            (b) =>
+              `<option value="${esc(b.blueprint_id)}" ${b.blueprint_id === cur ? "selected" : ""}>${esc(b.title)} · ${b.duration_sec}s (${esc(b.status)})</option>`
+          )
+          .join("");
+    }
+
+    $("dirSavedSelect").addEventListener("change", async () => {
+      const id = $("dirSavedSelect").value;
+      if (!id) return;
+      try {
+        const bp = await api(`/api/director/blueprints/${encodeURIComponent(id)}`);
+        dirState.blueprint = bp;
+        dirState.activeActIdx = 0;
+        renderDirectorBlueprintView();
+        setDirBanner("ok", `Loaded "${bp.title}" (${bp.duration_sec}s).`);
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    });
+
+    $("btnDirCompile").addEventListener("click", async () => {
+      const idea = $("dirIdeaInput").value.trim();
+      if (idea.length < 2) {
+        setDirBanner("error", "Enter a 1-sentence idea or click one of the Concept Recipes above.");
+        return;
+      }
+      setDirBanner("working", `Compiling ${dirState.durationSec}s Structured JSON Director Blueprint…`, true);
+      try {
+        const engineVal = dirState.mockMode ? "mock" : ($("dirEngineSelect").value || "kling/v4/text-to-video");
+        const bp = await api("/api/director/blueprints", {
+          method: "POST",
+          body: JSON.stringify({
+            idea,
+            duration_sec: dirState.durationSec,
+            format_mode: $("dirFormatSelect").value || "continuous",
+            continuity_mode: $("dirContinuitySelect").value || "last_frame_chain",
+            aspect_ratio: $("dirAspectSelect").value || "16:9",
+            engine: engineVal,
+            native_audio: $("dirNativeAudio").checked,
+            add_brand_endcard: $("dirAddEndcard").checked,
+            world_preset: dirState.worldPreset,
+            camera_preset: dirState.cameraPreset,
+            lighting_preset: dirState.lightingPreset,
+            motion_preset: dirState.motionPreset,
+            recipe_id: dirState.recipeId,
+            brand_name: $("dirBrandName").value.trim() || null,
+            brand_tagline: $("dirBrandTagline").value.trim() || null,
+            mock: dirState.mockMode,
+          }),
+        });
+        dirState.blueprint = bp;
+        dirState.activeActIdx = 0;
+        renderDirectorBlueprintView();
+        const listData = await api("/api/director/blueprints");
+        refreshDirectorSavedSelect(listData.blueprints || []);
+        setDirBanner("ok", `Compiled "${bp.title}" (${bp.duration_sec}s · ${bp.acts.length} Act${bp.acts.length === 1 ? "" : "s"}). Review beats or render!`);
+        $("dirBoardPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    });
+
+    async function applyDirectorRefine(instruction, actNumber = null, beatIndex = null) {
+      if (!dirState.blueprint) return;
+      setDirBanner("working", `Applying refinement: "${instruction.slice(0, 60)}"…`, true);
+      try {
+        const bp = await api(
+          `/api/director/blueprints/${encodeURIComponent(dirState.blueprint.blueprint_id)}/refine`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              instruction,
+              act_number: actNumber,
+              beat_index: beatIndex,
+              mock: dirState.mockMode,
+            }),
+          }
+        );
+        dirState.blueprint = bp;
+        renderDirectorBlueprintView();
+        setDirBanner("ok", bp.status_message || "Blueprint refined.");
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    }
+
+    $("btnDirApplyTweak").addEventListener("click", () => {
+      const txt = $("dirCustomTweak").value.trim();
+      if (!txt) return;
+      $("dirCustomTweak").value = "";
+      applyDirectorRefine(txt);
+    });
+
+    $("btnDirSaveEdits").addEventListener("click", async () => {
+      const bp = dirState.blueprint;
+      if (!bp) return;
+      const act = bp.acts[dirState.activeActIdx];
+      document.querySelectorAll("#dirBeatsGrid .beat-textarea").forEach((ta) => {
+        const bIdx = Number(ta.dataset.bidx);
+        const field = ta.dataset.field;
+        if (act.timeline[bIdx] && field) {
+          act.timeline[bIdx][field] = ta.value.trim();
+        }
+      });
+      setDirBanner("working", "Saving manual beat edits…", true);
+      try {
+        const updated = await api(
+          `/api/director/blueprints/${encodeURIComponent(bp.blueprint_id)}`,
+          { method: "PATCH", body: JSON.stringify({ acts: bp.acts }) }
+        );
+        dirState.blueprint = updated;
+        renderDirectorBlueprintView();
+        setDirBanner("ok", "Saved manual edits and recompiled JSON prompt.");
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    });
+
+    $("btnJsonScopeMaster").addEventListener("click", () => {
+      dirState.jsonScope = "master";
+      renderDirectorBlueprintView();
+    });
+    $("btnJsonScopeAct").addEventListener("click", () => {
+      dirState.jsonScope = "act";
+      renderDirectorBlueprintView();
+    });
+
+    $("btnDirCopyJson").addEventListener("click", async () => {
+      const txt = $("dirJsonPreview").textContent || "";
+      if (!txt) return;
+      try {
+        await navigator.clipboard.writeText(txt);
+        setDirBanner("ok", "Copied full structured JSON prompt to clipboard.");
+      } catch {
+        setDirBanner("ok", "Open the JSON drawer below to copy the prompt.");
+        $("dirJsonDrawer").open = true;
+      }
+    });
+
+    function wireDirectorUpload(inputId, kind) {
+      const inp = $(inputId);
+      if (!inp) return;
+      inp.addEventListener("change", () => {
+        const file = inp.files && inp.files[0];
+        if (!file || !dirState.blueprint) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          setDirBanner("working", `Uploading ${kind} image…`, true);
+          try {
+            const updated = await api(
+              `/api/director/blueprints/${encodeURIComponent(dirState.blueprint.blueprint_id)}/upload`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  kind,
+                  filename: file.name,
+                  data_base64: String(reader.result || ""),
+                }),
+              }
+            );
+            dirState.blueprint = updated;
+            renderDirectorBlueprintView();
+            setDirBanner("ok", `Uploaded ${kind} image (${file.name}).`);
+          } catch (err) {
+            setDirBanner("error", err.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    wireDirectorUpload("dirUploadProduct", "product");
+    wireDirectorUpload("dirUploadLogo", "logo");
+
+    $("btnDirKeyframes").addEventListener("click", async () => {
+      if (!dirState.blueprint) return;
+      setDirBanner("working", "Generating continuity-locked Start & End anchor keyframes…", true);
+      try {
+        const updated = await api(
+          `/api/director/blueprints/${encodeURIComponent(dirState.blueprint.blueprint_id)}/keyframes`,
+          { method: "POST", body: JSON.stringify({ mock: dirState.mockMode }) }
+        );
+        dirState.blueprint = updated;
+        renderDirectorBlueprintView();
+        setDirBanner("ok", updated.status_message || "Continuity keyframes ready.");
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    });
+
+    function stopDirPoll() {
+      if (dirState.pollTimer) {
+        clearInterval(dirState.pollTimer);
+        dirState.pollTimer = null;
+      }
+    }
+
+    $("btnDirRender").addEventListener("click", async () => {
+      const bp = dirState.blueprint;
+      if (!bp) return;
+      stopDirPoll();
+      const engine = dirState.mockMode ? "mock" : $("dirEngineSelect").value;
+      const continuity = $("dirRenderContinuity").value;
+      const nativeAudio = $("dirNativeAudio").checked;
+      setDirBanner("working", `Starting ${bp.duration_sec}s render (${engine})…`, true);
+      try {
+        const started = await api(
+          `/api/director/blueprints/${encodeURIComponent(bp.blueprint_id)}/render`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              engine,
+              continuity_mode: continuity,
+              native_audio: nativeAudio,
+              add_brand_endcard: $("dirAddEndcard").checked,
+              mock: dirState.mockMode || engine === "mock",
+              sync: false,
+            }),
+          }
+        );
+        dirState.blueprint = started;
+        renderDirectorBlueprintView();
+
+        dirState.pollTimer = setInterval(async () => {
+          try {
+            const latest = await api(
+              `/api/director/blueprints/${encodeURIComponent(bp.blueprint_id)}`
+            );
+            dirState.blueprint = latest;
+            renderDirectorBlueprintView();
+            if (latest.status === "done") {
+              stopDirPoll();
+              setDirBanner("ok", latest.status_message || "Final video ready!");
+              $("dirPlayerWrap").scrollIntoView({ behavior: "smooth", block: "center" });
+            } else if (latest.status === "failed") {
+              stopDirPoll();
+              setDirBanner("error", latest.error || latest.status_message || "Render failed.");
+            } else {
+              setDirBanner("working", latest.status_message || "Rendering…", true);
+            }
+          } catch (pollErr) {
+            stopDirPoll();
+            setDirBanner("error", pollErr.message);
+          }
+        }, 2500);
+      } catch (err) {
+        setDirBanner("error", err.message);
+      }
+    });
+
     // Boot
     loadHealth();
     loadRuns();
+    loadDirectorPresetsAndList();
     setInterval(loadHealth, 15000);
   </script>
 </body>

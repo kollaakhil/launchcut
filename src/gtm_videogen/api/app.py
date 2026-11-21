@@ -96,6 +96,9 @@ def create_app(
     from gtm_videogen.api.studio_steps import studio_router
 
     application.include_router(studio_router)
+    from gtm_videogen.api.director_routes import director_router
+
+    application.include_router(director_router)
 
     studio_html_path = Path(__file__).with_name("studio.html")
 
