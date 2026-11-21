@@ -149,7 +149,7 @@ class DirectorBlueprint(BaseModel):
     continuity_mode: DirectorContinuityMode = "last_frame_chain"
     aspect_ratio: DirectorAspect = "16:9"
     resolution: str = "4K"
-    engine: str = "kling/v4/text-to-video"
+    engine: str = "fal-ai/kling-video/v3/pro/text-to-video"
     native_audio: bool = True
     add_brand_endcard: bool = False
     brand_name: str | None = None
@@ -734,12 +734,20 @@ REFINEMENT_CHIPS: list[dict[str, str]] = [
 
 DIRECTOR_ENGINES: list[dict[str, Any]] = [
     {
-        "id": "kling/v4/text-to-video",
-        "label": "Kling v4 Pro Cinema (10s · Start→End Bridge)",
+        "id": "fal-ai/kling-video/v3/pro/text-to-video",
+        "label": "Kling 3.0 Pro Cinema (10s · 1080p · Start→End + Native Audio)",
+        "act_duration_sec": 10,
+        "supports_native_audio": True,
+        "est_usd_per_act": 1.68,
+        "badge": "Best for 10s–30s Chained",
+    },
+    {
+        "id": "kling/v4/flash/text-to-video",
+        "label": "Kling 4.0 Flash (10s · 720p · Fast & Cost-Efficient)",
         "act_duration_sec": 10,
         "supports_native_audio": False,
-        "est_usd_per_act": 1.10,
-        "badge": "Best for 10s–30s Chained",
+        "est_usd_per_act": 0.94,
+        "badge": "Fast Draft",
     },
     {
         "id": "fal-ai/veo3/fast",
@@ -756,14 +764,6 @@ DIRECTOR_ENGINES: list[dict[str, Any]] = [
         "supports_native_audio": True,
         "est_usd_per_act": 2.40,
         "badge": "Flagship",
-    },
-    {
-        "id": "kling/v4/flash/text-to-video",
-        "label": "Kling v4 Flash (10s · Fast Draft)",
-        "act_duration_sec": 10,
-        "supports_native_audio": False,
-        "est_usd_per_act": 0.94,
-        "badge": "Fast Draft",
     },
     {
         "id": "mock",

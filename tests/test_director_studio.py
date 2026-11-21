@@ -58,6 +58,19 @@ def test_fal_payload_supports_json_raw_prompt_native_audio_and_data_uri() -> Non
     assert veo_payload["generate_audio"] is True
     assert veo_payload["image_url"] == data_uri
 
+    kling3_payload = build_fal_video_payload(
+        shot,
+        "16:9",
+        24,
+        model="fal-ai/kling-video/v3/pro/image-to-video",
+        raw_prompt='{"type": "video_prompt", "duration": "10 seconds"}',
+        generate_audio=True,
+    )
+    assert kling3_payload["duration"] == "10"
+    assert kling3_payload["generate_audio"] is True
+    assert kling3_payload["start_image_url"] == data_uri
+    assert kling3_payload["end_image_url"] == data_uri
+
 
 @pytest.mark.asyncio
 async def test_director_blueprint_generation_10s_20s_30s_and_refine() -> None:

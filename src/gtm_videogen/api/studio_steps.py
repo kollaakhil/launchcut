@@ -132,9 +132,9 @@ FLAGSHIP_MASTER_MODELS: list[dict[str, Any]] = [
         "description": "Fast, cost-efficient master using the exact model stack you approved.",
     },
     {
-        "id": "kling/v4/text-to-video",
-        "label": "Kling v4 Pro Cinema (Start→End Frame Bridged)",
-        "description": "High-craft Kling v4 Pro with Start→End keyframe bridging across adjacent shots.",
+        "id": "fal-ai/kling-video/v3/pro/text-to-video",
+        "label": "Kling 3.0 Pro Cinema (1080p · Start→End Bridged)",
+        "description": "High-craft Kling 3.0 Pro 1080p with Start→End keyframe bridging across adjacent shots.",
     },
     {
         "id": "fal-ai/veo3/fast",

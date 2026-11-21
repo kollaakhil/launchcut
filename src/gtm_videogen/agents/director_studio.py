@@ -671,7 +671,7 @@ async def generate_director_blueprint(
     format_mode: DirectorFormatMode = "continuous",
     continuity_mode: DirectorContinuityMode = "last_frame_chain",
     aspect_ratio: DirectorAspect = "16:9",
-    engine: str = "kling/v4/text-to-video",
+    engine: str = "fal-ai/kling-video/v3/pro/text-to-video",
     native_audio: bool = True,
     add_brand_endcard: bool = False,
     world_preset: str = "miniature_diorama",
@@ -1560,8 +1560,9 @@ async def render_director_blueprint(
         usd_per_sec=0.11 if "veo3" not in bp.engine else 0.15,
     )
 
-    is_veo = "veo3" in bp.engine.lower()
-    use_native_audio = bool(is_veo and bp.native_audio and not use_mock)
+    low_eng = bp.engine.lower()
+    supports_native_audio = "veo3" in low_eng or "kling-video/v3" in low_eng or "kling-video/o3" in low_eng
+    use_native_audio = bool(supports_native_audio and bp.native_audio and not use_mock)
 
     async def _render_single_act(
         idx: int,

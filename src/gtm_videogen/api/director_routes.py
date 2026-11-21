@@ -77,7 +77,7 @@ class CreateBlueprintRequest(BaseModel):
     format_mode: DirectorFormatMode = "continuous"
     continuity_mode: DirectorContinuityMode = "last_frame_chain"
     aspect_ratio: DirectorAspect = "16:9"
-    engine: str = "kling/v4/text-to-video"
+    engine: str = "fal-ai/kling-video/v3/pro/text-to-video"
     native_audio: bool = True
     add_brand_endcard: bool = False
     world_preset: str = "miniature_diorama"

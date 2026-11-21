@@ -85,9 +85,29 @@ def build_fal_video_payload(
 
     compiled_prompt = (raw_prompt or "").strip() or compile_video_prompt(shot)
     low_model = model.strip().lower()
+    if "kling-video/v3" in low_model or "kling-video/o3" in low_model:
+        dur_str = str(max(3, min(15, int(round(float(shot.duration_sec))))))
+        payload = {
+            "prompt": compiled_prompt,
+            "duration": dur_str,
+            "generate_audio": bool(generate_audio),
+        }
+        if shot.negative_prompt:
+            payload["negative_prompt"] = shot.negative_prompt
+        has_start = bool(
+            shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image)
+        )
+        if has_start:
+            payload["start_image_url"] = shot.reference_image
+            if _is_valid_image_ref(shot.end_reference_image):
+                payload["end_image_url"] = shot.end_reference_image
+        else:
+            payload["aspect_ratio"] = select_supported_aspect(aspect, ("16:9", "9:16", "1:1"))
+        return payload
+
     if "kling/v4" in low_model:
         dur_int = max(3, min(20, int(round(float(shot.duration_sec)))))
-        payload: dict[str, Any] = {
+        payload = {
             "prompt": compiled_prompt,
             "duration": dur_int,
             "resolution": "720p",
@@ -506,6 +526,13 @@ class VideoProvider:
             headers["Authorization"] = f"Key {self.settings.fal_key}"
 
         target_model = model.lstrip("/")
+        # fal gates non-flash kling/v4 (playground-only -> HTTP 403 on queue.fal.run);
+        # route cleanly to the live public Kling 3.0 Pro 1080p API (Start->End + Native Audio).
+        if target_model == "kling/v4/text-to-video":
+            target_model = "fal-ai/kling-video/v3/pro/text-to-video"
+        elif target_model == "kling/v4/image-to-video":
+            target_model = "fal-ai/kling-video/v3/pro/image-to-video"
+
         has_ref = bool(
             shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image)
         )
@@ -533,12 +560,12 @@ class VideoProvider:
 
         request_id = submitted.get("request_id")
         status_url = submitted.get("status_url") or (
-            f"https://queue.fal.run/{model.lstrip('/')}/requests/{request_id}/status"
+            f"https://queue.fal.run/{target_model}/requests/{request_id}/status"
             if request_id
             else None
         )
         response_url = submitted.get("response_url") or (
-            f"https://queue.fal.run/{model.lstrip('/')}/requests/{request_id}"
+            f"https://queue.fal.run/{target_model}/requests/{request_id}"
             if request_id
             else None
         )
