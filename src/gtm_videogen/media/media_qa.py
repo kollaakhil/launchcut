@@ -120,6 +120,8 @@ class MediaQA:
         raw_w = os.getenv("GTM_FFMPEG_WORKERS", "").strip()
         env_conc = max(1, int(raw_w)) if raw_w.isdigit() else 2
         self.max_concurrency = max(1, max_concurrency if max_concurrency is not None else env_conc)
+        raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
+        self._ff_threads = str(max(1, int(raw_t)) if raw_t.isdigit() else 2)
 
     def is_tesseract_available(self) -> bool:
         return shutil.which(self.tesseract_bin) is not None
@@ -135,6 +137,8 @@ class MediaQA:
         cmd = [
             self.ffmpeg_bin,
             "-xerror",
+            "-threads",
+            self._ff_threads,
             "-i",
             str(video_path),
             "-vf",
@@ -193,6 +197,8 @@ class MediaQA:
         """Measure integrated loudness (LUFS) and true peak (dBTP) via FFmpeg ebur128."""
         cmd = [
             self.ffmpeg_bin,
+            "-threads",
+            self._ff_threads,
             "-i",
             str(video_path),
             "-vn",
@@ -649,42 +655,65 @@ class MediaQA:
                     )
                 )
 
-        # 2. Run black/freeze detect, ebur128 loudness, OCR, and optional Whisper sync in parallel
-        bf_task = asyncio.create_task(
-            self.detect_black_and_freeze(resolved, total_duration=probe.duration_sec, cancel=cancel)
-        )
-        loud_task = (
-            asyncio.create_task(self.measure_loudness(resolved, cancel=cancel))
-            if probe.has_audio
-            else None
-        )
-        ocr_task = (
-            asyncio.create_task(self.check_ocr(resolved, sheet, cancel=cancel)) if run_ocr else None
-        )
-        sync_task = (
-            asyncio.create_task(
-                self.check_sync(resolved, sheet, expected_vo, whisper, cancel=cancel)
+        # 2. Run black/freeze detect, ebur128 loudness, OCR, and Whisper sync
+        # Serialize when max_concurrency == 1 (e.g., Render 512MB RAM) to prevent OOM spikes.
+        if self.max_concurrency <= 1:
+            bf_res = await self.detect_black_and_freeze(
+                resolved, total_duration=probe.duration_sec, cancel=cancel
             )
-            if whisper is not None
-            else None
-        )
-
-        sibling_tasks = [t for t in (bf_task, loud_task, ocr_task, sync_task) if t is not None]
-        try:
-            bf_res = await bf_task
             loud_res = (
-                await loud_task
-                if loud_task is not None
+                await self.measure_loudness(resolved, cancel=cancel)
+                if probe.has_audio
                 else {"lufs": None, "peak_dbtp": None, "loudness_score": 2.0}
             )
-            ocr_checks: list[OCRCheck] = await ocr_task if ocr_task is not None else []
-            sync_checks: list[SyncCheck] = await sync_task if sync_task is not None else []
-        except BaseException:
-            for t in sibling_tasks:
-                if not t.done():
-                    t.cancel()
-            await asyncio.gather(*sibling_tasks, return_exceptions=True)
-            raise
+            ocr_checks: list[OCRCheck] = (
+                await self.check_ocr(resolved, sheet, cancel=cancel) if run_ocr else []
+            )
+            sync_checks: list[SyncCheck] = (
+                await self.check_sync(resolved, sheet, expected_vo, whisper, cancel=cancel)
+                if whisper is not None
+                else []
+            )
+        else:
+            bf_task = asyncio.create_task(
+                self.detect_black_and_freeze(
+                    resolved, total_duration=probe.duration_sec, cancel=cancel
+                )
+            )
+            loud_task = (
+                asyncio.create_task(self.measure_loudness(resolved, cancel=cancel))
+                if probe.has_audio
+                else None
+            )
+            ocr_task = (
+                asyncio.create_task(self.check_ocr(resolved, sheet, cancel=cancel))
+                if run_ocr
+                else None
+            )
+            sync_task = (
+                asyncio.create_task(
+                    self.check_sync(resolved, sheet, expected_vo, whisper, cancel=cancel)
+                )
+                if whisper is not None
+                else None
+            )
+
+            sibling_tasks = [t for t in (bf_task, loud_task, ocr_task, sync_task) if t is not None]
+            try:
+                bf_res = await bf_task
+                loud_res = (
+                    await loud_task
+                    if loud_task is not None
+                    else {"lufs": None, "peak_dbtp": None, "loudness_score": 2.0}
+                )
+                ocr_checks = await ocr_task if ocr_task is not None else []
+                sync_checks = await sync_task if sync_task is not None else []
+            except BaseException:
+                for t in sibling_tasks:
+                    if not t.done():
+                        t.cancel()
+                await asyncio.gather(*sibling_tasks, return_exceptions=True)
+                raise
 
         # Map black/freeze defects to issues & affected shots
         shot_windows: list[tuple[str, float, float]] = []

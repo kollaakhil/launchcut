@@ -197,7 +197,9 @@ class FFmpegStitcher:
             if slack >= 0.65:
                 lead_in_sec = round(min(0.40, slack * 0.45), 3)
 
-            cmd = [self.ffmpeg_bin, "-y"]
+            raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
+            dec_threads = str(max(1, int(raw_t)) if raw_t.isdigit() else 2)
+            cmd = [self.ffmpeg_bin, "-y", "-threads", dec_threads]
             if lead_in_sec > 0.0:
                 cmd.extend(["-ss", f"{lead_in_sec:.3f}"])
             cmd.extend(["-i", str(src_path)])
@@ -496,7 +498,9 @@ class FFmpegStitcher:
 
             has_audio_mix = bool(prepared_vo or prepared_sfx or music_path)
 
-            cmd = [self.ffmpeg_bin, "-y", "-i", str(concat_mp4)]
+            raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
+            dec_threads = str(max(1, int(raw_t)) if raw_t.isdigit() else 2)
+            cmd = [self.ffmpeg_bin, "-y", "-threads", dec_threads, "-i", str(concat_mp4)]
             input_idx = 1
 
             if not has_audio_mix:
