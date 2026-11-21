@@ -156,22 +156,17 @@ class StoryboardGenerator:
             "Authorization": f"Key {self.settings.fal_key.strip()}",
             "Content-Type": "application/json",
         }
-        palette_str = ", ".join(bible.visual_language.color_palette[:4])
-        style_suffix = (
-            f" Visual world: {bible.visual_language.world}. "
-            f"Lighting: {bible.visual_language.lighting_style}. "
-            f"Color palette: {palette_str}. "
-            "Ultra-sharp editorial commercial photography, zero garbled text or watermarks."
-        )
+        from gtm_videogen.models.prompt_compiler import compile_image_prompt
 
         # Reference-locked continuity via Flux Kontext when an anchor frame URL is provided
         use_kontext = bool(anchor_image_url and anchor_image_url.startswith(("http://", "https://")))
         if use_kontext:
             try:
+                kontext_prompt = compile_image_prompt(shot, bible, kontext_anchor=True)
                 return await self._generate_with_kontext(
                     shot=shot,
                     anchor_url=anchor_image_url or "",
-                    style_suffix=style_suffix,
+                    compiled_prompt=kontext_prompt,
                     headers=headers,
                     out_path=out_path,
                     cancel=cancel,
@@ -180,10 +175,11 @@ class StoryboardGenerator:
                 # Graceful fallback to Flux Schnell if Kontext fails or budget rejects
                 pass
 
+        schnell_prompt = compile_image_prompt(shot, bible, kontext_anchor=False)
         return await self._generate_with_schnell(
             shot=shot,
             sheet=sheet,
-            style_suffix=style_suffix,
+            compiled_prompt=schnell_prompt,
             headers=headers,
             out_path=out_path,
             cancel=cancel,
@@ -194,7 +190,7 @@ class StoryboardGenerator:
         *,
         shot: Shot,
         anchor_url: str,
-        style_suffix: str,
+        compiled_prompt: str,
         headers: dict[str, str],
         out_path: Path,
         cancel: CancellationToken | None,
@@ -208,13 +204,8 @@ class StoryboardGenerator:
                 provider="fal",
                 model=KONTEXT_MODEL,
             )
-        prompt = (
-            "Preserve the exact same lighting temperature, studio environment, material finish, "
-            "and cinematic lens aesthetic as the reference frame while staging this next shot: "
-            f"{shot.visual_prompt.strip()}.{style_suffix}"
-        )
         payload: dict[str, Any] = {
-            "prompt": prompt,
+            "prompt": compiled_prompt,
             "image_url": anchor_url,
             "num_inference_steps": 24,
             "guidance_scale": 3.5,
@@ -259,7 +250,7 @@ class StoryboardGenerator:
         *,
         shot: Shot,
         sheet: ShotSheet,
-        style_suffix: str,
+        compiled_prompt: str,
         headers: dict[str, str],
         out_path: Path,
         cancel: CancellationToken | None,
@@ -275,9 +266,8 @@ class StoryboardGenerator:
                 model=model,
             )
 
-        prompt = f"{shot.visual_prompt.strip()}.{style_suffix}"
         payload: dict[str, Any] = {
-            "prompt": prompt,
+            "prompt": compiled_prompt,
             "image_size": _ASPECT_FLUX_SIZE.get(sheet.aspect, "landscape_16_9"),
             "num_inference_steps": 4,
             "num_images": 1,

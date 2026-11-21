@@ -279,7 +279,7 @@ async def render_kinetic_card_mp4(
         "-c:v",
         "libx264",
         "-preset",
-        "veryfast",
+        "ultrafast" if even_w <= 860 else "veryfast",
         "-crf",
         "19",
         "-profile:v",

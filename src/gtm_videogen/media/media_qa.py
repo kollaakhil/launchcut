@@ -143,7 +143,7 @@ class MediaQA:
             "null",
             "-",
         ]
-        _, _, stderr_b = await run_subprocess(cmd, cancel=cancel, timeout_sec=120.0)
+        _, _, stderr_b = await run_subprocess(cmd, cancel=cancel, timeout_sec=240.0)
         stderr = stderr_b.decode("utf-8", errors="replace")
 
         black_segments = [
@@ -202,7 +202,7 @@ class MediaQA:
             "null",
             "-",
         ]
-        rc, _, stderr_b = await run_subprocess(cmd, cancel=cancel, timeout_sec=120.0, check=False)
+        rc, _, stderr_b = await run_subprocess(cmd, cancel=cancel, timeout_sec=240.0, check=False)
         stderr = stderr_b.decode("utf-8", errors="replace")
         if rc != 0 and "Integrated loudness" not in stderr:
             return {"lufs": None, "peak_dbtp": None, "loudness_score": 2.0}

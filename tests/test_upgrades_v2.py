@@ -541,3 +541,49 @@ async def test_studio_v2_endpoints_end_to_end(tmp_path: Path) -> None:
         assert st_fin["render_manifest"]["stitched_path"]
         assert st_fin["versions"][-1]["stack"]["video_model"] == "fal-ai/veo3/fast"
         assert "fal-ai/veo3/fast" in st_fin["versions"][-1]["label"]
+
+
+def test_modality_prompt_compilers(sample_creative_bible: CreativeBible) -> None:
+    from gtm_videogen.models.prompt_compiler import (
+        compile_image_prompt,
+        compile_sfx_prompt,
+        compile_video_prompt,
+    )
+
+    detailed = Shot(
+        id="s1",
+        index=0,
+        beat="hero_reveal",
+        duration_sec=4.0,
+        engine="image_to_video",
+        visual_prompt="Anodized aluminum kettle resting on dark slate countertop",
+        still_prompt="Rule-of-thirds composition, kettle on right third, negative space on left",
+        motion_prompt="Slow 8-degree orbital push-in as delicate steam curls upward from spout",
+        subject_and_materials="Matte black powder-coated steel body with walnut handle",
+        environment="Minimalist sunlit architectural kitchen with honed basalt slab",
+        lighting_rig="45-degree diffused north window key light + warm 3200K rim glint",
+        lens_mm=85,
+        camera_move="slow 8-degree orbital push-in",
+        camera_angle="three_quarter_close_up",
+        motion_curve="ease-in-out silky glide",
+        color_grade="5400K neutral highlights, deep obsidian shadows, warm amber specular",
+        sfx_note="Crisp metallic lid click at 0.3s followed by gentle simmering kettle hiss",
+        vo_delivery="Close-mic calm editorial authority",
+    )
+
+    img_p = compile_image_prompt(detailed, sample_creative_bible, kontext_anchor=True)
+    assert "Rule-of-thirds composition" in img_p
+    assert "85mm cinema prime lens" in img_p
+    assert "45-degree diffused north window" in img_p
+    assert "Matte black powder-coated steel" in img_p
+
+    vid_p = compile_video_prompt(detailed, sample_creative_bible)
+    assert "Slow 8-degree orbital push-in" in vid_p
+    assert "ease-in-out silky glide" in vid_p
+    assert "85mm lens" in vid_p
+    assert "no morphing" in vid_p
+
+    sfx_p = compile_sfx_prompt(detailed)
+    assert sfx_p is not None and "Crisp metallic lid click" in sfx_p
+    assert "honed basalt slab" in sfx_p
+

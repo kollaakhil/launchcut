@@ -50,7 +50,12 @@ class ClipShortageError(ValueError):
     """Raised when a rendered clip is shorter than its planned duration by > 1.0s."""
 
 
-def _pinned_h264_flags(fps: int, *, threads: int | None = None) -> list[str]:
+def _pinned_h264_flags(
+    fps: int,
+    *,
+    threads: int | None = None,
+    preset: str = "veryfast",
+) -> list[str]:
     eff_threads = threads
     if eff_threads is None:
         raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
@@ -61,7 +66,7 @@ def _pinned_h264_flags(fps: int, *, threads: int | None = None) -> list[str]:
         "-c:v",
         "libx264",
         "-preset",
-        "fast",
+        preset,
         "-crf",
         "20",
         "-profile:v",
@@ -205,7 +210,7 @@ class FFmpegStitcher:
                         "0:a:0",
                         "-vf",
                         ",".join(vf_parts),
-                        *_pinned_h264_flags(fps, threads=2),
+                        *_pinned_h264_flags(fps, preset="ultrafast"),
                         "-af",
                         f"aresample=44100,aformat=channel_layouts=stereo,apad=whole_dur={planned_duration:.4f}",
                         "-c:a",
@@ -234,7 +239,7 @@ class FFmpegStitcher:
                         "1:a:0",
                         "-vf",
                         ",".join(vf_parts),
-                        *_pinned_h264_flags(fps, threads=2),
+                        *_pinned_h264_flags(fps, preset="ultrafast"),
                         "-af",
                         f"apad=whole_dur={planned_duration:.4f}",
                         "-c:a",
@@ -251,7 +256,7 @@ class FFmpegStitcher:
                     ]
                 )
 
-            await run_subprocess(cmd, cancel=cancel, timeout_sec=120.0)
+            await run_subprocess(cmd, cancel=cancel, timeout_sec=240.0)
             return index, out_path, warnings
 
     async def _prepare_voice_wav(
@@ -608,7 +613,15 @@ class FFmpegStitcher:
                     vf_chain.append(build_ass_filter(generated_ass_path, self.fonts_dir))
 
                 if vf_chain:
-                    cmd.extend(["-vf", ",".join(vf_chain), *_pinned_h264_flags(fps)])
+                    cmd.extend(
+                        [
+                            "-vf",
+                            ",".join(vf_chain),
+                            *_pinned_h264_flags(
+                                fps, preset="ultrafast" if preview else "veryfast"
+                            ),
+                        ]
+                    )
                 else:
                     cmd.extend(["-c:v", "copy"])
 
@@ -630,7 +643,7 @@ class FFmpegStitcher:
                     ]
                 )
 
-            await run_subprocess(cmd, cancel=cancel, timeout_sec=180.0)
+            await run_subprocess(cmd, cancel=cancel, timeout_sec=300.0)
             _move_output_atomically(pass3_out, out_final)
             timings_ms["pass3_mix_ms"] = int((time.monotonic() - t_p3) * 1000)
             timings_ms["total_ms"] = int((time.monotonic() - t_total_start) * 1000)

@@ -66,8 +66,12 @@ Always use your tools in sequence:
 """
 
 AGENT1_GRADER_SYSTEM_PROMPT = """You are the Research & CreativeBible Rubric Grader.
-Always invoke `verify_research_and_bible_tool` to inspect the persisted workspace JSON
-artifacts directly before issuing your structured GraderResponse verdict.
+Always invoke `verify_research_and_bible_tool` first to inspect the persisted workspace JSON
+artifacts directly (`research.json`, `concepts.json`, `creative_bible.json`).
+Base your structured `GraderResponse` verdict (`result`, `passed`, and `criteria`) DIRECTLY on
+`verify_research_and_bible_tool`'s returned `passed`, `result`, and `criteria`.
+Never reject a passing workspace because tool output was truncated in the conversation transcript
+or over bundled font choices (e.g., Roboto/Inter/Playfair/Oswald/SpaceGrotesk are valid bundled fonts).
 """
 
 AGENT1_RUBRIC = """Evaluate the Research & CreativeBible workspace artifacts:
@@ -704,6 +708,16 @@ def _build_agent1_tools(
 
         all_passed = all(c["passed"] for c in criteria)
         failed_names = [c["name"] for c in criteria if not c["passed"]]
+        claims_preview = (
+            list(raw_research.get("verified_claims") or [])[:5]
+            if isinstance(raw_research, dict)
+            else []
+        )
+        facts_preview = (
+            list(raw_research.get("product_facts") or [])[:5]
+            if isinstance(raw_research, dict)
+            else []
+        )
         return json.dumps(
             {
                 "passed": all_passed,
@@ -713,6 +727,8 @@ def _build_agent1_tools(
                     if all_passed
                     else f"Failed criteria: {', '.join(failed_names)}."
                 ),
+                "verified_claims_preview": claims_preview,
+                "product_facts_preview": facts_preview,
                 "criteria": criteria,
             }
         )

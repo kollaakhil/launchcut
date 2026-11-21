@@ -395,13 +395,30 @@ async def render_assets_overlapped(
             coros.append(_gen_vo(vc))
 
         effective_sfx = list(sound_plan.sfx_cues)
-        if (
-            shot_sheet.audio_mode in ("both", "foley")
-            and len(effective_sfx) < len(shot_sheet.shots) - 1
-        ):
+        if shot_sheet.audio_mode in ("both", "foley"):
             from gtm_videogen.media.audio_sync import build_transition_sfx_cues
+            from gtm_videogen.models.prompt_compiler import compile_sfx_prompt
+            from gtm_videogen.models.schemas import SfxCue
 
-            effective_sfx = build_transition_sfx_cues(shot_sheet, existing_sfx=effective_sfx)
+            cursor = 0.0
+            for sh in ordered_shots:
+                compiled_sfx = compile_sfx_prompt(sh)
+                if compiled_sfx and not any(
+                    c.shot_id == sh.id or abs(c.at_sec - cursor) < 0.45 for c in effective_sfx
+                ):
+                    effective_sfx.append(
+                        SfxCue(
+                            shot_id=sh.id,
+                            at_sec=round(cursor + min(0.25, sh.duration_sec * 0.15), 3),
+                            duration_sec=round(min(2.0, max(0.6, sh.duration_sec * 0.45)), 2),
+                            prompt=compiled_sfx,
+                            gain_db=-8.5,
+                        )
+                    )
+                cursor += float(sh.duration_sec)
+
+            if len(effective_sfx) < len(shot_sheet.shots) - 1:
+                effective_sfx = build_transition_sfx_cues(shot_sheet, existing_sfx=effective_sfx)
             sound_plan.sfx_cues = effective_sfx
 
         for sc in effective_sfx:

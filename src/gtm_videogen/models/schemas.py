@@ -280,6 +280,11 @@ class Shot(BaseModel):
     environment: str | None = None
     lighting_rig: str | None = None
     motion_curve: str | None = None
+    still_prompt: str | None = None
+    motion_prompt: str | None = None
+    subject_and_materials: str | None = None
+    color_grade: str | None = None
+    vo_delivery: str | None = None
     theme: GraphicsTheme | None = None
     product_hero: bool = False
     on_screen_text: str | None = None

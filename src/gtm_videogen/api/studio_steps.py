@@ -855,7 +855,10 @@ async def edit_shot_sheet(
                             at_sec=round(cursor, 3),
                             duration_sec=shot.duration_sec,
                             text=shot.vo_line.strip(),
-                            delivery_note=run_state.creative_bible.sonic_identity.voice_casting.delivery_style,
+                            delivery_note=(
+                                (shot.vo_delivery or "").strip()
+                                or run_state.creative_bible.sonic_identity.voice_casting.delivery_style
+                            ),
                         )
                     )
                 cursor += shot.duration_sec

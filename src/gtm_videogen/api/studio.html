@@ -1643,7 +1643,10 @@
 
       $("sheetTableBody").innerHTML = state.draftShots.map((s, idx) => `
         <tr data-idx="${idx}">
-          <td style="font-family:var(--font-mono); font-size:12px; padding-top:14px;">${esc(s.id)}</td>
+          <td style="font-family:var(--font-mono); font-size:12px; padding-top:14px;">
+            <div>${esc(s.id)}</div>
+            <button type="button" class="film-fix-btn" data-toggle-spec="${idx}" style="margin-top:4px;">⚙ Spec</button>
+          </td>
           <td><input type="text" data-k="beat" value="${esc(s.beat)}" /></td>
           <td><input type="number" step="0.25" min="1" max="15" data-k="duration_sec" value="${Number(s.duration_sec).toFixed(2)}" /></td>
           <td>
@@ -1657,24 +1660,106 @@
           <td><input type="text" data-k="on_screen_text" value="${esc(s.on_screen_text || "")}" placeholder="(optional)" /></td>
           <td><button type="button" class="btn btn-danger btn-sm" data-del="${idx}" title="Remove shot">×</button></td>
         </tr>
+        <tr data-spec-idx="${idx}" style="display:none; background:rgba(255,255,255,0.018);">
+          <td colspan="9" style="padding:10px 12px;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent); margin-bottom:8px;">
+              Precision Modality Specs for ${esc(s.id)} (Image · Video · Audio Models)
+            </div>
+            <div class="grid-2" style="margin-bottom:8px;">
+              <div class="field">
+                <label>Image / Keyframe Prompt (Flux Schnell / Kontext — static composition)</label>
+                <textarea rows="2" data-k="still_prompt" placeholder="Exact static framing, foreground/midground/background, zero motion verbs">${esc(s.still_prompt || "")}</textarea>
+              </div>
+              <div class="field">
+                <label>Video Motion Prompt (Kling v4 / Veo 3 — camera &amp; subject physics)</label>
+                <textarea rows="2" data-k="motion_prompt" placeholder="Exact camera trajectory, subject micro-motion from 0s to end">${esc(s.motion_prompt || "")}</textarea>
+              </div>
+            </div>
+            <div class="grid-3" style="margin-bottom:8px;">
+              <div class="field">
+                <label>Subject &amp; Materials</label>
+                <input type="text" data-k="subject_and_materials" value="${esc(s.subject_and_materials || "")}" placeholder="Brushed aluminum, matte glass, exact finishes" />
+              </div>
+              <div class="field">
+                <label>Environment / Set</label>
+                <input type="text" data-k="environment" value="${esc(s.environment || "")}" placeholder="Physical location, surfaces, background depth" />
+              </div>
+              <div class="field">
+                <label>Lighting Rig</label>
+                <input type="text" data-k="lighting_rig" value="${esc(s.lighting_rig || "")}" placeholder="Key angle, fill ratio, Kelvin rim light" />
+              </div>
+            </div>
+            <div class="grid-4" style="margin-bottom:8px;">
+              <div class="field">
+                <label>Lens (mm)</label>
+                <input type="number" min="12" max="200" data-k="lens_mm" value="${s.lens_mm || ""}" placeholder="50" />
+              </div>
+              <div class="field">
+                <label>Camera Angle</label>
+                <input type="text" data-k="camera_angle" value="${esc(s.camera_angle || "")}" placeholder="low_angle_hero" />
+              </div>
+              <div class="field">
+                <label>Motion Curve</label>
+                <input type="text" data-k="motion_curve" value="${esc(s.motion_curve || "")}" placeholder="ease-in-out glide" />
+              </div>
+              <div class="field">
+                <label>Transition</label>
+                <select data-k="transition">
+                  ${["cut", "j_cut", "match_cut", "crossfade", "whip", "smash_cut", "fade_black"].map((tr) => `<option value="${tr}" ${(s.transition || "cut") === tr ? "selected" : ""}>${tr}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+            <div class="grid-3">
+              <div class="field">
+                <label>Color Grade</label>
+                <input type="text" data-k="color_grade" value="${esc(s.color_grade || "")}" placeholder="5400K neutral highlights, warm amber accent" />
+              </div>
+              <div class="field">
+                <label>SFX / Foley Note (Mirelo / ElevenLabs SFX)</label>
+                <input type="text" data-k="sfx_note" value="${esc(s.sfx_note || "")}" placeholder="Crisp dry click at 0.3s + warm room air" />
+              </div>
+              <div class="field">
+                <label>VO Delivery Direction (ElevenLabs v3)</label>
+                <input type="text" data-k="vo_delivery" value="${esc(s.vo_delivery || "")}" placeholder="Close-mic calm authority, slight breath" />
+              </div>
+            </div>
+          </td>
+        </tr>
       `).join("");
 
-      $("sheetTableBody").querySelectorAll("tr").forEach((tr) => {
-        const idx = Number(tr.dataset.idx);
+      const bindField = (tr, idx) => {
         tr.querySelectorAll("[data-k]").forEach((inp) => {
           inp.addEventListener("input", () => {
             const k = inp.dataset.k;
-            state.draftShots[idx][k] = k === "duration_sec" ? Number(inp.value || 1) : (inp.value || (k === "vo_line" || k === "on_screen_text" ? null : ""));
+            if (k === "duration_sec") state.draftShots[idx][k] = Number(inp.value || 1);
+            else if (k === "lens_mm") state.draftShots[idx][k] = inp.value ? Number(inp.value) : null;
+            else if (["vo_line", "on_screen_text", "still_prompt", "motion_prompt", "subject_and_materials", "environment", "lighting_rig", "motion_curve", "color_grade", "sfx_note", "vo_delivery"].includes(k)) {
+              state.draftShots[idx][k] = inp.value.trim() ? inp.value : null;
+            } else {
+              state.draftShots[idx][k] = inp.value || "";
+            }
             const total = state.draftShots.reduce((a, x) => a + Number(x.duration_sec || 0), 0);
             const tgt = Number(state.run?.shot_sheet?.target_duration_sec || 12);
             $("sheetDurChip").textContent = `${total.toFixed(2)}s / ${tgt.toFixed(2)}s`;
           });
+        });
+      };
+
+      $("sheetTableBody").querySelectorAll("tr[data-idx]").forEach((tr) => {
+        const idx = Number(tr.dataset.idx);
+        bindField(tr, idx);
+        tr.querySelector("[data-toggle-spec]")?.addEventListener("click", () => {
+          const specRow = $("sheetTableBody").querySelector(`tr[data-spec-idx="${idx}"]`);
+          if (specRow) specRow.style.display = specRow.style.display === "none" ? "table-row" : "none";
         });
         tr.querySelector("[data-del]")?.addEventListener("click", () => {
           if (state.draftShots.length <= 1) return;
           state.draftShots.splice(idx, 1);
           renderSheetRows();
         });
+      });
+      $("sheetTableBody").querySelectorAll("tr[data-spec-idx]").forEach((tr) => {
+        bindField(tr, Number(tr.dataset.specIdx));
       });
     }
 

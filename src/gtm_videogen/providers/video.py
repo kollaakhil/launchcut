@@ -74,11 +74,14 @@ def build_fal_video_payload(
     model: str = "",
 ) -> dict[str, Any]:
     """Build fal.ai video queue submission payload honoring requested aspect ratio."""
+    from gtm_videogen.models.prompt_compiler import compile_video_prompt
+
+    compiled_prompt = compile_video_prompt(shot)
     low_model = model.strip().lower()
     if "kling/v4" in low_model:
         dur_int = max(3, min(20, int(round(float(shot.duration_sec)))))
         payload: dict[str, Any] = {
-            "prompt": shot.visual_prompt,
+            "prompt": compiled_prompt,
             "duration": dur_int,
             "resolution": "720p",
         }
@@ -104,7 +107,7 @@ def build_fal_video_payload(
         dur_val = float(shot.duration_sec)
         veo_dur = "4s" if dur_val <= 5.0 else ("6s" if dur_val <= 7.0 else "8s")
         payload = {
-            "prompt": shot.visual_prompt,
+            "prompt": compiled_prompt,
             "aspect_ratio": select_supported_aspect(aspect),
             "duration": veo_dur,
             "resolution": "720p",
@@ -122,7 +125,7 @@ def build_fal_video_payload(
         return payload
 
     payload = {
-        "prompt": shot.visual_prompt,
+        "prompt": compiled_prompt,
         "aspect_ratio": select_supported_aspect(aspect),
         "duration": str(int(round(max(1.0, shot.duration_sec)))),
         "fps": fps,
@@ -141,10 +144,12 @@ def build_openrouter_video_payload(
     model: str,
 ) -> dict[str, Any]:
     """Build OpenRouter /api/v1/videos payload honoring requested aspect ratio (fixes BUG-07)."""
+    from gtm_videogen.models.prompt_compiler import compile_video_prompt
+
     chosen_aspect = select_supported_aspect(aspect)
     payload: dict[str, Any] = {
         "model": model,
-        "prompt": shot.visual_prompt,
+        "prompt": compile_video_prompt(shot),
         "aspect_ratio": chosen_aspect,
         "duration": round(float(shot.duration_sec), 2),
         "fps": fps,
@@ -163,11 +168,13 @@ def build_higgsfield_video_payload(
     model: str,
 ) -> dict[str, Any]:
     """Build Higgsfield REST payload honoring requested aspect ratio (fixes BUG-07)."""
+    from gtm_videogen.models.prompt_compiler import compile_video_prompt
+
     chosen_aspect = select_supported_aspect(aspect)
     width, height = ASPECT_DIMENSIONS[aspect]
     payload: dict[str, Any] = {
         "model": model,
-        "prompt": shot.visual_prompt,
+        "prompt": compile_video_prompt(shot),
         "aspect_ratio": chosen_aspect,
         "width": width,
         "height": height,
