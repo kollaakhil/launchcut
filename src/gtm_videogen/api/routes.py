@@ -359,12 +359,15 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
     )
     fal_ready = bool(settings.fal_key)
 
+    fonts_ok = (Path(settings.fonts_dir) / "Roboto-Bold.ttf").is_file()
+
     return {
         "status": "ok" if (ffmpeg_ok and ffprobe_ok) else "degraded",
         "tools": {
             "ffmpeg": ffmpeg_ok,
             "ffprobe": ffprobe_ok,
             "tesseract": tesseract_ok,
+            "fonts": fonts_ok,
             "manim": bool(manim_info.get("available", False)),
         },
         "api_keys": {
