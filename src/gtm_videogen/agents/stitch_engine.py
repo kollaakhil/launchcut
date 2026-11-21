@@ -1161,12 +1161,15 @@ async def render_single_scene_take(
                 chained_start_uri = encode_image_data_uri(chain_jpg)
                 chained_from_prev = True
 
-        # 2A. User / Founder Video Clip Take ($0 — trimmed, framed & loudnormed)
-        if sc.kind == "user_clip":
-            if not sc.user_clip or not sc.user_clip.raw_video_path or not Path(sc.user_clip.raw_video_path).is_file():
-                raise RuntimeError(
-                    f"Upload a video clip (.mp4/.mov) onto '{sc.title}' before shooting this Act."
-                )
+        # 2A. User / Founder Video Clip Take ($0 — trimmed, framed & loudnormed) when a clip is uploaded
+        has_uploaded_clip = (
+            sc.kind == "user_clip"
+            and sc.user_clip is not None
+            and bool(sc.user_clip.raw_video_path)
+            and Path(sc.user_clip.raw_video_path).is_file()
+        )
+        if has_uploaded_clip:
+            assert sc.user_clip is not None
             await _report(f"Normalizing {sc.title} ({sc.user_clip.framing}, loudnorm)...")
             _, norm_dur = await normalize_user_clip_take(
                 clip_spec=sc.user_clip,

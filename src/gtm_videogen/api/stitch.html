@@ -2913,30 +2913,19 @@
 
         const isUserClip = sc.kind === 'user_clip';
         const hasUploadedClip = Boolean(sc.user_clip && sc.user_clip.clip_url);
-        const headerActions = isUserClip && !hasUploadedClip
-          ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-               <label class="pill-btn primary" style="cursor:pointer;">
+        const headerActions = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          ${isUserClip ? `<label class="pill-btn" style="cursor:pointer;">⬆ ${hasUploadedClip ? 'Replace Video' : 'Upload Video (Optional)'}<input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" /></label>` : ''}
+          <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
+            ${isRendering ? '⏳ Rendering…' : (sc.takes.length ? '↻ Re-Render' : (isUserClip && !hasUploadedClip ? '▶ Render with AI' : '▶ Render Act'))}
+          </button>
+        </div>`;
+        const emptyBoxHtml = isUserClip && !hasUploadedClip
+          ? `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;text-align:center;">
+               <div style="font-size:13px;opacity:0.9;">Upload your own clip — or click <strong>Render with AI</strong> to generate it automatically.</div>
+               <label class="pill-btn" style="cursor:pointer;">
                  ⬆ Upload Video (.mp4/.mov)
                  <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" />
                </label>
-               <button class="pill-btn" onclick="switchSceneToAiUI('${esc(sc.scene_id)}')">✦ Generate with AI Instead</button>
-             </div>`
-          : `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-               ${isUserClip ? `<label class="pill-btn" style="cursor:pointer;">⬆ Replace Video<input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" /></label>` : ''}
-               <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
-                 ${isRendering ? '⏳ Rendering…' : (sc.takes.length ? '↻ Re-Render' : '▶ Render Act')}
-               </button>
-             </div>`;
-        const emptyBoxHtml = isUserClip && !hasUploadedClip
-          ? `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;text-align:center;">
-               <div style="font-size:13.5px;font-weight:700;">This Act expects your uploaded video clip</div>
-               <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-                 <label class="pill-btn primary" style="cursor:pointer;">
-                   ⬆ Upload Video (.mp4/.mov)
-                   <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" />
-                 </label>
-                 <button class="pill-btn" onclick="switchSceneToAiUI('${esc(sc.scene_id)}')">✦ Use AI Video Instead</button>
-               </div>
              </div>`
           : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Render Act</strong> to generate this clip'}</div>`;
 
