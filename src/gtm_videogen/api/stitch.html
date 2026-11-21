@@ -1,0 +1,2567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stitch — Tactile AI Film Director Studio</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23E54D3A'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='800' font-size='30'%3ESt%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-paper: #F8F5EF;
+      --bg-card: #FFFFFF;
+      --bg-soft: #F2ECE2;
+      --bg-warm: #EFE7DA;
+      --ink: #1F1D1A;
+      --ink-soft: #5E584F;
+      --ink-muted: #8C8478;
+      --border: #E5DDD0;
+      --border-strong: #D5C9B6;
+      --coral: #E54D3A;
+      --coral-hover: #CF3E2C;
+      --coral-soft: #FDECE9;
+      --sage: #2E7D5B;
+      --sage-soft: #E8F5EE;
+      --amber: #B86E14;
+      --amber-soft: #FEF4E4;
+      --shadow-sm: 0 2px 8px rgba(31, 29, 26, 0.05);
+      --shadow-md: 0 10px 28px rgba(31, 29, 26, 0.08);
+      --shadow-lg: 0 20px 50px rgba(31, 29, 26, 0.13);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-pill: 999px;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-serif: 'Fraunces', Georgia, serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-paper);
+      background-image: radial-gradient(rgba(31, 29, 26, 0.075) 1px, transparent 1px);
+      background-size: 20px 20px;
+      color: var(--ink);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea { font-family: inherit; }
+    button { cursor: pointer; }
+
+    /* Top Sticky Studio Navigation */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(248, 245, 239, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      background: var(--coral);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 4px 12px rgba(229, 77, 58, 0.3);
+      letter-spacing: -0.02em;
+    }
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .brand-sub {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-left: 2px;
+    }
+
+    .stage-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 4px;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-sm);
+    }
+    .stage-btn {
+      border: none;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 15px;
+      border-radius: var(--radius-pill);
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stage-btn:hover:not(:disabled):not(.active) { color: var(--ink); background: var(--bg-soft); }
+    .stage-btn.active {
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 3px 10px rgba(31, 29, 26, 0.2);
+    }
+    .stage-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .stage-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      font-size: 11px;
+      display: grid;
+      place-items: center;
+      background: rgba(31, 29, 26, 0.08);
+    }
+    .stage-btn.active .stage-num { background: var(--coral); color: #fff; }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: var(--radius-pill);
+      padding: 8px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.15s ease;
+    }
+    .pill-btn:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .pill-btn.primary {
+      background: var(--coral);
+      border-color: var(--coral);
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(229, 77, 58, 0.28);
+    }
+    .pill-btn.primary:hover { background: var(--coral-hover); }
+    .pill-btn.dark {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+    .pill-btn.sage {
+      background: var(--sage-soft);
+      border-color: #B9DEC8;
+      color: var(--sage);
+    }
+    .pill-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .mode-switch {
+      display: inline-flex;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 3px;
+    }
+    .mode-opt {
+      border: none;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: var(--radius-pill);
+      transition: all 0.15s;
+    }
+    .mode-opt.active {
+      background: var(--bg-card);
+      color: var(--ink);
+      box-shadow: var(--shadow-sm);
+    }
+    .mode-opt.live.active { color: var(--sage); }
+
+    .project-select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 7px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink);
+      max-width: 190px;
+    }
+
+    /* Status Toast / Banner */
+    .status-strip {
+      max-width: 1260px;
+      margin: 14px auto 0;
+      padding: 0 24px;
+    }
+    .status-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 16px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      font-weight: 600;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+    .status-banner.show { display: flex; }
+    .status-banner.info { background: #FFFDF9; border-color: var(--border-strong); color: var(--ink); }
+    .status-banner.success { background: var(--sage-soft); border-color: #B7DEC8; color: var(--sage); }
+    .status-banner.error { background: var(--coral-soft); border-color: #F3BEB6; color: #9F2617; }
+    .status-banner .dismiss {
+      background: transparent; border: none; color: inherit; font-size: 16px; opacity: 0.7;
+    }
+
+    /* Main Container */
+    .main-wrap {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 22px 24px 80px;
+    }
+    .stage-view { display: none; }
+    .stage-view.active { display: block; animation: fadeIn 0.22s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Stage 1: Hero + Airbnb Spark Pill */
+    .hero-head {
+      text-align: center;
+      max-width: 780px;
+      margin: 12px auto 22px;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 5px 13px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+    .hero-eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: clamp(32px, 4.4vw, 46px);
+      line-height: 1.08;
+      letter-spacing: -0.025em;
+      margin: 0 0 10px;
+      color: var(--ink);
+    }
+    .hero-sub {
+      font-size: 15.5px;
+      color: var(--ink-soft);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .spark-pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 8px 10px 8px 20px;
+      display: grid;
+      grid-template-columns: 1.7fr 0.9fr auto auto auto;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-md);
+      max-width: 1040px;
+      margin: 0 auto 14px;
+    }
+    @media (max-width: 900px) {
+      .spark-pill { grid-template-columns: 1fr; border-radius: 20px; padding: 14px; }
+    }
+    .spark-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+    }
+    .spark-field.no-border { border-right: none; padding-right: 0; }
+    @media (max-width: 900px) { .spark-field { border-right: none; padding-right: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); } }
+    .spark-label {
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+    }
+    .spark-input, .spark-select {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      width: 100%;
+    }
+    .spark-input::placeholder { color: #AEA597; font-weight: 500; }
+    .spark-cta {
+      background: var(--coral);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 13px 22px;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      box-shadow: 0 6px 18px rgba(229, 77, 58, 0.3);
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+    .spark-cta:hover:not(:disabled) { background: var(--coral-hover); transform: translateY(-1px); }
+    .spark-cta:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .spark-subbar {
+      max-width: 1040px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .preset-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .mini-select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+
+    /* Pitch 3 Concepts Grid */
+    .pitches-panel {
+      display: none;
+      max-width: 1040px;
+      margin: 0 auto 28px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+    }
+    .pitches-panel.show { display: block; }
+    .pitches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .pitch-card {
+      background: var(--bg-paper);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.18s ease;
+    }
+    .pitch-card:hover { border-color: var(--coral); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+    .swatch-row { display: flex; gap: 5px; align-items: center; }
+    .swatch-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(31,29,26,0.16); }
+
+    /* Airbnb Category Filter Bar & Gallery */
+    .cat-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .cat-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cat-chip {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--ink-soft);
+      border-radius: var(--radius-pill);
+      padding: 7px 15px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .cat-chip:hover { border-color: var(--ink); color: var(--ink); }
+    .cat-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 22px;
+    }
+    .gallery-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+    }
+    .gallery-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .gallery-img-wrap {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      background: #231E1A;
+    }
+    .gallery-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.35s ease;
+      display: block;
+    }
+    .gallery-card:hover .gallery-img-wrap img { transform: scale(1.04); }
+    .gallery-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      color: var(--ink);
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: var(--radius-pill);
+    }
+    .gallery-lens {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(31, 29, 26, 0.78);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: var(--radius-pill);
+    }
+    .gallery-body {
+      padding: 16px 18px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+    .gallery-title {
+      font-size: 16.5px;
+      font-weight: 700;
+      margin: 0;
+      color: var(--ink);
+    }
+    .gallery-desc {
+      font-size: 13px;
+      color: var(--ink-soft);
+      line-height: 1.48;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .gallery-foot {
+      margin-top: auto;
+      padding-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--coral);
+    }
+
+    /* Stage 2: Tactile Pinboard & Script Gate */
+    .board-header {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .board-title-input {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      outline: none;
+      width: min(680px, 65vw);
+      min-width: 240px;
+      border-bottom: 2px solid transparent;
+    }
+    .board-title-input:focus { border-bottom-color: var(--coral); }
+    .meta-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--bg-soft);
+      color: var(--ink-soft);
+      border: 1px solid var(--border);
+    }
+    .tag-pill.ok { background: var(--sage-soft); color: var(--sage); border-color: #B7DEC8; }
+    .tag-pill.warn { background: var(--amber-soft); color: var(--amber); border-color: #F2D29B; }
+    .tag-pill.coral { background: var(--coral-soft); color: var(--coral); border-color: #F5C3BC; }
+
+    /* Visual Scene Flow Diagram on Tactile Pinboard */
+    .pinboard-flow {
+      display: flex;
+      align-items: stretch;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 10px 4px 20px;
+    }
+    .scene-node-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .chain-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--coral);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+      padding: 4px 8px;
+      background: var(--coral-soft);
+      border: 1px dashed #E8968B;
+      border-radius: var(--radius-pill);
+    }
+    .polaroid-card {
+      width: 315px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 12px 12px 15px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .polaroid-card.tilt-l { transform: rotate(-0.65deg); }
+    .polaroid-card.tilt-r { transform: rotate(0.55deg); }
+    .polaroid-card:hover {
+      transform: rotate(0deg) translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--coral);
+    }
+    .polaroid-card.selected {
+      transform: rotate(0deg);
+      border: 2px solid var(--coral);
+    }
+    .polaroid-pin {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--coral);
+      box-shadow: 0 2px 5px rgba(229, 77, 58, 0.4);
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .polaroid-frame {
+      aspect-ratio: 16 / 9;
+      border-radius: 11px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(135deg, #27221E, #46392D);
+      display: flex;
+      align-items: flex-end;
+      padding: 10px;
+    }
+    .polaroid-frame img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .polaroid-frame-overlay {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .frame-chip {
+      background: rgba(20, 18, 16, 0.78);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      backdrop-filter: blur(4px);
+    }
+    .polaroid-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .polaroid-title { font-size: 15px; font-weight: 800; margin: 0; color: var(--ink); line-height: 1.25; }
+    .spec-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .spec-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 7px;
+      background: var(--bg-soft);
+      color: var(--ink-soft);
+    }
+    .polaroid-cam {
+      font-size: 12px;
+      color: var(--ink-soft);
+      line-height: 1.4;
+      margin: 0;
+    }
+    .polaroid-end {
+      font-size: 11.5px;
+      color: var(--ink-muted);
+      background: var(--bg-paper);
+      border-radius: 9px;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      line-height: 1.38;
+    }
+    .polaroid-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+    }
+    .mini-btn {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--ink);
+      border-radius: 9px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .mini-btn:hover { background: var(--bg-soft); }
+    .mini-btn.danger:hover { background: var(--coral-soft); color: var(--coral); border-color: #F3BEB6; }
+
+    .add-scene-card {
+      width: 210px;
+      min-height: 310px;
+      border: 2px dashed var(--border-strong);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.55);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--ink-soft);
+      font-weight: 700;
+      font-size: 14px;
+      transition: all 0.18s;
+    }
+    .add-scene-card:hover {
+      border-color: var(--coral);
+      color: var(--coral);
+      background: var(--bg-card);
+    }
+
+    /* Slide-Over Scene Inspector Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(31, 29, 26, 0.35);
+      backdrop-filter: blur(3px);
+      z-index: 60;
+      display: none;
+    }
+    .drawer-backdrop.open { display: block; }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(600px, 96vw);
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      box-shadow: -14px 0 40px rgba(31, 29, 26, 0.16);
+      z-index: 61;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.24s ease;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .drawer-body {
+      padding: 18px 22px 26px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .drawer-foot {
+      padding: 14px 22px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-paper);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-label {
+      font-size: 11.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-muted);
+    }
+    .field-input, .field-textarea, .field-select {
+      width: 100%;
+      background: var(--bg-paper);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      color: var(--ink);
+      outline: none;
+    }
+    .field-input:focus, .field-textarea:focus, .field-select:focus {
+      border-color: var(--coral);
+      background: #fff;
+    }
+    .field-textarea { resize: vertical; min-height: 62px; line-height: 1.45; }
+
+    .beat-box {
+      background: var(--bg-paper);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .json-preview {
+      background: #1B1917;
+      color: #F4ECE1;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.5;
+      padding: 12px;
+      border-radius: 12px;
+      max-height: 250px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Stage 3: Shoot & Takes */
+    .tray-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+    }
+    .elements-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .element-slot {
+      border: 1.5px dashed var(--border-strong);
+      border-radius: 14px;
+      padding: 11px;
+      background: var(--bg-paper);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .element-slot.filled { border-style: solid; border-color: var(--sage); background: #fff; }
+    .element-thumb {
+      width: 58px;
+      height: 58px;
+      border-radius: 10px;
+      background: var(--bg-soft);
+      object-fit: cover;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .element-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    .shoot-act-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 18px;
+    }
+    .shoot-act-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.25fr;
+      gap: 16px;
+      margin-top: 14px;
+      align-items: start;
+    }
+    @media (max-width: 980px) { .shoot-act-grid { grid-template-columns: 1fr; } }
+    .kf-panel {
+      background: var(--bg-paper);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .kf-img-box {
+      aspect-ratio: 16 / 9;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #231E1A;
+      display: grid;
+      place-items: center;
+      color: #C7BEB0;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .kf-img-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .take-player-box {
+      background: #171513;
+      border-radius: 14px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: grid;
+      place-items: center;
+      color: #C7BEB0;
+      font-size: 13px;
+    }
+    .take-player-box video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    .takes-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .take-pill {
+      border: 1px solid var(--border);
+      background: var(--bg-paper);
+      color: var(--ink);
+      border-radius: var(--radius-pill);
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .take-pill.winner {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+
+    /* Stage 4: Screening Room */
+    .screening-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+    @media (max-width: 960px) { .screening-grid { grid-template-columns: 1fr; } }
+    .theater-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: var(--shadow-md);
+    }
+    .theater-screen {
+      background: #141210;
+      border-radius: 16px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: grid;
+      place-items: center;
+      color: #CFC6B9;
+    }
+    .theater-screen video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    .option-cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .opt-card {
+      border: 1.5px solid var(--border);
+      background: var(--bg-paper);
+      border-radius: 13px;
+      padding: 11px 13px;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .opt-card.active {
+      border-color: var(--coral);
+      background: var(--coral-soft);
+    }
+
+    /* Dynamic Model Registry Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(31, 29, 26, 0.45);
+      backdrop-filter: blur(4px);
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      width: min(820px, 96vw);
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .modal-body { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+    .model-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-paper);
+      flex-wrap: wrap;
+    }
+    .model-row.active { border-color: var(--coral); background: var(--coral-soft); }
+    .caps-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .cap-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+    }
+  </style>
+</head>
+<body>
+  <!-- Sticky Warm Studio Header -->
+  <header class="topbar">
+    <div class="brand" onclick="switchStage('discover')">
+      <div class="brand-mark">St</div>
+      <div>
+        <div class="brand-title">Stitch <span class="brand-sub">Studio</span></div>
+      </div>
+    </div>
+
+    <nav class="stage-nav" aria-label="Stitch Studio Stages">
+      <button class="stage-btn active" id="nav-discover" onclick="switchStage('discover')">
+        <span class="stage-num">1</span> Discover
+      </button>
+      <button class="stage-btn" id="nav-pinboard" onclick="switchStage('pinboard')" disabled>
+        <span class="stage-num">2</span> Pinboard
+      </button>
+      <button class="stage-btn" id="nav-shoot" onclick="switchStage('shoot')" disabled>
+        <span class="stage-num">3</span> Shoot &amp; Takes
+      </button>
+      <button class="stage-btn" id="nav-screening" onclick="switchStage('screening')" disabled>
+        <span class="stage-num">4</span> Screening Room
+      </button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="mode-switch" title="Switch between live cloud AI models and instant $0 offline preview">
+        <button class="mode-opt live active" id="mode-live-btn" onclick="setMockMode(false)">● Live AI</button>
+        <button class="mode-opt" id="mode-mock-btn" onclick="setMockMode(true)">⚡ Instant $0</button>
+      </div>
+      <button class="pill-btn" id="open-models-btn" onclick="openModelsModal()">⚙ Models</button>
+      <select class="project-select" id="saved-projects-select" onchange="loadSavedProject(this.value)">
+        <option value="">Saved Films…</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="status-strip">
+    <div class="status-banner" id="status-banner">
+      <span id="status-text"></span>
+      <button class="dismiss" onclick="hideBanner()" aria-label="Dismiss">✕</button>
+    </div>
+  </div>
+
+  <main class="main-wrap">
+    <!-- ==================== STAGE 1: DISCOVER & PITCH ==================== -->
+    <section class="stage-view active" id="stage-discover">
+      <div class="hero-head">
+        <div class="hero-eyebrow"><span class="dot"></span> Tactile Director's Pinboard · 10s to 60s Pixel-Chained Films</div>
+        <h1 class="hero-title">Direct every scene before a single frame renders.</h1>
+        <p class="hero-sub">Drop a one-line idea or product URL, shape each scene visually on your pinboard, verify the live JSON script gate, and stitch long films with dynamic AI models.</p>
+      </div>
+
+      <!-- Airbnb-Style Floating Director's Spark Pill -->
+      <div class="spark-pill">
+        <div class="spark-field">
+          <label class="spark-label" for="spark-idea">Film Idea or Story</label>
+          <input class="spark-input" id="spark-idea" type="text" placeholder="e.g. Liquid gold awakens a miniature wood city inside a glass jar…" />
+        </div>
+        <div class="spark-field">
+          <label class="spark-label" for="spark-url">Product / Brand URL (Optional)</label>
+          <input class="spark-input" id="spark-url" type="url" placeholder="https://yourbrand.com" />
+        </div>
+        <div class="spark-field">
+          <label class="spark-label" for="spark-duration">Length</label>
+          <select class="spark-select" id="spark-duration">
+            <option value="10">10s (1 Scene)</option>
+            <option value="15" selected>15s (1–2 Scenes)</option>
+            <option value="30">30s (3 Chained)</option>
+            <option value="45">45s (3–4 Chained)</option>
+            <option value="60">60s (4 Chained)</option>
+          </select>
+        </div>
+        <div class="spark-field no-border">
+          <label class="spark-label" for="spark-aspect">Frame</label>
+          <select class="spark-select" id="spark-aspect">
+            <option value="16:9" selected>16:9 Cinema</option>
+            <option value="9:16">9:16 Vertical</option>
+            <option value="1:1">1:1 Square</option>
+          </select>
+        </div>
+        <button class="spark-cta" id="btn-direct-now" onclick="directFromSpark()">✦ Direct</button>
+      </div>
+
+      <div class="spark-subbar">
+        <div class="preset-row">
+          <button class="pill-btn" id="btn-pitch-3" onclick="pitchThree()">✨ Pitch 3 Concepts</button>
+          <select class="mini-select" id="preset-world" title="Visual World"></select>
+          <select class="mini-select" id="preset-camera" title="Camera Style"></select>
+          <select class="mini-select" id="preset-lighting" title="Lighting"></select>
+          <select class="mini-select" id="preset-motion" title="Motion Feel"></select>
+        </div>
+        <div class="preset-row">
+          <select class="mini-select" id="spark-video-model" title="Active Video Model" onchange="onSparkModelChange(this.value)"></select>
+          <select class="mini-select" id="spark-llm-model" title="Script Writer LLM"></select>
+        </div>
+      </div>
+
+      <!-- 3 Concept Pitches Drawer -->
+      <div class="pitches-panel" id="pitches-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div>
+            <strong style="font-size:15px;">✨ Director's Concept Pitches</strong>
+            <span style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Pick a treatment to expand onto your Pinboard</span>
+          </div>
+          <button class="mini-btn" onclick="document.getElementById('pitches-panel').classList.remove('show')">Hide</button>
+        </div>
+        <div class="pitches-grid" id="pitches-grid"></div>
+      </div>
+
+      <!-- Photography-First Curated Gallery -->
+      <div class="cat-bar">
+        <div class="cat-chips" id="gallery-cats">
+          <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Films</button>
+          <button class="cat-chip" data-cat="diorama" onclick="filterGallery('diorama', this)">Miniature Diorama</button>
+          <button class="cat-chip" data-cat="hardware" onclick="filterGallery('hardware', this)">Hardware &amp; Brand</button>
+          <button class="cat-chip" data-cat="craft" onclick="filterGallery('craft', this)">Paper &amp; Craft</button>
+          <button class="cat-chip" data-cat="asmr" onclick="filterGallery('asmr', this)">ASMR Macro</button>
+        </div>
+        <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Click any film to load directly onto your Pinboard</span>
+      </div>
+
+      <div class="gallery-grid" id="gallery-grid"></div>
+    </section>
+
+    <!-- ==================== STAGE 2: PINBOARD & SCRIPT GATE ==================== -->
+    <section class="stage-view" id="stage-pinboard">
+      <div class="board-header">
+        <div>
+          <input class="board-title-input" id="board-title" type="text" onblur="saveProjectTitle(this.value)" />
+          <div class="meta-pills" id="board-meta-pills"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button class="pill-btn" id="btn-autofix" onclick="runScriptAutofix()" style="display:none;">✨ Auto-Fix Warnings</button>
+          <button class="pill-btn" onclick="addScenePrompt()">+ Add Scene</button>
+          <button class="pill-btn primary" onclick="switchStage('shoot')">Shoot &amp; Takes →</button>
+        </div>
+      </div>
+
+      <div id="gate-warnings-bar" style="display:none;margin-bottom:16px;"></div>
+
+      <!-- Tactile Polaroid Visual Scene Flow Diagram -->
+      <div class="pinboard-flow" id="pinboard-flow"></div>
+    </section>
+
+    <!-- ==================== STAGE 3: SHOOT & TAKES ==================== -->
+    <section class="stage-view" id="stage-shoot">
+      <div class="board-header">
+        <div>
+          <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;" id="shoot-title">Shoot &amp; Takes</div>
+          <div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">Lock visual identity with @Elements, tweak individual Start/End stills, and shoot Acts non-linearly with Take History.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select class="mini-select" id="shoot-model-select" onchange="changeProjectModel(this.value)"></select>
+          <button class="pill-btn" id="btn-gen-all-kf" onclick="generateAllKeyframesUI()">🎨 Generate All Stills</button>
+          <button class="pill-btn primary" id="btn-render-all" onclick="renderAllScenesUI()">▶ Shoot All Acts (Chained)</button>
+          <button class="pill-btn dark" onclick="switchStage('screening')">Screening Room →</button>
+        </div>
+      </div>
+
+      <!-- Reference Elements Tray (@Element1..3) -->
+      <div class="tray-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            <strong style="font-size:14.5px;">Reference Elements Tray</strong>
+            <span style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Upload Product, Character, or Style photos — locked across 0s → 60s on Kling 3.0 &amp; Flux Kontext</span>
+          </div>
+          <span class="tag-pill" id="elements-support-badge">Supports @Elements</span>
+        </div>
+        <div class="elements-row" id="elements-row"></div>
+      </div>
+
+      <!-- Per-Act Shoot Cards -->
+      <div id="shoot-acts-list"></div>
+    </section>
+
+    <!-- ==================== STAGE 4: SCREENING ROOM & MASTER STITCH ==================== -->
+    <section class="stage-view" id="stage-screening">
+      <div class="screening-grid">
+        <div class="theater-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+            <div>
+              <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;" id="screen-title">Screening Room</div>
+              <div style="font-size:12.5px;color:var(--ink-muted);" id="screen-sub">Assemble your winning takes in &lt;5s with zero AI re-render cost.</div>
+            </div>
+            <a class="pill-btn sage" id="btn-download-master" href="#" download style="display:none;text-decoration:none;">⬇ Download Master MP4</a>
+          </div>
+
+          <div class="theater-screen" id="theater-screen">
+            <div style="text-align:center;padding:30px;">
+              <div style="font-size:32px;margin-bottom:8px;">🎬</div>
+              <div style="font-weight:700;">No Master Cut stitched yet</div>
+              <div style="font-size:12.5px;opacity:0.75;margin-top:4px;">Shoot at least one Act, then click <strong>Stitch Master Cut</strong>.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div class="field-label" style="margin-bottom:8px;">Winning Takes Timeline</div>
+            <div id="screening-timeline" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+          </div>
+        </div>
+
+        <div class="theater-card" style="display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <div class="field-label" style="margin-bottom:8px;">Seam Transitions</div>
+            <div class="option-cards" id="seam-options">
+              <button class="opt-card active" data-seam="invisible_chain" onclick="selectSeam('invisible_chain')">
+                <strong>Invisible Pixel Chain</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Hard pixel-exact frame handoff between chained Acts.</div>
+              </button>
+              <button class="opt-card" data-seam="micro_dissolve" onclick="selectSeam('micro_dissolve')">
+                <strong>Micro-Dissolve (0.35s)</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Silky short visual + audio crossfade at scene cuts.</div>
+              </button>
+              <button class="opt-card" data-seam="audio_riser" onclick="selectSeam('audio_riser')">
+                <strong>Audio Riser Swell</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Subtle harmonic swell bridging each scene boundary.</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-label" style="margin-bottom:8px;">Unified Soundstage</div>
+            <div class="option-cards" id="audio-options">
+              <button class="opt-card" data-audio="native_only" onclick="selectAudioMode('native_only')">
+                <strong>Native Model Audio Only</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Pure Kling 3.0 / Veo 3 foley mastered to -14 LUFS.</div>
+              </button>
+              <button class="opt-card active" data-audio="native_plus_score" onclick="selectAudioMode('native_plus_score')">
+                <strong>Native Foley + Warm Cinema Score</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Blends native audio with a subtle ambient studio bed.</div>
+              </button>
+              <button class="opt-card" data-audio="vo_plus_ducked_score" onclick="selectAudioMode('vo_plus_ducked_score')">
+                <strong>ElevenLabs VO + Ducked Score</strong>
+                <div style="font-size:12px;color:var(--ink-soft);">Speaks your Scene VO lines over a smoothly ducked score.</div>
+              </button>
+            </div>
+          </div>
+
+          <div style="background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="chk-brand-outro" onchange="toggleBrandOutro(this.checked)" />
+              Add +2.5s Kinetic Brand Logo Outro ($0)
+            </label>
+            <div id="brand-outro-fields" style="display:none;flex-direction:column;gap:8px;">
+              <input class="field-input" id="outro-brand-name" placeholder="Brand Name (e.g. Fellow, Lumina)" />
+              <input class="field-input" id="outro-brand-tagline" placeholder="Tagline (e.g. Precision pour-over craft)" />
+              <label class="mini-btn" style="display:inline-flex;align-items:center;gap:6px;width:fit-content;cursor:pointer;">
+                ⬆ Upload Brand Logo
+                <input type="file" accept="image/*" style="display:none;" onchange="uploadBrandLogo(this)" />
+              </label>
+            </div>
+          </div>
+
+          <button class="spark-cta" id="btn-stitch-master" style="width:100%;" onclick="stitchMasterCutUI()">⚡ Stitch Master Cut (&lt;5s)</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== SLIDE-OVER SCENE INSPECTOR DRAWER ==================== -->
+  <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeSceneDrawer()"></div>
+  <aside class="drawer" id="scene-drawer" aria-label="Scene Script Inspector">
+    <div class="drawer-head">
+      <div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--coral);" id="drawer-kicker">Scene Inspector &amp; Script Gate</div>
+        <h3 style="margin:2px 0 0;font-size:19px;" id="drawer-heading">Edit Scene</h3>
+      </div>
+      <button class="mini-btn" onclick="closeSceneDrawer()">✕ Close</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-foot">
+      <button class="mini-btn" onclick="toggleDrawerJson()">&lt;/&gt; Inspect Live Model JSON</button>
+      <div style="display:flex;gap:8px;">
+        <button class="pill-btn" onclick="closeSceneDrawer()">Cancel</button>
+        <button class="pill-btn primary" id="btn-save-scene" onclick="saveSceneFromDrawer()">Save Scene</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==================== DYNAMIC MODEL REGISTRY MODAL ==================== -->
+  <div class="modal-backdrop" id="models-modal" onclick="if(event.target===this) closeModelsModal()">
+    <div class="modal-card">
+      <div class="drawer-head">
+        <div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--coral);">Capability-Driven Registry</div>
+          <h3 style="margin:2px 0 0;font-size:20px;">Dynamic AI Models</h3>
+        </div>
+        <button class="mini-btn" onclick="closeModelsModal()">✕ Close</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--ink-soft);">
+          Switch models anytime or plug in tomorrow's new fal.ai endpoint without touching code. Stitch automatically adapts durations, prompt char cap, Start→End bridging, and @Elements support.
+        </div>
+        <div id="models-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+        <div style="border-top:1px solid var(--border);padding-top:16px;">
+          <h4 style="margin:0 0 12px;font-size:15px;">+ Add Custom fal.ai Video Model</h4>
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Model Endpoint ID (T2V or Main)</label>
+              <input class="field-input" id="cm-id" placeholder="e.g. fal-ai/kling-video/v4/pro/text-to-video" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Image-to-Video Endpoint (Optional)</label>
+              <input class="field-input" id="cm-i2v" placeholder="e.g. fal-ai/kling-video/v4/pro/image-to-video" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Display Label</label>
+              <input class="field-input" id="cm-label" placeholder="e.g. Kling 4.0 Pro Cinema" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Allowed Durations (sec, comma-sep)</label>
+              <input class="field-input" id="cm-durs" value="5, 8, 10, 15" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Duration Format</label>
+              <select class="field-select" id="cm-dur-fmt">
+                <option value="string">String ("10") — Kling v3</option>
+                <option value="int">Integer (10) — Kling v4 Flash</option>
+                <option value="seconds_suffix">Seconds Suffix ("8s") — Veo 3</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Max Prompt Chars &amp; Est $/sec</label>
+              <div style="display:flex;gap:8px;">
+                <input class="field-input" id="cm-chars" type="number" value="2400" title="Max prompt characters" />
+                <input class="field-input" id="cm-usd" type="number" step="0.01" value="0.18" title="Est USD per second" />
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;">
+            <label style="font-size:12.5px;font-weight:600;"><input type="checkbox" id="cm-start" checked /> Start Frame</label>
+            <label style="font-size:12.5px;font-weight:600;"><input type="checkbox" id="cm-end" checked /> End Frame Bridge</label>
+            <label style="font-size:12.5px;font-weight:600;"><input type="checkbox" id="cm-elem" /> @Elements Lock</label>
+            <label style="font-size:12.5px;font-weight:600;"><input type="checkbox" id="cm-audio" checked /> Native Audio</label>
+          </div>
+          <button class="pill-btn primary" onclick="submitCustomModel()">+ Register Model</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      catalog: null,
+      project: null,
+      mockMode: false,
+      activeStage: 'discover',
+      activeCategory: 'all',
+      editingSceneId: null,
+      showDrawerJson: false,
+      pollTimer: null,
+    };
+
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showBanner(msg, type = 'info') {
+      const el = document.getElementById('status-banner');
+      el.className = `status-banner show ${type}`;
+      document.getElementById('status-text').textContent = msg;
+    }
+
+    function hideBanner() {
+      document.getElementById('status-banner').classList.remove('show');
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts,
+      });
+      let data = null;
+      try { data = await res.json(); } catch {}
+      if (!res.ok) {
+        const detail = (data && (data.detail || data.message)) || `HTTP ${res.status}`;
+        throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      }
+      return data;
+    }
+
+    function setMockMode(isMock) {
+      state.mockMode = Boolean(isMock);
+      document.getElementById('mode-live-btn').classList.toggle('active', !state.mockMode);
+      document.getElementById('mode-mock-btn').classList.toggle('active', state.mockMode);
+      showBanner(
+        state.mockMode
+          ? 'Instant $0 Preview mode enabled — scripts, stills & takes run offline in seconds.'
+          : 'Live AI Studio mode enabled — powered by OpenRouter + fal.ai Dynamic Model Registry.',
+        'info'
+      );
+    }
+
+    function switchStage(stage) {
+      if (stage !== 'discover' && !state.project) return;
+      state.activeStage = stage;
+      for (const s of ['discover', 'pinboard', 'shoot', 'screening']) {
+        document.getElementById(`stage-${s}`).classList.toggle('active', s === stage);
+        document.getElementById(`nav-${s}`).classList.toggle('active', s === stage);
+      }
+      if (stage === 'pinboard') renderPinboard();
+      if (stage === 'shoot') renderShootStage();
+      if (stage === 'screening') renderScreeningRoom();
+    }
+
+    function enableProjectNav() {
+      const has = Boolean(state.project);
+      document.getElementById('nav-pinboard').disabled = !has;
+      document.getElementById('nav-shoot').disabled = !has;
+      document.getElementById('nav-screening').disabled = !has;
+    }
+
+    async function init() {
+      try {
+        const [cat, projList] = await Promise.all([
+          api('/api/stitch/catalog'),
+          api('/api/stitch/projects'),
+        ]);
+        state.catalog = cat;
+        if (!cat.live_video_ready && !cat.live_llm_ready) {
+          setMockMode(true);
+        }
+        populateCatalogControls();
+        renderGallery();
+        renderSavedProjects(projList.projects || []);
+      } catch (err) {
+        showBanner(`Failed to load Stitch catalog: ${err.message}`, 'error');
+      }
+    }
+
+    function populateCatalogControls() {
+      const cat = state.catalog;
+      if (!cat) return;
+      const fill = (id, items, valKey = 'id', lblKey = 'label') => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = items.map(it => `<option value="${esc(it[valKey])}">${esc(it[lblKey])}</option>`).join('');
+        if (prev && items.some(it => it[valKey] === prev)) sel.value = prev;
+      };
+      fill('preset-world', cat.worlds || []);
+      fill('preset-camera', cat.cameras || []);
+      fill('preset-lighting', cat.lightings || []);
+      fill('preset-motion', cat.motions || []);
+      fill('spark-llm-model', cat.llm_models || []);
+      const vmHtml = (cat.video_models || []).map(m =>
+        `<option value="${esc(m.id)}">${esc(m.label)} (${esc(m.resolution)}${m.est_usd_per_sec > 0 ? ` · ~$${m.est_usd_per_sec.toFixed(2)}/s` : ' · $0'})</option>`
+      ).join('');
+      for (const sid of ['spark-video-model', 'shoot-model-select']) {
+        const el = document.getElementById(sid);
+        if (el) {
+          const prev = el.value;
+          el.innerHTML = vmHtml;
+          if (prev && (cat.video_models || []).some(m => m.id === prev)) el.value = prev;
+        }
+      }
+      if (state.project) {
+        document.getElementById('shoot-model-select').value = state.project.video_model_id;
+      }
+    }
+
+    function onSparkModelChange(val) {
+      if (val === 'mock') setMockMode(true);
+    }
+
+    function renderSavedProjects(list) {
+      const sel = document.getElementById('saved-projects-select');
+      const cur = state.project ? state.project.project_id : '';
+      sel.innerHTML = `<option value="">Saved Films (${list.length})…</option>` +
+        list.map(p => `<option value="${esc(p.project_id)}" ${p.project_id === cur ? 'selected' : ''}>${esc(p.title)} (${p.total_duration_sec}s)</option>`).join('');
+    }
+
+    async function refreshSavedProjects() {
+      try {
+        const data = await api('/api/stitch/projects');
+        renderSavedProjects(data.projects || []);
+      } catch {}
+    }
+
+    async function loadSavedProject(projectId) {
+      if (!projectId) return;
+      try {
+        showBanner('Loading film onto Pinboard…', 'info');
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(projectId)}`);
+        setProject(proj);
+        switchStage('pinboard');
+        showBanner(`Loaded "${proj.title}".`, 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    function setProject(proj) {
+      state.project = proj;
+      enableProjectNav();
+      const sm = document.getElementById('shoot-model-select');
+      if (sm && proj.video_model_id) sm.value = proj.video_model_id;
+    }
+
+    /* ---------------- Stage 1: Gallery & Pitch ---------------- */
+    function filterGallery(cat, btn) {
+      state.activeCategory = cat;
+      document.querySelectorAll('.cat-chip').forEach(b => b.classList.toggle('active', b === btn));
+      renderGallery();
+    }
+
+    function renderGallery() {
+      const grid = document.getElementById('gallery-grid');
+      const items = (state.catalog?.gallery || []).filter(
+        g => state.activeCategory === 'all' || g.category === state.activeCategory
+      );
+      grid.innerHTML = items.map(g => `
+        <article class="gallery-card" onclick="launchGalleryRecipe('${esc(g.id)}')">
+          <div class="gallery-img-wrap">
+            <img src="${esc(g.image_url)}" alt="${esc(g.title)}" loading="lazy" />
+            <span class="gallery-badge">${esc(g.badge)}</span>
+            <span class="gallery-lens">${esc(g.lens_tag)}</span>
+          </div>
+          <div class="gallery-body">
+            <h3 class="gallery-title">${esc(g.title)}</h3>
+            <p class="gallery-desc">${esc(g.idea)}</p>
+            <div class="gallery-foot">
+              <span>${esc(g.world_preset.replace('_', ' '))}</span>
+              <span>Pin to Board →</span>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    async function launchGalleryRecipe(recipeId) {
+      const rec = (state.catalog?.gallery || []).find(g => g.id === recipeId);
+      if (!rec) return;
+      document.getElementById('spark-idea').value = rec.idea;
+      document.getElementById('preset-world').value = rec.world_preset;
+      document.getElementById('preset-camera').value = rec.camera_preset;
+      document.getElementById('preset-lighting').value = rec.lighting_preset;
+      document.getElementById('preset-motion').value = rec.motion_preset;
+      await createProjectFlow({
+        idea: rec.idea,
+        recipe_id: rec.id,
+        world_preset: rec.world_preset,
+        camera_preset: rec.camera_preset,
+        lighting_preset: rec.lighting_preset,
+        motion_preset: rec.motion_preset,
+      });
+    }
+
+    async function pitchThree() {
+      const idea = document.getElementById('spark-idea').value.trim();
+      const source_url = document.getElementById('spark-url').value.trim() || null;
+      if (!idea && !source_url) {
+        showBanner('Enter a 1-line idea or a product URL first to pitch 3 visual concepts.', 'error');
+        document.getElementById('spark-idea').focus();
+        return;
+      }
+      const btn = document.getElementById('btn-pitch-3');
+      btn.disabled = true;
+      showBanner('Pitching 3 visual director treatments…', 'info');
+      try {
+        const res = await api('/api/stitch/pitch', {
+          method: 'POST',
+          body: JSON.stringify({
+            idea,
+            source_url,
+            llm_model_id: document.getElementById('spark-llm-model').value,
+            mock: state.mockMode,
+          }),
+        });
+        const grid = document.getElementById('pitches-grid');
+        window.__stitchPitches = res.pitches || [];
+        grid.innerHTML = (res.pitches || []).map((p, idx) => `
+          <div class="pitch-card">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
+                <span class="tag-pill coral">${esc(p.angle)}</span>
+                <div class="swatch-row">${(p.palette || []).map(c => `<span class="swatch-dot" style="background:${esc(c)}"></span>`).join('')}</div>
+              </div>
+              <h4 style="margin:0 0 6px;font-size:15.5px;">${esc(p.title)}</h4>
+              <p style="margin:0;font-size:13px;color:var(--ink-soft);line-height:1.45;">${esc(p.logline)}</p>
+            </div>
+            <button class="pill-btn primary" style="justify-content:center;" onclick="directFromPitch(${idx})">Direct this Pitch →</button>
+          </div>
+        `).join('');
+        document.getElementById('pitches-panel').classList.add('show');
+        showBanner('3 visual treatments ready — pick one to pin onto your board.', 'success');
+      } catch (err) {
+        showBanner(`Pitch failed: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function directFromPitch(idx) {
+      const p = (window.__stitchPitches || [])[idx];
+      if (!p) return;
+      document.getElementById('spark-idea').value = p.idea;
+      document.getElementById('preset-world').value = p.world_preset;
+      document.getElementById('preset-camera').value = p.camera_preset;
+      document.getElementById('preset-lighting').value = p.lighting_preset;
+      document.getElementById('preset-motion').value = p.motion_preset;
+      await createProjectFlow({
+        idea: p.idea,
+        world_preset: p.world_preset,
+        camera_preset: p.camera_preset,
+        lighting_preset: p.lighting_preset,
+        motion_preset: p.motion_preset,
+      });
+    }
+
+    async function directFromSpark() {
+      const idea = document.getElementById('spark-idea').value.trim();
+      const url = document.getElementById('spark-url').value.trim();
+      if (!idea && !url) {
+        showBanner('Type a film idea or paste a product URL — or click any curated film below.', 'error');
+        document.getElementById('spark-idea').focus();
+        return;
+      }
+      await createProjectFlow({ idea: idea || `Cinematic product launch film for ${url}` });
+    }
+
+    async function createProjectFlow(overrides = {}) {
+      const btn = document.getElementById('btn-direct-now');
+      btn.disabled = true;
+      showBanner('Directing multi-scene visual script onto your Pinboard…', 'info');
+      try {
+        const body = {
+          idea: overrides.idea || document.getElementById('spark-idea').value.trim(),
+          source_url: document.getElementById('spark-url').value.trim() || null,
+          target_duration_sec: Number(document.getElementById('spark-duration').value || 15),
+          aspect_ratio: document.getElementById('spark-aspect').value || '16:9',
+          video_model_id: document.getElementById('spark-video-model').value || 'fal-ai/kling-video/v3/pro/text-to-video',
+          llm_model_id: document.getElementById('spark-llm-model').value || '',
+          world_preset: overrides.world_preset || document.getElementById('preset-world').value,
+          camera_preset: overrides.camera_preset || document.getElementById('preset-camera').value,
+          lighting_preset: overrides.lighting_preset || document.getElementById('preset-lighting').value,
+          motion_preset: overrides.motion_preset || document.getElementById('preset-motion').value,
+          recipe_id: overrides.recipe_id || null,
+          mock: state.mockMode,
+        };
+        const proj = await api('/api/stitch/projects', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        setProject(proj);
+        await refreshSavedProjects();
+        switchStage('pinboard');
+        showBanner(proj.status_message || 'Pinboard ready!', 'success');
+      } catch (err) {
+        showBanner(`Could not direct film: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ---------------- Stage 2: Tactile Pinboard & Script Gate ---------------- */
+    function renderPinboard() {
+      const p = state.project;
+      if (!p) return;
+      document.getElementById('board-title').value = p.title;
+      const gate = p.script_gate || { valid: true, total_warnings: 0, scenes: [] };
+      const activeM = p.active_model || {};
+
+      document.getElementById('board-meta-pills').innerHTML = `
+        <span class="tag-pill">${p.scenes.length} Scene(s) · ${p.total_duration_sec}s</span>
+        <span class="tag-pill">${esc(p.aspect_ratio)}</span>
+        <span class="tag-pill">${esc(activeM.label || p.video_model_id)} · est. $${Number(p.estimated_usd || 0).toFixed(2)}</span>
+        <span class="tag-pill ${gate.valid ? 'ok' : 'warn'}">${gate.valid ? '✓ Script Gate Verified' : `⚠ ${gate.total_warnings} Script Gate Warning(s)`}</span>
+      `;
+      document.getElementById('btn-autofix').style.display = gate.valid ? 'none' : 'inline-flex';
+
+      const warnBar = document.getElementById('gate-warnings-bar');
+      if (!gate.valid) {
+        const allIssues = (gate.scenes || []).flatMap((sr, i) =>
+          (sr.issues || []).map(iss => `<li><strong>Scene ${i + 1}:</strong> ${esc(iss.message)}</li>`)
+        );
+        warnBar.style.display = 'block';
+        warnBar.innerHTML = `
+          <div style="background:var(--amber-soft);border:1px solid #F2D29B;border-radius:14px;padding:12px 16px;font-size:13px;color:var(--amber);">
+            <strong>Script Gate caught ${gate.total_warnings} detail(s) before rendering:</strong>
+            <ul style="margin:6px 0 0 18px;padding:0;">${allIssues.join('')}</ul>
+          </div>
+        `;
+      } else {
+        warnBar.style.display = 'none';
+      }
+
+      const flow = document.getElementById('pinboard-flow');
+      const cardsHtml = p.scenes.map((sc, idx) => {
+        const sr = (gate.scenes || [])[idx] || { valid: true, issues: [], compiled_chars: sc.compiled_prompt_chars || 0, max_chars: sc.max_prompt_chars || 2400 };
+        const tilt = idx % 2 === 0 ? 'tilt-l' : 'tilt-r';
+        const thumbUrl = sc.start_keyframe_media_url || '';
+        const bgGrad = sc.colors && sc.colors.length >= 2
+          ? `linear-gradient(135deg, ${esc(sc.colors[0])}, ${esc(sc.colors[1])})`
+          : 'linear-gradient(135deg, #27221E, #46392D)';
+        const connHtml = idx > 0
+          ? `<div class="chain-connector">${sc.continues_from_prev ? '↳ Pixel-Chained' : '→ Cut'}</div>`
+          : '';
+        return `
+          <div class="scene-node-wrap">
+            ${connHtml}
+            <article class="polaroid-card ${tilt} ${state.editingSceneId === sc.scene_id ? 'selected' : ''}" onclick="openSceneDrawer('${esc(sc.scene_id)}')">
+              <span class="polaroid-pin"></span>
+              <div class="polaroid-frame" style="background:${bgGrad};">
+                ${thumbUrl ? `<img src="${esc(thumbUrl)}" alt="${esc(sc.title)}" />` : ''}
+                <div class="polaroid-frame-overlay">
+                  <span class="frame-chip">Scene ${idx + 1} · ${sc.duration_sec}s</span>
+                  <span class="frame-chip" style="background:${sr.valid ? 'rgba(46,125,91,0.9)' : 'rgba(184,110,20,0.92)'};">
+                    ${sr.valid ? '✓ Valid' : `⚠ ${sr.issues.length}`}
+                  </span>
+                </div>
+              </div>
+
+              <div class="polaroid-head">
+                <h3 class="polaroid-title">${esc(sc.title)}</h3>
+                <div class="swatch-row">${(sc.colors || []).slice(0, 3).map(c => `<span class="swatch-dot" style="background:${esc(c)}"></span>`).join('')}</div>
+              </div>
+
+              <div class="spec-chips">
+                ${(sc.subjects || []).slice(0, 2).map(s => `<span class="spec-chip">👤 ${esc(s)}</span>`).join('')}
+                ${(sc.materials || []).slice(0, 2).map(m => `<span class="spec-chip">◆ ${esc(m)}</span>`).join('')}
+              </div>
+
+              <p class="polaroid-cam">🎥 ${esc(sc.camera_spec)}</p>
+              <div class="polaroid-end"><strong>End Lock:</strong> ${esc(sc.end_frame)}</div>
+
+              <div class="polaroid-actions" onclick="event.stopPropagation()">
+                <div style="display:flex;gap:6px;">
+                  <button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', false)">✎ Edit Sheet</button>
+                  <button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', true)">&lt;/&gt; JSON</button>
+                </div>
+                ${p.scenes.length > 1 ? `<button class="mini-btn danger" onclick="deleteSceneUI('${esc(sc.scene_id)}')" title="Remove scene">✕</button>` : `<span style="font-size:11px;color:var(--ink-muted);">${sr.compiled_chars}/${sr.max_chars} ch</span>`}
+              </div>
+            </article>
+          </div>
+        `;
+      }).join('');
+
+      const addCard = p.scenes.length < 6
+        ? `<button class="add-scene-card" onclick="addScenePrompt()"><span style="font-size:26px;">＋</span><span>Add Next Scene</span><span style="font-size:11.5px;font-weight:500;">Chain +5s to +15s</span></button>`
+        : '';
+
+      flow.innerHTML = cardsHtml + addCard;
+    }
+
+    async function saveProjectTitle(val) {
+      if (!state.project || !val.trim() || val.trim() === state.project.title) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ title: val.trim() }),
+        });
+        setProject(proj);
+        refreshSavedProjects();
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function runScriptAutofix() {
+      if (!state.project) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/autofix`, {
+          method: 'POST',
+        });
+        setProject(proj);
+        renderPinboard();
+        showBanner('Script Gate auto-fixed all warnings cleanly!', 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function addScenePrompt() {
+      if (!state.project) return;
+      try {
+        const activeM = state.project.active_model || {};
+        const defDur = activeM.default_duration_sec || 10;
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes`, {
+          method: 'POST',
+          body: JSON.stringify({
+            title: `Scene ${state.project.scenes.length + 1} · Next Evolution`,
+            duration_sec: defDur,
+            kind: 'ai_sequence',
+            continues_from_prev: true,
+          }),
+        });
+        setProject(proj);
+        renderPinboard();
+        showBanner(`Added Scene ${proj.scenes.length} (total ${proj.total_duration_sec}s).`, 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function deleteSceneUI(sceneId) {
+      if (!state.project) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}`, {
+          method: 'DELETE',
+        });
+        if (state.editingSceneId === sceneId) closeSceneDrawer();
+        setProject(proj);
+        renderPinboard();
+        showBanner('Scene removed from Pinboard.', 'info');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    /* ---------------- Slide-Over Scene Inspector Drawer ---------------- */
+    function openSceneDrawer(sceneId, showJson = false) {
+      if (!state.project) return;
+      const idx = state.project.scenes.findIndex(s => s.scene_id === sceneId);
+      if (idx < 0) return;
+      state.editingSceneId = sceneId;
+      state.showDrawerJson = showJson;
+      const sc = state.project.scenes[idx];
+      const activeM = state.project.active_model || { durations_sec: [5, 8, 10, 15], max_prompt_chars: 2400 };
+      const durs = activeM.durations_sec || [5, 8, 10, 15];
+      if (!durs.includes(sc.duration_sec)) durs.push(sc.duration_sec);
+      durs.sort((a, b) => a - b);
+
+      document.getElementById('drawer-kicker').textContent = `Scene ${idx + 1} of ${state.project.scenes.length} · Script Gate Inspector`;
+      document.getElementById('drawer-heading').textContent = sc.title;
+
+      const sr = (state.project.script_gate?.scenes || [])[idx] || { valid: true, issues: [], compiled_chars: sc.compiled_prompt_chars || 0, max_chars: activeM.max_prompt_chars || 2400 };
+
+      const beatsHtml = (sc.beats || []).map((b, bi) => `
+        <div class="beat-box" data-beat-idx="${bi}">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="field-input" style="width:92px;font-family:var(--font-mono);font-size:12px;" data-bk="time" value="${esc(b.time)}" />
+            <input class="field-input" data-bk="camera" placeholder="Camera beat move" value="${esc(b.camera)}" />
+            <button class="mini-btn danger" onclick="this.closest('.beat-box').remove()" title="Delete beat">✕</button>
+          </div>
+          <textarea class="field-textarea" data-bk="scene" placeholder="Visual scene composition…">${esc(b.scene)}</textarea>
+          <textarea class="field-textarea" data-bk="action" placeholder="Physical action & motion…">${esc(b.action)}</textarea>
+          <input class="field-input" data-bk="sound" placeholder="Tactile foley / sound cue…" value="${esc(b.sound || '')}" />
+        </div>
+      `).join('');
+
+      document.getElementById('drawer-body').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span class="tag-pill ${sr.valid ? 'ok' : 'warn'}">${sr.valid ? '✓ Scene Script Valid' : `⚠ ${sr.issues.length} Warning(s)`}</span>
+          <span style="font-size:12px;font-family:var(--font-mono);color:var(--ink-muted);">${sr.compiled_chars} / ${sr.max_chars} chars compiled</span>
+        </div>
+
+        ${sr.issues.length ? `<div style="background:var(--amber-soft);border:1px solid #F2D29B;border-radius:11px;padding:9px 12px;font-size:12.5px;color:var(--amber);">${sr.issues.map(i => `• ${esc(i.message)}`).join('<br/>')}</div>` : ''}
+
+        <div class="field-group">
+          <label class="field-label">Scene Title</label>
+          <input class="field-input" id="ed-title" value="${esc(sc.title)}" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="field-group">
+            <label class="field-label">Duration (${esc(activeM.label || 'Active Model')})</label>
+            <select class="field-select" id="ed-dur">
+              ${durs.map(d => `<option value="${d}" ${d === sc.duration_sec ? 'selected' : ''}>${d} seconds</option>`).join('')}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Scene Engine Mode</label>
+            <select class="field-select" id="ed-kind">
+              <option value="ai_sequence" ${sc.kind === 'ai_sequence' ? 'selected' : ''}>AI Cinema Sequence</option>
+              <option value="kinetic_ui" ${sc.kind === 'kinetic_ui' ? 'selected' : ''}>Kinetic Brand / UI Card ($0)</option>
+            </select>
+          </div>
+        </div>
+
+        ${idx > 0 ? `
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="ed-chain" ${sc.continues_from_prev ? 'checked' : ''} />
+            Pixel-Chain from Scene ${idx}'s exact final frame
+          </label>
+        ` : ''}
+
+        <div class="field-group">
+          <label class="field-label">Characters &amp; Hero Subjects (comma-separated)</label>
+          <input class="field-input" id="ed-subjects" value="${esc((sc.subjects || []).join(', '))}" />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Physical Materials &amp; Textures (comma-separated)</label>
+          <input class="field-input" id="ed-materials" value="${esc((sc.materials || []).join(', '))}" />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Camera Position &amp; Movement</label>
+          <input class="field-input" id="ed-camera" value="${esc(sc.camera_spec)}" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="field-group">
+            <label class="field-label">Palette Hexes (3 comma-sep)</label>
+            <input class="field-input" id="ed-colors" value="${esc((sc.colors || []).join(', '))}" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Voiceover Line (Optional)</label>
+            <input class="field-input" id="ed-vo" value="${esc(sc.vo_line || '')}" placeholder="Optional spoken line…" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Locked End Frame (Feeds Next Scene's Continuity)</label>
+          <textarea class="field-textarea" id="ed-end">${esc(sc.end_frame)}</textarea>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span class="field-label">Beat-by-Beat Choreography</span>
+            <button class="mini-btn" onclick="appendDrawerBeat()">+ Add Beat</button>
+          </div>
+          <div id="ed-beats-list" style="display:flex;flex-direction:column;gap:10px;">${beatsHtml}</div>
+        </div>
+
+        <div id="drawer-json-wrap" style="display:${showJson ? 'block' : 'none'};">
+          <div class="field-label" style="margin-bottom:6px;">Live Compiled Model JSON (Sent to ${esc(activeM.label || 'Video Model')})</div>
+          <pre class="json-preview">${esc(JSON.stringify(sc.compiled_prompt_dict || {}, null, 2))}</pre>
+        </div>
+      `;
+
+      document.getElementById('drawer-backdrop').classList.add('open');
+      document.getElementById('scene-drawer').classList.add('open');
+      renderPinboard();
+    }
+
+    function appendDrawerBeat() {
+      const list = document.getElementById('ed-beats-list');
+      const div = document.createElement('div');
+      div.className = 'beat-box';
+      div.innerHTML = `
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="field-input" style="width:92px;font-family:var(--font-mono);font-size:12px;" data-bk="time" value="6-10s" />
+          <input class="field-input" data-bk="camera" placeholder="Camera beat move" value="Smooth continuous glide" />
+          <button class="mini-btn danger" onclick="this.closest('.beat-box').remove()">✕</button>
+        </div>
+        <textarea class="field-textarea" data-bk="scene" placeholder="Visual scene composition…"></textarea>
+        <textarea class="field-textarea" data-bk="action" placeholder="Physical action & motion…"></textarea>
+        <input class="field-input" data-bk="sound" placeholder="Tactile foley / sound cue…" value="" />
+      `;
+      list.appendChild(div);
+    }
+
+    function toggleDrawerJson() {
+      const el = document.getElementById('drawer-json-wrap');
+      if (!el) return;
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+      if (el.style.display === 'block') el.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeSceneDrawer() {
+      state.editingSceneId = null;
+      document.getElementById('drawer-backdrop').classList.remove('open');
+      document.getElementById('scene-drawer').classList.remove('open');
+      renderPinboard();
+    }
+
+    async function saveSceneFromDrawer() {
+      if (!state.project || !state.editingSceneId) return;
+      const idx = state.project.scenes.findIndex(s => s.scene_id === state.editingSceneId);
+      if (idx < 0) return;
+
+      const splitCsv = v => v.split(',').map(x => x.trim()).filter(Boolean);
+      const beats = Array.from(document.querySelectorAll('#ed-beats-list .beat-box')).map(box => ({
+        time: box.querySelector('[data-bk="time"]').value.trim() || '0-5s',
+        camera: box.querySelector('[data-bk="camera"]').value.trim(),
+        scene: box.querySelector('[data-bk="scene"]').value.trim(),
+        action: box.querySelector('[data-bk="action"]').value.trim(),
+        sound: box.querySelector('[data-bk="sound"]').value.trim(),
+      })).filter(b => b.scene || b.action);
+
+      const scenesCopy = state.project.scenes.map(s => ({ ...s }));
+      const chainEl = document.getElementById('ed-chain');
+      scenesCopy[idx] = {
+        ...scenesCopy[idx],
+        title: document.getElementById('ed-title').value.trim() || scenesCopy[idx].title,
+        duration_sec: Number(document.getElementById('ed-dur').value || 10),
+        kind: document.getElementById('ed-kind').value,
+        continues_from_prev: chainEl ? chainEl.checked : false,
+        subjects: splitCsv(document.getElementById('ed-subjects').value),
+        materials: splitCsv(document.getElementById('ed-materials').value),
+        camera_spec: document.getElementById('ed-camera').value.trim(),
+        colors: splitCsv(document.getElementById('ed-colors').value),
+        vo_line: document.getElementById('ed-vo').value.trim(),
+        end_frame: document.getElementById('ed-end').value.trim(),
+        beats,
+      };
+
+      const btn = document.getElementById('btn-save-scene');
+      btn.disabled = true;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ scenes: scenesCopy }),
+        });
+        setProject(proj);
+        closeSceneDrawer();
+        renderPinboard();
+        showBanner('Scene saved & re-validated by Script Gate.', 'success');
+      } catch (err) {
+        showBanner(`Save failed: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ---------------- Stage 3: Shoot & Takes ---------------- */
+    function renderShootStage() {
+      const p = state.project;
+      if (!p) return;
+      document.getElementById('shoot-title').textContent = `${p.title} · Shoot & Takes`;
+      document.getElementById('shoot-model-select').value = p.video_model_id;
+      const activeM = p.active_model || {};
+      const supBadge = document.getElementById('elements-support-badge');
+      supBadge.textContent = activeM.supports_elements
+        ? `✓ ${activeM.label} locks @Elements`
+        : `${activeM.label || 'Model'} uses Start Frame anchor`;
+      supBadge.className = `tag-pill ${activeM.supports_elements ? 'ok' : ''}`;
+
+      // Reference Elements Tray (@Element1..3)
+      const roles = [
+        { slot: 1, role: 'product', title: 'Product / Hero Object' },
+        { slot: 2, role: 'character', title: 'Character / Hand' },
+        { slot: 3, role: 'style', title: 'Lighting / Style Ref' },
+      ];
+      document.getElementById('elements-row').innerHTML = roles.map(r => {
+        const existing = (p.elements || []).find(e => e.slot === r.slot);
+        return `
+          <div class="element-slot ${existing ? 'filled' : ''}">
+            <div class="element-thumb">
+              ${existing && existing.image_url ? `<img src="${esc(existing.image_url)}" alt="${esc(existing.label)}" />` : '📷'}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:800;color:var(--coral);">@Element${r.slot}</div>
+              <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(existing ? existing.label : r.title)}</div>
+              <div style="display:flex;gap:6px;margin-top:6px;">
+                <label class="mini-btn" style="cursor:pointer;">
+                  ${existing ? 'Replace' : '⬆ Upload'}
+                  <input type="file" accept="image/*" style="display:none;" onchange="uploadElementFile(${r.slot}, '${r.role}', '${esc(r.title)}', this)" />
+                </label>
+                ${existing ? `<button class="mini-btn danger" onclick="deleteElementUI(${r.slot})">✕</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Per-Act Shoot Cards
+      document.getElementById('shoot-acts-list').innerHTML = p.scenes.map((sc, idx) => {
+        const isRendering = sc.render_status === 'rendering';
+        const winClip = sc.winning_clip_url;
+        const takesHtml = (sc.takes || []).map(t => `
+          <button class="take-pill ${t.take_id === sc.winning_take_id ? 'winner' : ''}" onclick="selectTakeUI('${esc(sc.scene_id)}', ${t.take_id})">
+            Take ${t.take_id} ${t.take_id === sc.winning_take_id ? '★' : ''} · ${esc(t.engine_label)} (${t.duration_sec}s${t.chained_from_prev ? ' · Chained' : ''})
+          </button>
+        `).join('');
+
+        return `
+          <div class="shoot-act-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <strong style="font-size:16.5px;">Act ${idx + 1} · ${esc(sc.title)}</strong>
+                  <span class="tag-pill">${sc.duration_sec}s</span>
+                  ${idx > 0 && sc.continues_from_prev ? '<span class="tag-pill coral">↳ Auto-Chains from Act ' + idx + ' Final Pixel</span>' : ''}
+                  ${sc.render_status === 'rendering' ? '<span class="tag-pill warn">⏳ Rendering…</span>' : ''}
+                  ${sc.render_status === 'done' ? '<span class="tag-pill ok">✓ Ready</span>' : ''}
+                  ${sc.render_status === 'failed' ? '<span class="tag-pill coral">✕ Failed</span>' : ''}
+                </div>
+                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${esc(sc.render_message || sc.camera_spec)}</div>
+              </div>
+              <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
+                ${isRendering ? '⏳ Shooting…' : (sc.takes.length ? '↻ Shoot New Take' : '▶ Shoot Act')}
+              </button>
+            </div>
+
+            <div class="shoot-act-grid">
+              <!-- Start Frame -->
+              <div class="kf-panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span class="field-label">Start Anchor Frame</span>
+                  <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'start', this)" /></label>
+                </div>
+                <div class="kf-img-box">
+                  ${sc.start_keyframe_media_url ? `<img src="${esc(sc.start_keyframe_media_url)}?v=${Date.now()}" alt="Start keyframe" />` : 'Not generated yet'}
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-start-${esc(sc.scene_id)}" placeholder="1-line tweak (e.g. warmer light)…" />
+                  <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'start')">↻ Regen</button>
+                </div>
+              </div>
+
+              <!-- End Frame -->
+              <div class="kf-panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span class="field-label">End Anchor Frame ${activeM.supports_end_frame ? '✓ Bridged' : ''}</span>
+                  <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'end', this)" /></label>
+                </div>
+                <div class="kf-img-box">
+                  ${sc.end_keyframe_media_url ? `<img src="${esc(sc.end_keyframe_media_url)}?v=${Date.now()}" alt="End keyframe" />` : 'Not generated yet'}
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-end-${esc(sc.scene_id)}" placeholder="1-line tweak for end frame…" />
+                  <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'end')">↻ Regen</button>
+                </div>
+              </div>
+
+              <!-- Video Take Preview + Take History -->
+              <div>
+                <div class="take-player-box">
+                  ${winClip
+                    ? `<video controls playsinline preload="metadata" src="${esc(winClip)}"></video>`
+                    : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Shoot Act</strong> to render Take 1'}</div>`}
+                </div>
+                <div class="takes-strip">
+                  ${takesHtml || '<span style="font-size:12px;color:var(--ink-muted);">No takes rendered yet for this Act.</span>'}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function changeProjectModel(modelId) {
+      if (!state.project) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ video_model_id: modelId }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(`Switched active video model to ${proj.active_model?.label || modelId}.`, 'info');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ''));
+        r.onerror = () => reject(new Error('Failed to read image file'));
+        r.readAsDataURL(file);
+      });
+    }
+
+    async function uploadElementFile(slot, role, label, input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      try {
+        const data_url = await fileToDataUrl(file);
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/elements`, {
+          method: 'POST',
+          body: JSON.stringify({ slot, role, label: file.name.replace(/\.[^.]+$/, '') || label, filename: file.name, data_url }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(`Locked @Element${slot} into Reference Tray.`, 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function deleteElementUI(slot) {
+      if (!state.project) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/elements/${slot}`, {
+          method: 'DELETE',
+        });
+        setProject(proj);
+        renderShootStage();
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function generateAllKeyframesUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-gen-all-kf');
+      btn.disabled = true;
+      showBanner('Generating continuity-locked Start & End anchor stills…', 'info');
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/keyframes`, {
+          method: 'POST',
+          body: JSON.stringify({ mock: state.mockMode }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(proj.status_message || 'All anchor stills ready!', 'success');
+      } catch (err) {
+        showBanner(`Keyframe error: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function regenKeyframeUI(sceneId, which) {
+      if (!state.project) return;
+      const noteEl = document.getElementById(`tw-${which}-${sceneId}`);
+      const tweak_note = noteEl ? noteEl.value.trim() : '';
+      showBanner(`Regenerating ${which} anchor still…`, 'info');
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/keyframe`, {
+          method: 'POST',
+          body: JSON.stringify({ which, tweak_note: tweak_note || null, mock: state.mockMode }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(proj.status_message || 'Anchor still updated!', 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function uploadKeyframeFile(sceneId, which, input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      try {
+        const upload_data_url = await fileToDataUrl(file);
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/keyframe`, {
+          method: 'POST',
+          body: JSON.stringify({ which, upload_data_url }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(`Uploaded custom ${which} anchor frame.`, 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function renderSingleSceneUI(sceneId) {
+      if (!state.project) return;
+      const engine_id = document.getElementById('shoot-model-select').value;
+      showBanner(`Queued Act render with ${engine_id}…`, 'info');
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/render`, {
+          method: 'POST',
+          body: JSON.stringify({ engine_id, mock: state.mockMode, sync: false }),
+        });
+        setProject(proj);
+        renderShootStage();
+        startPollingProject();
+      } catch (err) {
+        showBanner(`Render failed: ${err.message}`, 'error');
+      }
+    }
+
+    async function renderAllScenesUI() {
+      if (!state.project) return;
+      const engine_id = document.getElementById('shoot-model-select').value;
+      showBanner('Shooting all Acts sequentially with pixel-exact Last-Frame Chaining…', 'info');
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/render-all`, {
+          method: 'POST',
+          body: JSON.stringify({ engine_id, mock: state.mockMode, sync: false }),
+        });
+        setProject(proj);
+        renderShootStage();
+        startPollingProject();
+      } catch (err) {
+        showBanner(`Render All failed: ${err.message}`, 'error');
+      }
+    }
+
+    async function selectTakeUI(sceneId, takeId) {
+      if (!state.project) return;
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/select-take`, {
+          method: 'POST',
+          body: JSON.stringify({ take_id: takeId }),
+        });
+        setProject(proj);
+        renderShootStage();
+        showBanner(proj.status_message || `Selected Take ${takeId}.`, 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    function startPollingProject() {
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(async () => {
+        if (!state.project) return;
+        try {
+          const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`);
+          setProject(proj);
+          if (state.activeStage === 'shoot') renderShootStage();
+          if (state.activeStage === 'screening') renderScreeningRoom();
+          const anyBusy = proj.status === 'shooting' || proj.status === 'stitching' || proj.scenes.some(s => s.render_status === 'rendering');
+          if (!anyBusy) {
+            clearInterval(state.pollTimer);
+            state.pollTimer = null;
+            if (proj.error || proj.status === 'failed' || proj.scenes.some(s => s.render_status === 'failed')) {
+              showBanner(proj.error || proj.status_message || 'Render finished with an error.', 'error');
+            } else {
+              showBanner(proj.status_message || 'Render complete!', 'success');
+            }
+          } else {
+            showBanner(proj.status_message || 'Shooting in progress…', 'info');
+          }
+        } catch {}
+      }, 2200);
+    }
+
+    /* ---------------- Stage 4: Screening Room & Master Stitch ---------------- */
+    function renderScreeningRoom() {
+      const p = state.project;
+      if (!p) return;
+      document.getElementById('screen-title').textContent = `${p.title} · Screening Room`;
+      document.getElementById('screen-sub').textContent = `${p.total_duration_sec}s · ${p.aspect_ratio} · Actual spend $${Number(p.actual_usd || 0).toFixed(2)}`;
+
+      const dlBtn = document.getElementById('btn-download-master');
+      const screen = document.getElementById('theater-screen');
+      if (p.master_video_url) {
+        screen.innerHTML = `<video controls playsinline preload="metadata" src="${esc(p.master_video_url)}"></video>`;
+        dlBtn.href = p.master_video_url;
+        dlBtn.download = `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_stitch_master.mp4`;
+        dlBtn.style.display = 'inline-flex';
+      } else {
+        dlBtn.style.display = 'none';
+        screen.innerHTML = `
+          <div style="text-align:center;padding:30px;">
+            <div style="font-size:32px;margin-bottom:8px;">🎬</div>
+            <div style="font-weight:700;">Ready to Stitch Master Cut</div>
+            <div style="font-size:12.5px;opacity:0.75;margin-top:4px;">Pick your seam transition &amp; soundstage on the right, then click <strong>Stitch Master Cut</strong>.</div>
+          </div>
+        `;
+      }
+
+      document.getElementById('screening-timeline').innerHTML = p.scenes.map((sc, idx) => {
+        const hasWin = Boolean(sc.winning_clip_url);
+        return `
+          <div style="background:var(--bg-paper);border:1px solid ${hasWin ? 'var(--sage)' : 'var(--border)'};border-radius:12px;padding:9px 12px;min-width:155px;">
+            <div style="font-size:11px;font-weight:800;color:${hasWin ? 'var(--sage)' : 'var(--ink-muted)'};">Act ${idx + 1} · ${sc.duration_sec}s</div>
+            <div style="font-size:12.5px;font-weight:700;">${esc(sc.title)}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">${hasWin ? `★ Take ${sc.winning_take_id} ready` : 'Not shot yet'}</div>
+          </div>
+        `;
+      }).join('');
+
+      document.querySelectorAll('#seam-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.seam === p.seam_transition));
+      document.querySelectorAll('#audio-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.audio === p.audio_mode));
+      const chk = document.getElementById('chk-brand-outro');
+      chk.checked = Boolean(p.add_brand_outro);
+      document.getElementById('brand-outro-fields').style.display = p.add_brand_outro ? 'flex' : 'none';
+      document.getElementById('outro-brand-name').value = p.brand_name || '';
+      document.getElementById('outro-brand-tagline').value = p.brand_tagline || '';
+    }
+
+    function selectSeam(seam) {
+      if (!state.project) return;
+      state.project.seam_transition = seam;
+      document.querySelectorAll('#seam-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.seam === seam));
+    }
+
+    function selectAudioMode(mode) {
+      if (!state.project) return;
+      state.project.audio_mode = mode;
+      document.querySelectorAll('#audio-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.audio === mode));
+    }
+
+    function toggleBrandOutro(checked) {
+      if (!state.project) return;
+      state.project.add_brand_outro = Boolean(checked);
+      document.getElementById('brand-outro-fields').style.display = checked ? 'flex' : 'none';
+    }
+
+    async function uploadBrandLogo(input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      try {
+        const data_url = await fileToDataUrl(file);
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/logo`, {
+          method: 'POST',
+          body: JSON.stringify({ filename: file.name, data_url }),
+        });
+        setProject(proj);
+        showBanner('Uploaded brand logo for Kinetic Outro.', 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    async function stitchMasterCutUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-stitch-master');
+      btn.disabled = true;
+      showBanner('Stitching Master Cut in low-RAM studio FFmpeg…', 'info');
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/stitch`, {
+          method: 'POST',
+          body: JSON.stringify({
+            audio_mode: state.project.audio_mode,
+            seam_transition: state.project.seam_transition,
+            add_brand_outro: document.getElementById('chk-brand-outro').checked,
+            brand_name: document.getElementById('outro-brand-name').value.trim() || null,
+            brand_tagline: document.getElementById('outro-brand-tagline').value.trim() || null,
+            mock: state.mockMode,
+          }),
+        });
+        setProject(proj);
+        renderScreeningRoom();
+        showBanner(proj.status_message || 'Master Cut ready!', 'success');
+      } catch (err) {
+        showBanner(`Stitch failed: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ---------------- Dynamic Model Registry Modal ---------------- */
+    async function openModelsModal() {
+      try {
+        const data = await api('/api/stitch/models');
+        if (state.catalog) state.catalog.video_models = data.video_models;
+        renderModelsList();
+        document.getElementById('models-modal').classList.add('open');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    function closeModelsModal() {
+      document.getElementById('models-modal').classList.remove('open');
+    }
+
+    function renderModelsList() {
+      const models = state.catalog?.video_models || [];
+      const activeId = state.project ? state.project.video_model_id : document.getElementById('spark-video-model').value;
+      document.getElementById('models-list').innerHTML = models.map(m => `
+        <div class="model-row ${m.id === activeId ? 'active' : ''}">
+          <div>
+            <div style="font-size:14.5px;font-weight:800;">
+              ${esc(m.label)}
+              ${m.custom ? '<span class="tag-pill coral" style="margin-left:6px;">Custom</span>' : ''}
+            </div>
+            <div style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-muted);margin-top:2px;">${esc(m.id)}</div>
+            <div class="caps-row">
+              <span class="cap-badge">${esc(m.resolution)}</span>
+              <span class="cap-badge">${(m.durations_sec || []).join('/')}s</span>
+              <span class="cap-badge">${m.max_prompt_chars} ch max</span>
+              ${m.supports_end_frame ? '<span class="cap-badge">Start→End</span>' : ''}
+              ${m.supports_elements ? '<span class="cap-badge">@Elements</span>' : ''}
+              ${m.supports_native_audio ? '<span class="cap-badge">Native Audio</span>' : ''}
+              <span class="cap-badge">${m.est_usd_per_sec > 0 ? `$${m.est_usd_per_sec.toFixed(2)}/s` : '$0'}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="mini-btn" onclick="pickModelFromModal('${esc(m.id)}')">${m.id === activeId ? '✓ Active' : 'Use Model'}</button>
+            ${m.custom ? `<button class="mini-btn danger" onclick="deleteCustomModelUI('${esc(m.id)}')">Delete</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function pickModelFromModal(modelId) {
+      document.getElementById('spark-video-model').value = modelId;
+      if (state.project) {
+        await changeProjectModel(modelId);
+      }
+      renderModelsList();
+      closeModelsModal();
+    }
+
+    async function submitCustomModel() {
+      const id = document.getElementById('cm-id').value.trim();
+      const label = document.getElementById('cm-label').value.trim();
+      if (!id || !label) {
+        showBanner('Enter both an Endpoint ID and Display Label to register a custom model.', 'error');
+        return;
+      }
+      const durs = document.getElementById('cm-durs').value
+        .split(',')
+        .map(x => parseInt(x.trim(), 10))
+        .filter(n => Number.isFinite(n) && n >= 2 && n <= 30);
+
+      try {
+        const res = await api('/api/stitch/models', {
+          method: 'POST',
+          body: JSON.stringify({
+            id,
+            i2v_id: document.getElementById('cm-i2v').value.trim() || null,
+            label,
+            tier: 'custom',
+            provider: 'fal',
+            resolution: '1080p',
+            durations_sec: durs.length ? durs : [5, 8, 10],
+            default_duration_sec: durs.length ? durs[0] : 10,
+            duration_format: document.getElementById('cm-dur-fmt').value,
+            max_prompt_chars: Number(document.getElementById('cm-chars').value || 2400),
+            est_usd_per_sec: Number(document.getElementById('cm-usd').value || 0.18),
+            supports_start_frame: document.getElementById('cm-start').checked,
+            supports_end_frame: document.getElementById('cm-end').checked,
+            supports_elements: document.getElementById('cm-elem').checked,
+            supports_native_audio: document.getElementById('cm-audio').checked,
+          }),
+        });
+        state.catalog.video_models = res.video_models;
+        populateCatalogControls();
+        renderModelsList();
+        document.getElementById('cm-id').value = '';
+        document.getElementById('cm-i2v').value = '';
+        document.getElementById('cm-label').value = '';
+        showBanner(`Registered custom model "${label}" into Dynamic Model Registry!`, 'success');
+      } catch (err) {
+        showBanner(`Could not add model: ${err.message}`, 'error');
+      }
+    }
+
+    async function deleteCustomModelUI(modelId) {
+      try {
+        const res = await api(`/api/stitch/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+        state.catalog.video_models = res.video_models;
+        populateCatalogControls();
+        renderModelsList();
+        showBanner(`Removed custom model ${modelId}.`, 'info');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -99,14 +99,20 @@ def create_app(
     from gtm_videogen.api.director_routes import director_router
 
     application.include_router(director_router)
+    from gtm_videogen.api.stitch_routes import stitch_router
 
-    studio_html_path = Path(__file__).with_name("studio.html")
+    application.include_router(stitch_router)
+
+    stitch_html_path = Path(__file__).with_name("stitch.html")
 
     @application.get("/", include_in_schema=False)
-    async def studio_index() -> HTMLResponse:
-        if studio_html_path.is_file():
-            return HTMLResponse(studio_html_path.read_text(encoding="utf-8"))
-        return HTMLResponse("<h1>LaunchCut API</h1><p>Open <a href='/docs'>/docs</a>.</p>")
+    async def stitch_index() -> HTMLResponse:
+        if stitch_html_path.is_file():
+            return HTMLResponse(
+                stitch_html_path.read_text(encoding="utf-8"),
+                headers={"Cache-Control": "no-cache"},
+            )
+        return HTMLResponse("<h1>Stitch Studio API</h1><p>Open <a href='/docs'>/docs</a>.</p>")
 
     return application
 

@@ -475,6 +475,147 @@ class VideoProvider:
             if owns_client:
                 await client.aclose()
 
+    async def generate_from_registry(
+        self,
+        *,
+        spec: Any,
+        shot_id: str,
+        prompt: str,
+        duration_sec: int | float,
+        aspect: AspectRatio,
+        fps: int = 24,
+        start_image: str | None = None,
+        end_image: str | None = None,
+        negative_prompt: str | None = None,
+        generate_audio: bool = True,
+        element_image_urls: list[str] | None = None,
+        cancel: CancellationToken | None = None,
+    ) -> RenderedClip:
+        """Submit any declarative VideoModelSpec from ModelRegistryStore dynamically."""
+        from gtm_videogen.models.model_registry import build_registry_fal_payload
+
+        if cancel is not None:
+            cancel.raise_if_cancelled()
+
+        endpoint, payload = build_registry_fal_payload(
+            spec,
+            prompt=prompt,
+            duration_sec=duration_sec,
+            aspect_ratio=aspect,
+            start_image=start_image,
+            end_image=end_image,
+            negative_prompt=negative_prompt,
+            generate_audio=generate_audio,
+            element_image_urls=element_image_urls,
+        )
+        width, height = ASPECT_DIMENSIONS[aspect]
+
+        meter = self._cost_meter or current_cost_meter()
+        est_usd = round(
+            max(float(duration_sec), self._min_seconds)
+            * float(getattr(spec, "est_usd_per_sec", self._usd_per_sec)),
+            6,
+        )
+        reservation_id: str | None = None
+        if meter is not None:
+            reservation_id = meter.reserve(
+                f"stitch:{shot_id}",
+                est_usd,
+                stage="render_video",
+                provider=str(getattr(spec, "provider", "fal")),
+                model=endpoint,
+            )
+
+        client = self._http_client
+        owns_client = client is None
+        if client is None:
+            client = ResilientHttpClient(
+                connect_timeout=self.settings.http_connect_timeout_sec,
+                read_timeout=self.settings.http_read_timeout_sec,
+                write_timeout=self.settings.http_write_timeout_sec,
+                pool_timeout=self.settings.http_pool_timeout_sec,
+                max_retries=self.settings.http_max_retries,
+            )
+
+        try:
+            headers = {"Content-Type": "application/json"}
+            if self.settings.fal_key:
+                headers["Authorization"] = f"Key {self.settings.fal_key}"
+
+            submit_url = f"https://queue.fal.run/{endpoint}"
+            submitted = await client.post_json(
+                submit_url, json=payload, headers=headers, cancel=cancel
+            )
+            if not isinstance(submitted, dict):
+                raise VideoProviderError(f"fal returned non-object submit payload: {submitted!r}")
+
+            video_url = _extract_video_url(submitted)
+            reported_usd = self._parse_reported_cost(submitted)
+            if not video_url:
+                request_id = submitted.get("request_id")
+                status_url = submitted.get("status_url") or (
+                    f"https://queue.fal.run/{endpoint}/requests/{request_id}/status"
+                    if request_id
+                    else None
+                )
+                response_url = submitted.get("response_url") or (
+                    f"https://queue.fal.run/{endpoint}/requests/{request_id}"
+                    if request_id
+                    else None
+                )
+                if not status_url or not response_url:
+                    raise VideoProviderError(
+                        f"fal submit response missing status/response URL: {submitted}"
+                    )
+                status_data = await self._poll_until_complete(
+                    client=client,
+                    status_url=str(status_url),
+                    headers=headers,
+                    cancel=cancel,
+                    provider_name="fal",
+                )
+                result_url = str(status_data.get("response_url") or response_url)
+                result_data = await client.get_json(result_url, headers=headers, cancel=cancel)
+                video_url = _extract_video_url(result_data)
+                reported_usd = self._parse_reported_cost(result_data)
+                if not video_url:
+                    raise VideoProviderError(f"fal result missing video URL: {result_data!r}")
+
+            if cancel is not None:
+                cancel.raise_if_cancelled()
+
+            video_bytes = await client.get_bytes(video_url, cancel=cancel)
+            if not video_bytes:
+                raise VideoProviderError(f"Empty video payload downloaded from fal: {video_url}")
+
+            _, saved_path = self._media_store.save_bytes(
+                video_bytes,
+                ext=".mp4",
+                subdir="clips",
+            )
+            actual_usd = reported_usd if reported_usd is not None else est_usd
+            if meter is not None and reservation_id is not None:
+                meter.settle(reservation_id, actual_usd)
+                reservation_id = None
+
+            return RenderedClip(
+                shot_id=shot_id,
+                path=str(saved_path),
+                duration_sec=float(duration_sec),
+                fps=fps,
+                width=width,
+                height=height,
+                cache_hit=False,
+                usd=actual_usd,
+            )
+        except BaseException:
+            if meter is not None and reservation_id is not None:
+                meter.release(reservation_id)
+            raise
+        finally:
+            if owns_client:
+                await client.aclose()
+
     async def _poll_until_complete(
         self,
         *,
