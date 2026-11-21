@@ -271,3 +271,55 @@ def test_stitch_full_four_stage_workflow_and_http_206(tmp_path: Path) -> None:
     assert rng.status_code == 206
     assert len(rng.content) == 1024
     assert rng.headers["content-range"].startswith("bytes 0-1023/")
+
+
+def test_theme_adapts_user_brand_idea_and_progress_bar_markup(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+
+    # UI exposes non-destructive theme selector & live progress bar
+    html = client.get("/").text
+    assert "selectGalleryTheme(" in html
+    assert "status-progress-fill" in html
+    assert "active-theme-pill" in html
+
+    # Applying PaperCraft theme to a custom brand + idea preserves user idea in PaperCraft world
+    res = client.post(
+        "/api/stitch/projects",
+        json={
+            "idea": "Unfolding our ultralight carbon running shoe for marathon launch",
+            "brand_name": "AeroStride",
+            "world_preset": "paper_origami",
+            "camera_preset": "overhead_topdown",
+            "lighting_preset": "golden_hour",
+            "motion_preset": "seamless_morph",
+            "recipe_id": "cotton_origami_city",
+            "target_duration_sec": 15,
+            "mock": True,
+        },
+    )
+    assert res.status_code == 200
+    proj = res.json()
+    assert "AeroStride" in proj["brand_name"]
+    assert "running shoe" in proj["idea"].lower()
+    assert "papercraft" in proj["style"].lower()
+    assert "cotton paper" in proj["environment"]["materials"].lower()
+    assert "origami" in proj["subject_details"]["appearance"].lower()
+    assert "Tactile Paper & Craft" in proj["scenes"][0]["title"]
+
+    # Selecting miniature_jar_world theme with a custom idea does NOT overwrite with the jar sample
+    res2 = client.post(
+        "/api/stitch/projects",
+        json={
+            "idea": "Solar powered espresso maker on a mountain camp table",
+            "brand_name": "PeakBrew",
+            "world_preset": "miniature_diorama",
+            "recipe_id": "miniature_jar_world",
+            "target_duration_sec": 15,
+            "mock": True,
+        },
+    )
+    assert res2.status_code == 200
+    proj2 = res2.json()
+    assert "espresso" in proj2["idea"].lower()
+    assert proj2["title"] != "Miniature World in a Jar"
+

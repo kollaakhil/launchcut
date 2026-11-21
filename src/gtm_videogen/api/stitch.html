@@ -220,31 +220,159 @@
       max-width: 190px;
     }
 
-    /* Status Toast / Banner */
+    /* Status Toast / Live Progress Bar */
     .status-strip {
+      position: sticky;
+      top: 68px;
+      z-index: 45;
       max-width: 1260px;
       margin: 14px auto 0;
       padding: 0 24px;
     }
     .status-banner {
       display: none;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 11px 16px;
+      flex-direction: column;
+      gap: 9px;
+      padding: 12px 16px;
       border-radius: 14px;
       font-size: 13.5px;
       font-weight: 600;
       background: var(--bg-card);
       border: 1px solid var(--border);
       box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.25s ease, border-color 0.25s ease;
     }
     .status-banner.show { display: flex; }
     .status-banner.info { background: #FFFDF9; border-color: var(--border-strong); color: var(--ink); }
+    .status-banner.busy {
+      border-color: rgba(229, 77, 58, 0.45);
+      box-shadow: 0 4px 20px rgba(229, 77, 58, 0.14), var(--shadow-sm);
+      animation: stitch-banner-pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes stitch-banner-pulse {
+      0%, 100% { box-shadow: 0 4px 18px rgba(229, 77, 58, 0.12), var(--shadow-sm); }
+      50% { box-shadow: 0 6px 26px rgba(229, 77, 58, 0.24), var(--shadow-md); }
+    }
     .status-banner.success { background: var(--sage-soft); border-color: #B7DEC8; color: var(--sage); }
     .status-banner.error { background: var(--coral-soft); border-color: #F3BEB6; color: #9F2617; }
+    .status-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+    }
+    .status-msg-wrap {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      flex: 1;
+    }
+    .status-spinner {
+      display: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(229, 77, 58, 0.22);
+      border-top-color: var(--coral);
+      animation: stitch-spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+    .status-banner.busy .status-spinner { display: inline-block; }
+    @keyframes stitch-spin { to { transform: rotate(360deg); } }
+    @keyframes stitch-shimmer {
+      0% { background-position: -220% 0; }
+      100% { background-position: 220% 0; }
+    }
+    .status-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink-soft);
+      flex-shrink: 0;
+    }
+    .status-banner.success .status-meta { color: var(--sage); }
+    .status-banner.error .status-meta { color: #9F2617; }
+    .status-progress-wrap {
+      display: none;
+      flex-direction: column;
+      gap: 7px;
+      width: 100%;
+    }
+    .status-banner.has-progress .status-progress-wrap { display: flex; }
+    .status-progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(31, 29, 26, 0.09);
+      overflow: hidden;
+    }
+    .status-progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--coral) 0%, #F48D63 50%, var(--coral) 100%);
+      background-size: 220% 100%;
+      transition: width 0.35s ease;
+    }
+    .status-banner.busy .status-progress-fill {
+      animation: stitch-shimmer 1.6s linear infinite;
+    }
+    .status-banner.success .status-progress-fill { background: var(--sage); animation: none; }
+    .status-banner.error .status-progress-fill { background: #C83E2B; animation: none; }
+    .status-steps {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .status-step {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(31, 29, 26, 0.05);
+      color: var(--ink-muted);
+      transition: all 0.2s ease;
+    }
+    .status-step.active {
+      background: var(--coral-soft);
+      color: var(--coral);
+      font-weight: 700;
+      box-shadow: 0 0 0 1px rgba(229, 77, 58, 0.25);
+    }
+    .status-step.done {
+      background: var(--sage-soft);
+      color: var(--sage);
+    }
     .status-banner .dismiss {
       background: transparent; border: none; color: inherit; font-size: 16px; opacity: 0.7;
+    }
+    .is-loading {
+      position: relative;
+      pointer-events: none;
+      opacity: 0.88 !important;
+    }
+    .is-loading::before {
+      content: "";
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      margin-right: 7px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      vertical-align: -2px;
+      animation: stitch-spin 0.75s linear infinite;
+    }
+    .take-player-box.is-rendering {
+      background: linear-gradient(110deg, #1E1B18 20%, #2F2924 45%, #1E1B18 70%);
+      background-size: 220% 100%;
+      animation: stitch-shimmer 1.8s linear infinite;
     }
 
     /* Main Container */
@@ -452,6 +580,59 @@
       cursor: pointer;
     }
     .gallery-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .gallery-card.selected {
+      border-color: var(--coral);
+      box-shadow: 0 0 0 3px rgba(229, 77, 58, 0.16), var(--shadow-md);
+    }
+    .gallery-selected-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--coral);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-sm);
+    }
+    .gallery-sample-btn {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      color: var(--ink-soft);
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: var(--radius-pill);
+      transition: all 0.15s;
+    }
+    .gallery-sample-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+      background: var(--bg-card);
+    }
+    .active-theme-pill {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: var(--radius-pill);
+      background: var(--coral-soft);
+      border: 1px solid #F3BEB6;
+      color: var(--coral);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .active-theme-pill.show { display: inline-flex; }
+    .active-theme-pill button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0 2px;
+      opacity: 0.8;
+    }
     .gallery-img-wrap {
       position: relative;
       aspect-ratio: 16 / 10;
@@ -1068,8 +1249,23 @@
 
   <div class="status-strip">
     <div class="status-banner" id="status-banner">
-      <span id="status-text"></span>
-      <button class="dismiss" onclick="hideBanner()" aria-label="Dismiss">✕</button>
+      <div class="status-top-row">
+        <div class="status-msg-wrap">
+          <span class="status-spinner" aria-hidden="true"></span>
+          <span id="status-text"></span>
+        </div>
+        <div class="status-meta">
+          <span id="status-pct"></span>
+          <span id="status-elapsed"></span>
+          <button class="dismiss" onclick="hideBanner()" aria-label="Dismiss">✕</button>
+        </div>
+      </div>
+      <div class="status-progress-wrap">
+        <div class="status-progress-track">
+          <div class="status-progress-fill" id="status-progress-fill"></div>
+        </div>
+        <div class="status-steps" id="status-steps"></div>
+      </div>
     </div>
   </div>
 
@@ -1116,6 +1312,10 @@
       <div class="spark-subbar">
         <div class="preset-row">
           <button class="pill-btn" id="btn-pitch-3" onclick="pitchThree()">✨ Pitch 3 Concepts</button>
+          <span class="active-theme-pill" id="active-theme-pill">
+            <span id="active-theme-name"></span>
+            <button type="button" onclick="clearGalleryTheme()" title="Clear selected theme" aria-label="Clear theme">✕</button>
+          </span>
           <select class="mini-select" id="preset-world" title="Visual World"></select>
           <select class="mini-select" id="preset-camera" title="Camera Style"></select>
           <select class="mini-select" id="preset-lighting" title="Lighting"></select>
@@ -1139,16 +1339,16 @@
         <div class="pitches-grid" id="pitches-grid"></div>
       </div>
 
-      <!-- Photography-First Curated Gallery -->
+      <!-- Photography-First Visual Themes Gallery -->
       <div class="cat-bar">
         <div class="cat-chips" id="gallery-cats">
-          <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Films</button>
+          <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Themes</button>
           <button class="cat-chip" data-cat="diorama" onclick="filterGallery('diorama', this)">Miniature Diorama</button>
           <button class="cat-chip" data-cat="hardware" onclick="filterGallery('hardware', this)">Hardware &amp; Brand</button>
           <button class="cat-chip" data-cat="craft" onclick="filterGallery('craft', this)">Paper &amp; Craft</button>
           <button class="cat-chip" data-cat="asmr" onclick="filterGallery('asmr', this)">ASMR Macro</button>
         </div>
-        <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Click any film to load directly onto your Pinboard</span>
+        <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Click any theme to style your brand/idea — or try an example film</span>
       </div>
 
       <div class="gallery-grid" id="gallery-grid"></div>
@@ -1379,9 +1579,14 @@
       mockMode: false,
       activeStage: 'discover',
       activeCategory: 'all',
+      selectedRecipeId: null,
       editingSceneId: null,
       showDrawerJson: false,
       pollTimer: null,
+      progressTimer: null,
+      progressStartMs: 0,
+      progressSteps: [],
+      progressPct: 0,
     };
 
     function esc(str) {
@@ -1393,14 +1598,136 @@
         .replace(/'/g, '&#39;');
     }
 
+    function _fmtElapsed(ms) {
+      const sec = Math.max(0, Math.floor(ms / 1000));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function stopProgressTimer() {
+      if (state.progressTimer) {
+        clearInterval(state.progressTimer);
+        state.progressTimer = null;
+      }
+    }
+
+    function _renderProgressSteps(steps, activeIdx, allDone = false) {
+      const wrap = document.getElementById('status-steps');
+      if (!wrap) return;
+      if (!steps || !steps.length) {
+        wrap.innerHTML = '';
+        return;
+      }
+      wrap.innerHTML = steps.map((label, idx) => {
+        const cls = allDone || idx < activeIdx ? 'done' : (idx === activeIdx ? 'active' : '');
+        const prefix = allDone || idx < activeIdx ? '✓ ' : `${idx + 1}. `;
+        return `<span class="status-step ${cls}">${esc(prefix + label)}</span>`;
+      }).join('');
+    }
+
+    function startProgress({ message, steps = [], avgDurationSec = 10, initialPct = 8 }) {
+      stopProgressTimer();
+      state.progressStartMs = Date.now();
+      state.progressSteps = steps;
+      state.progressPct = initialPct;
+
+      const el = document.getElementById('status-banner');
+      el.className = 'status-banner show info busy has-progress';
+      document.getElementById('status-text').textContent = message;
+      document.getElementById('status-pct').textContent = `${Math.round(initialPct)}%`;
+      document.getElementById('status-elapsed').textContent = '0:00';
+      document.getElementById('status-progress-fill').style.width = `${initialPct}%`;
+      _renderProgressSteps(steps, 0, false);
+
+      const expectedMs = Math.max(2000, avgDurationSec * 1000);
+      state.progressTimer = setInterval(() => {
+        const elapsed = Date.now() - state.progressStartMs;
+        document.getElementById('status-elapsed').textContent = _fmtElapsed(elapsed);
+        if (avgDurationSec > 0) {
+          // Smooth asymptotic curve approaching 92% based on average case duration
+          const ratio = elapsed / expectedMs;
+          const eased = 1 - Math.exp(-2.1 * ratio);
+          const pct = Math.min(92, Math.max(state.progressPct, initialPct + eased * (92 - initialPct)));
+          state.progressPct = pct;
+          document.getElementById('status-pct').textContent = `${Math.round(pct)}%`;
+          document.getElementById('status-progress-fill').style.width = `${pct.toFixed(1)}%`;
+          if (steps.length) {
+            const stepIdx = Math.min(steps.length - 1, Math.floor((pct / 95) * steps.length));
+            _renderProgressSteps(steps, stepIdx, false);
+          }
+        }
+      }, 300);
+    }
+
+    function updateProgress({ message, pct, activeStepIdx = null, steps = null }) {
+      const el = document.getElementById('status-banner');
+      el.className = 'status-banner show info busy has-progress';
+      if (message) document.getElementById('status-text').textContent = message;
+      if (typeof pct === 'number') {
+        const clamped = Math.max(0, Math.min(99, pct));
+        state.progressPct = clamped;
+        document.getElementById('status-pct').textContent = `${Math.round(clamped)}%`;
+        document.getElementById('status-progress-fill').style.width = `${clamped.toFixed(1)}%`;
+      }
+      if (state.progressStartMs) {
+        document.getElementById('status-elapsed').textContent = _fmtElapsed(Date.now() - state.progressStartMs);
+      }
+      const stepList = steps || state.progressSteps;
+      if (steps) state.progressSteps = steps;
+      if (stepList.length) {
+        const idx = activeStepIdx !== null
+          ? activeStepIdx
+          : Math.min(stepList.length - 1, Math.floor((state.progressPct / 100) * stepList.length));
+        _renderProgressSteps(stepList, idx, false);
+      }
+    }
+
+    function finishProgress(message, type = 'success') {
+      stopProgressTimer();
+      const el = document.getElementById('status-banner');
+      const isOk = type === 'success';
+      el.className = `status-banner show ${type} has-progress`;
+      document.getElementById('status-text').textContent = message;
+      const finalPct = isOk ? 100 : Math.max(state.progressPct, 12);
+      document.getElementById('status-pct').textContent = isOk ? '100%' : 'Failed';
+      document.getElementById('status-progress-fill').style.width = `${finalPct}%`;
+      if (state.progressStartMs) {
+        document.getElementById('status-elapsed').textContent = _fmtElapsed(Date.now() - state.progressStartMs);
+      }
+      _renderProgressSteps(state.progressSteps, state.progressSteps.length, isOk);
+    }
+
     function showBanner(msg, type = 'info') {
+      stopProgressTimer();
       const el = document.getElementById('status-banner');
       el.className = `status-banner show ${type}`;
       document.getElementById('status-text').textContent = msg;
+      document.getElementById('status-pct').textContent = '';
+      document.getElementById('status-elapsed').textContent = '';
+      document.getElementById('status-steps').innerHTML = '';
     }
 
     function hideBanner() {
+      stopProgressTimer();
       document.getElementById('status-banner').classList.remove('show');
+    }
+
+    function setButtonLoading(btn, isLoading, loadingText = '') {
+      if (!btn) return;
+      if (isLoading) {
+        if (!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+        btn.disabled = true;
+        btn.classList.add('is-loading');
+        if (loadingText) btn.textContent = loadingText;
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('is-loading');
+        if (btn.dataset.origLabel) {
+          btn.textContent = btn.dataset.origLabel;
+          delete btn.dataset.origLabel;
+        }
+      }
     }
 
     async function api(path, opts = {}) {
@@ -1542,40 +1869,92 @@
       renderGallery();
     }
 
+    function _syncActiveThemePill() {
+      const pill = document.getElementById('active-theme-pill');
+      const nameEl = document.getElementById('active-theme-name');
+      if (!pill || !nameEl) return;
+      const rec = (state.catalog?.gallery || []).find(g => g.id === state.selectedRecipeId);
+      if (rec) {
+        nameEl.textContent = `🎨 Theme: ${rec.title}`;
+        pill.classList.add('show');
+      } else {
+        nameEl.textContent = '';
+        pill.classList.remove('show');
+      }
+    }
+
     function renderGallery() {
       const grid = document.getElementById('gallery-grid');
       const items = (state.catalog?.gallery || []).filter(
         g => state.activeCategory === 'all' || g.category === state.activeCategory
       );
-      grid.innerHTML = items.map(g => `
-        <article class="gallery-card" onclick="launchGalleryRecipe('${esc(g.id)}')">
+      grid.innerHTML = items.map(g => {
+        const isSel = state.selectedRecipeId === g.id;
+        return `
+        <article class="gallery-card ${isSel ? 'selected' : ''}" onclick="selectGalleryTheme('${esc(g.id)}')">
           <div class="gallery-img-wrap">
             <img src="${esc(g.image_url)}" alt="${esc(g.title)}" loading="lazy" />
             <span class="gallery-badge">${esc(g.badge)}</span>
+            ${isSel ? '<span class="gallery-selected-tag">✓ Active Theme</span>' : ''}
             <span class="gallery-lens">${esc(g.lens_tag)}</span>
           </div>
           <div class="gallery-body">
             <h3 class="gallery-title">${esc(g.title)}</h3>
             <p class="gallery-desc">${esc(g.idea)}</p>
             <div class="gallery-foot">
-              <span>${esc(g.world_preset.replace('_', ' '))}</span>
-              <span>Pin to Board →</span>
+              <span>${isSel ? '✓ Theme Active' : 'Use as Theme'}</span>
+              <button type="button" class="gallery-sample-btn" onclick="event.stopPropagation(); launchGallerySample('${esc(g.id)}')">Try Example →</button>
             </div>
           </div>
         </article>
-      `).join('');
+      `;
+      }).join('');
+      _syncActiveThemePill();
     }
 
-    async function launchGalleryRecipe(recipeId) {
+    function selectGalleryTheme(recipeId) {
       const rec = (state.catalog?.gallery || []).find(g => g.id === recipeId);
       if (!rec) return;
+      if (state.selectedRecipeId === recipeId) {
+        clearGalleryTheme();
+        return;
+      }
+      state.selectedRecipeId = rec.id;
+      document.getElementById('preset-world').value = rec.world_preset;
+      document.getElementById('preset-camera').value = rec.camera_preset;
+      document.getElementById('preset-lighting').value = rec.lighting_preset;
+      document.getElementById('preset-motion').value = rec.motion_preset;
+      renderGallery();
+      const hasInput = Boolean(
+        document.getElementById('spark-idea').value.trim() ||
+        document.getElementById('spark-url').value.trim()
+      );
+      showBanner(
+        hasInput
+          ? `Theme "${rec.title}" applied to your idea — click ✦ Direct to write your script in this style.`
+          : `Theme "${rec.title}" selected — enter your idea or brand URL above and click ✦ Direct.`,
+        'info'
+      );
+    }
+
+    function clearGalleryTheme() {
+      state.selectedRecipeId = null;
+      renderGallery();
+    }
+
+    async function launchGallerySample(recipeId) {
+      const rec = (state.catalog?.gallery || []).find(g => g.id === recipeId);
+      if (!rec) return;
+      state.selectedRecipeId = rec.id;
       document.getElementById('spark-idea').value = rec.idea;
       document.getElementById('preset-world').value = rec.world_preset;
       document.getElementById('preset-camera').value = rec.camera_preset;
       document.getElementById('preset-lighting').value = rec.lighting_preset;
       document.getElementById('preset-motion').value = rec.motion_preset;
+      renderGallery();
       await createProjectFlow({
         idea: rec.idea,
+        source_url: null,
         recipe_id: rec.id,
         world_preset: rec.world_preset,
         camera_preset: rec.camera_preset,
@@ -1593,8 +1972,14 @@
         return;
       }
       const btn = document.getElementById('btn-pitch-3');
-      btn.disabled = true;
-      showBanner('Pitching 3 visual director treatments…', 'info');
+      setButtonLoading(btn, true, 'Pitching…');
+      startProgress({
+        message: source_url ? 'Researching brand URL & pitching 3 visual treatments…' : 'Pitching 3 visual director treatments…',
+        steps: source_url
+          ? ['Research Brand URL', 'Explore 3 Visual Angles', 'Build Concept Cards']
+          : ['Analyze Film Idea', 'Explore 3 Visual Angles', 'Build Concept Cards'],
+        avgDurationSec: state.mockMode ? 2 : (source_url ? 14 : 9),
+      });
       try {
         const res = await api('/api/stitch/pitch', {
           method: 'POST',
@@ -1621,11 +2006,11 @@
           </div>
         `).join('');
         document.getElementById('pitches-panel').classList.add('show');
-        showBanner('3 visual treatments ready — pick one to pin onto your board.', 'success');
+        finishProgress('3 visual treatments ready — pick one to pin onto your board.', 'success');
       } catch (err) {
-        showBanner(`Pitch failed: ${err.message}`, 'error');
+        finishProgress(`Pitch failed: ${err.message}`, 'error');
       } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
       }
     }
 
@@ -1650,21 +2035,39 @@
       const idea = document.getElementById('spark-idea').value.trim();
       const url = document.getElementById('spark-url').value.trim();
       if (!idea && !url) {
-        showBanner('Type a film idea or paste a product URL — or click any curated film below.', 'error');
+        showBanner('Type a film idea or paste a product URL — or click "Try Example →" on any theme below.', 'error');
         document.getElementById('spark-idea').focus();
         return;
       }
-      await createProjectFlow({ idea: idea || `Cinematic product launch film for ${url}` });
+      await createProjectFlow({
+        idea: idea || `Cinematic product launch film for ${url}`,
+        recipe_id: state.selectedRecipeId,
+      });
     }
 
     async function createProjectFlow(overrides = {}) {
       const btn = document.getElementById('btn-direct-now');
-      btn.disabled = true;
-      showBanner('Directing multi-scene visual script onto your Pinboard…', 'info');
+      setButtonLoading(btn, true, 'Directing…');
+      const sourceUrl = overrides.source_url !== undefined
+        ? overrides.source_url
+        : (document.getElementById('spark-url').value.trim() || null);
+      const selectedTheme = (state.catalog?.gallery || []).find(
+        g => g.id === (overrides.recipe_id !== undefined ? overrides.recipe_id : state.selectedRecipeId)
+      );
+      const steps = sourceUrl
+        ? ['Research Brand URL', 'Apply Visual Theme', 'Write Multi-Scene Script', 'Verify Script Gate']
+        : ['Apply Visual Theme', 'Write Multi-Scene Script', 'Verify Script Gate'];
+      startProgress({
+        message: selectedTheme
+          ? `Directing your film in "${selectedTheme.title}" style…`
+          : 'Directing multi-scene visual script onto your Pinboard…',
+        steps,
+        avgDurationSec: state.mockMode ? 2 : (sourceUrl ? 18 : 12),
+      });
       try {
         const body = {
           idea: overrides.idea || document.getElementById('spark-idea').value.trim(),
-          source_url: document.getElementById('spark-url').value.trim() || null,
+          source_url: sourceUrl,
           target_duration_sec: Number(document.getElementById('spark-duration').value || 15),
           aspect_ratio: document.getElementById('spark-aspect').value || '16:9',
           video_model_id: document.getElementById('spark-video-model').value || 'fal-ai/kling-video/v3/pro/text-to-video',
@@ -1673,7 +2076,7 @@
           camera_preset: overrides.camera_preset || document.getElementById('preset-camera').value,
           lighting_preset: overrides.lighting_preset || document.getElementById('preset-lighting').value,
           motion_preset: overrides.motion_preset || document.getElementById('preset-motion').value,
-          recipe_id: overrides.recipe_id || null,
+          recipe_id: overrides.recipe_id !== undefined ? overrides.recipe_id : state.selectedRecipeId,
           mock: state.mockMode,
         };
         const proj = await api('/api/stitch/projects', {
@@ -1683,11 +2086,11 @@
         setProject(proj);
         await refreshSavedProjects();
         switchStage('pinboard');
-        showBanner(proj.status_message || 'Pinboard ready!', 'success');
+        finishProgress(proj.status_message || 'Pinboard ready!', 'success');
       } catch (err) {
-        showBanner(`Could not direct film: ${err.message}`, 'error');
+        finishProgress(`Could not direct film: ${err.message}`, 'error');
       } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
       }
     }
 
@@ -2146,7 +2549,7 @@
 
               <!-- Video Take Preview + Take History -->
               <div>
-                <div class="take-player-box">
+                <div class="take-player-box ${isRendering ? 'is-rendering' : ''}">
                   ${winClip
                     ? `<video controls playsinline preload="metadata" src="${esc(winClip)}"></video>`
                     : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Shoot Act</strong> to render Take 1'}</div>`}
@@ -2218,8 +2621,13 @@
     async function generateAllKeyframesUI() {
       if (!state.project) return;
       const btn = document.getElementById('btn-gen-all-kf');
-      btn.disabled = true;
-      showBanner('Generating continuity-locked Start & End anchor stills…', 'info');
+      setButtonLoading(btn, true, 'Generating Stills…');
+      const count = (state.project.scenes || []).length || 1;
+      startProgress({
+        message: `Generating continuity-locked Start & End anchor stills for ${count} Act(s)…`,
+        steps: ['Lock Visual Prompt', 'Render Start & End Stills', 'Attach to Shoot Board'],
+        avgDurationSec: state.mockMode ? 2 : count * 12,
+      });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/keyframes`, {
           method: 'POST',
@@ -2227,11 +2635,11 @@
         });
         setProject(proj);
         renderShootStage();
-        showBanner(proj.status_message || 'All anchor stills ready!', 'success');
+        finishProgress(proj.status_message || 'All anchor stills ready!', 'success');
       } catch (err) {
-        showBanner(`Keyframe error: ${err.message}`, 'error');
+        finishProgress(`Keyframe error: ${err.message}`, 'error');
       } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
       }
     }
 
@@ -2239,7 +2647,11 @@
       if (!state.project) return;
       const noteEl = document.getElementById(`tw-${which}-${sceneId}`);
       const tweak_note = noteEl ? noteEl.value.trim() : '';
-      showBanner(`Regenerating ${which} anchor still…`, 'info');
+      startProgress({
+        message: `Regenerating ${which} anchor still…`,
+        steps: ['Apply Director Tweak', 'Render Still', 'Update Continuity'],
+        avgDurationSec: state.mockMode ? 2 : 9,
+      });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/keyframe`, {
           method: 'POST',
@@ -2247,9 +2659,9 @@
         });
         setProject(proj);
         renderShootStage();
-        showBanner(proj.status_message || 'Anchor still updated!', 'success');
+        finishProgress(proj.status_message || 'Anchor still updated!', 'success');
       } catch (err) {
-        showBanner(err.message, 'error');
+        finishProgress(err.message, 'error');
       }
     }
 
@@ -2273,7 +2685,13 @@
     async function renderSingleSceneUI(sceneId) {
       if (!state.project) return;
       const engine_id = document.getElementById('shoot-model-select').value;
-      showBanner(`Queued Act render with ${engine_id}…`, 'info');
+      const scIdx = (state.project.scenes || []).findIndex(s => s.scene_id === sceneId);
+      const actLabel = scIdx >= 0 ? `Act ${scIdx + 1}` : 'Act';
+      startProgress({
+        message: `Shooting ${actLabel} with ${engine_id}…`,
+        steps: ['Queue Video Model', `Render ${actLabel} Take`, 'Extract Last Frame'],
+        avgDurationSec: state.mockMode ? 3 : 65,
+      });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/render`, {
           method: 'POST',
@@ -2283,14 +2701,20 @@
         renderShootStage();
         startPollingProject();
       } catch (err) {
-        showBanner(`Render failed: ${err.message}`, 'error');
+        finishProgress(`Render failed: ${err.message}`, 'error');
       }
     }
 
     async function renderAllScenesUI() {
       if (!state.project) return;
       const engine_id = document.getElementById('shoot-model-select').value;
-      showBanner('Shooting all Acts sequentially with pixel-exact Last-Frame Chaining…', 'info');
+      const scenes = state.project.scenes || [];
+      const steps = scenes.map((s, i) => `Act ${i + 1}`);
+      startProgress({
+        message: `Shooting ${scenes.length} Act(s) sequentially with Last-Frame Chaining…`,
+        steps: steps.length ? steps : ['Shoot Acts'],
+        avgDurationSec: state.mockMode ? 4 : Math.max(45, scenes.length * 65),
+      });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/render-all`, {
           method: 'POST',
@@ -2300,7 +2724,7 @@
         renderShootStage();
         startPollingProject();
       } catch (err) {
-        showBanner(`Render All failed: ${err.message}`, 'error');
+        finishProgress(`Render All failed: ${err.message}`, 'error');
       }
     }
 
@@ -2328,17 +2752,28 @@
           setProject(proj);
           if (state.activeStage === 'shoot') renderShootStage();
           if (state.activeStage === 'screening') renderScreeningRoom();
-          const anyBusy = proj.status === 'shooting' || proj.status === 'stitching' || proj.scenes.some(s => s.render_status === 'rendering');
+          const scenes = proj.scenes || [];
+          const anyBusy = proj.status === 'shooting' || proj.status === 'stitching' || scenes.some(s => s.render_status === 'rendering');
           if (!anyBusy) {
             clearInterval(state.pollTimer);
             state.pollTimer = null;
-            if (proj.error || proj.status === 'failed' || proj.scenes.some(s => s.render_status === 'failed')) {
-              showBanner(proj.error || proj.status_message || 'Render finished with an error.', 'error');
+            if (proj.error || proj.status === 'failed' || scenes.some(s => s.render_status === 'failed')) {
+              finishProgress(proj.error || proj.status_message || 'Render finished with an error.', 'error');
             } else {
-              showBanner(proj.status_message || 'Render complete!', 'success');
+              finishProgress(proj.status_message || 'Render complete!', 'success');
             }
           } else {
-            showBanner(proj.status_message || 'Shooting in progress…', 'info');
+            const total = Math.max(1, scenes.length);
+            const doneCount = scenes.filter(s => s.render_status === 'done' || Boolean(s.winning_clip_url)).length;
+            const activeIdx = scenes.findIndex(s => s.render_status === 'rendering');
+            const realFloor = Math.min(92, Math.round(((doneCount + (activeIdx >= 0 ? 0.35 : 0.1)) / total) * 100));
+            const pct = Math.max(state.progressPct, realFloor);
+            updateProgress({
+              message: proj.status_message || `Shooting Act ${activeIdx >= 0 ? activeIdx + 1 : doneCount + 1} of ${total}…`,
+              pct,
+              activeStepIdx: activeIdx >= 0 ? activeIdx : Math.min(total - 1, doneCount),
+              steps: scenes.length > 1 ? scenes.map((_, i) => `Act ${i + 1}`) : state.progressSteps,
+            });
           }
         } catch {}
       }, 2200);
@@ -2426,8 +2861,12 @@
     async function stitchMasterCutUI() {
       if (!state.project) return;
       const btn = document.getElementById('btn-stitch-master');
-      btn.disabled = true;
-      showBanner('Stitching Master Cut in low-RAM studio FFmpeg…', 'info');
+      setButtonLoading(btn, true, 'Stitching…');
+      startProgress({
+        message: 'Stitching Master Cut in low-RAM studio FFmpeg…',
+        steps: ['Collect Winning Takes', 'Blend Seams & Audio', 'Encode Master Cut'],
+        avgDurationSec: state.mockMode ? 3 : 8,
+      });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/stitch`, {
           method: 'POST',
@@ -2442,11 +2881,11 @@
         });
         setProject(proj);
         renderScreeningRoom();
-        showBanner(proj.status_message || 'Master Cut ready!', 'success');
+        finishProgress(proj.status_message || 'Master Cut ready!', 'success');
       } catch (err) {
-        showBanner(`Stitch failed: ${err.message}`, 'error');
+        finishProgress(`Stitch failed: ${err.message}`, 'error');
       } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
       }
     }
 

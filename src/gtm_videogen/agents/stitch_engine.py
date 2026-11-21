@@ -69,6 +69,7 @@ from gtm_videogen.models.schemas import (
     VoiceCue,
 )
 from gtm_videogen.models.stitch_project import (
+    STITCH_GALLERY_RECIPES,
     StitchAspect,
     StitchBeat,
     StitchProject,
@@ -446,6 +447,15 @@ def _make_beats_for_duration(
     return beats
 
 
+def _find_gallery_recipe(recipe_id: str | None) -> dict[str, Any] | None:
+    if not recipe_id:
+        return None
+    for rec in STITCH_GALLERY_RECIPES:
+        if rec.get("id") == recipe_id:
+            return rec
+    return None
+
+
 def _build_deterministic_scenes(
     *,
     idea: str,
@@ -469,7 +479,12 @@ def _build_deterministic_scenes(
     base_mats = mats_raw[:3] or ["aged oak wood", "optical borosilicate glass", "brushed brass"]
     base_cam = f"{camera_data['camera'].get('lens_mm', 85)}mm {camera_data['camera'].get('style', 'macro cinema')} · {camera_data['camera'].get('movement', 'smooth continuous glide')}"
 
-    if recipe_id == "miniature_jar_world":
+    is_jar_sample = (
+        recipe_id == "miniature_jar_world"
+        and not brand
+        and (not idea.strip() or "jar" in clean_idea.lower() or "miniature" in clean_idea.lower())
+    )
+    if is_jar_sample:
         title = "Miniature World in a Jar"
         main_subject = "a tiny living miniature city awakened by glowing liquid gold inside a glass jar"
         arc_specs = [
@@ -507,40 +522,46 @@ def _build_deterministic_scenes(
             ),
         ]
     else:
+        world_label = str(world_data.get("label") or "Cinematic").strip()
         short_title = " ".join(clean_idea.split()[:5]).rstrip(".,;:")
         title = f"{brand}: {short_title}" if brand else (short_title.title() or "Untitled Film")
-        main_subject = f"{brand} — {clean_idea[:120]}" if brand else clean_idea[:130]
+        main_subject = (
+            f"{brand} — {clean_idea[:110]} (reimagined in {world_label})"
+            if brand
+            else f"{clean_idea[:120]} ({world_label})"
+        )
+        hero_ref = brand or "hero centerpiece"
         arc_specs = [
             (
-                "Scene 1 · Tactile Hook",
-                [brand or "hero centerpiece", "sculpted foreground detail"],
+                f"Scene 1 · {world_label} Hook",
+                [hero_ref, f"{base_mats[0]} sculpted foreground"],
                 base_mats,
                 base_cam,
-                f"Hero subject illuminated cleanly in frame with warm depth ({clean_idea[:75]})",
+                f"{hero_ref} emerging cleanly inside a {world_label.lower()} world ({clean_idea[:65]})",
                 f"Start with the quiet craft of {brand or 'every detail'}.",
             ),
             (
-                "Scene 2 · World Transformation",
-                [brand or "hero centerpiece", "dynamic light & material interplay"],
+                f"Scene 2 · {world_label} Transformation",
+                [hero_ref, f"living {base_mats[0]} & light interplay"],
                 [*base_mats[:2], "volumetric golden caustics"],
                 "65mm cinema glide · smooth continuous sculptural orbit",
-                "Mid-arc hero peak with luminous reflections and clean silhouette",
+                f"Mid-arc {world_label.lower()} peak showcasing {hero_ref} with luminous depth",
                 "Light moves across every surface with effortless precision.",
             ),
             (
                 "Scene 3 · Hero Pull-Back Reveal",
-                [brand or "flagship hero centerpiece", "complete sunlit studio tableau"],
-                [*base_mats[:2], "warm natural stone"],
+                [brand or "flagship hero centerpiece", f"complete {world_label.lower()} tableau"],
+                [*base_mats[:2], base_mats[-1]],
                 "85mm cinema lens · sweeping continuous pull-back into hero lock",
-                f"Locked-off hero composition framing {brand or 'the centerpiece'} with balanced negative space",
+                f"Locked-off hero composition framing {hero_ref} in {world_label.lower()} craft with balanced negative space",
                 "Pull back to see the entire story lock into place.",
             ),
             (
                 "Scene 4 · Signature Hold",
-                [brand or "hero centerpiece"],
+                [hero_ref],
                 base_mats,
                 "85mm locked-off cinema frame · subtle breathing focus",
-                "Unforgettable still hero finish with glowing ambient depth",
+                f"Unforgettable {world_label.lower()} hero finish with glowing ambient depth",
                 f"{brand or 'Designed'} to stay with you.",
             ),
         ]
@@ -650,7 +671,7 @@ async def compile_stitch_project(
         camera=CameraSpec.model_validate(camera_data["camera"]),
         environment=EnvironmentSpec.model_validate(world_data["environment"]),
         lighting=LightingSpec.model_validate(lighting_data["lighting"]),
-        subject_details=SubjectDetailsSpec(),
+        subject_details=SubjectDetailsSpec.model_validate(world_data.get("subject_details") or {}),
         motion=MotionSpec.model_validate(motion_data["motion"]),
         scenes=scenes,
         brand_name=eff_brand,
@@ -662,11 +683,18 @@ async def compile_stitch_project(
 
     # Upgrade with live OpenRouter LLM choreography when live & API key configured
     if not mock and resolved.openrouter_api_key.strip():
+        theme_recipe = _find_gallery_recipe(recipe_id)
         sys_prompt = (
             "You are a Master Film Director crafting a structured multi-scene Stitch Script "
             "for AI video models (Kling 3.0 Pro / Veo 3). Every scene has concrete physical "
             "subjects, materials, camera movement, 3-color hex palette, a locked end_frame, "
             "and 3-4 timed beats (time, scene, action, camera, sound). "
+            "THEME ADAPTATION RULE: `world_theme` and `theme_reference_example` define the "
+            "visual style, tactile craft, materials, lighting, and cinematography direction ONLY. "
+            "You MUST reimagine and transform the USER'S `idea`, `brand_name`, and "
+            "`scraped_brand_context` INTO that visual theme — the story, product, and hero "
+            "centerpiece MUST belong to the user's brand/idea, NEVER copy an unrelated subject "
+            "from `theme_reference_example` unless the user explicitly asked for that example. "
             "RULES: Never include readable text, neon signs, billboards, or watermarks in scene "
             "descriptions. For Scene 2+, Beat 1 MUST explicitly start with 'Continues seamlessly "
             "from Scene N's locked frame...' so Last-Frame Chaining is invisible. "
@@ -675,21 +703,34 @@ async def compile_stitch_project(
             "materials (3 strings), camera_spec, colors (3 hex), vo_line (<=14 words), end_frame, "
             "beats (array of {time, scene, action, camera, sound}))."
         )
-        usr_prompt = json.dumps(
-            {
-                "idea": project.idea,
-                "scraped_brand_context": project.scraped_context,
-                "brand_name": eff_brand or "",
-                "num_scenes": len(durations),
-                "scene_durations_sec": durations,
-                "aspect_ratio": aspect_ratio,
-                "world_style": project.style,
-                "camera_preset": camera_data["label"],
-                "lighting_preset": lighting_data["label"],
-                "motion_preset": motion_data["label"],
+        usr_payload: dict[str, Any] = {
+            "idea": project.idea,
+            "brand_name": eff_brand or "",
+            "brand_tagline": eff_tagline or "",
+            "scraped_brand_context": project.scraped_context,
+            "scraped_facts": list(scraped.get("facts") or [])[:6],
+            "scraped_colors": list(scraped.get("colors") or [])[:4],
+            "num_scenes": len(durations),
+            "scene_durations_sec": durations,
+            "aspect_ratio": aspect_ratio,
+            "world_theme": {
+                "label": world_data.get("label", ""),
+                "tagline": world_data.get("tagline", ""),
+                "style": project.style,
+                "environment": world_data.get("environment", {}),
+                "subject_details": world_data.get("subject_details", {}),
             },
-            indent=2,
-        )
+            "camera_preset": camera_data["label"],
+            "lighting_preset": lighting_data["label"],
+            "motion_preset": motion_data["label"],
+        }
+        if theme_recipe and (eff_brand or project.idea.strip() != str(theme_recipe.get("idea") or "").strip()):
+            usr_payload["theme_reference_example"] = {
+                "title": theme_recipe.get("title", ""),
+                "badge": theme_recipe.get("badge", ""),
+                "aesthetic_reference_only": theme_recipe.get("idea", ""),
+            }
+        usr_prompt = json.dumps(usr_payload, indent=2)
         llm_doc = await _call_openrouter_json(
             system_prompt=sys_prompt,
             user_prompt=usr_prompt,
