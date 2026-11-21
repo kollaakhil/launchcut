@@ -36,14 +36,14 @@ class Settings(BaseSettings):
     hf_api_key_id: str = Field(default="", alias="HF_API_KEY_ID")
     hf_api_key_secret: str = Field(default="", alias="HF_API_KEY_SECRET")
 
-    # Stage model defaults
-    fast_model: str = Field(default="google/gemini-2.5-flash", alias="GTM_FAST_MODEL")
-    flagship_model: str = Field(default="anthropic/claude-sonnet-4", alias="GTM_FLAGSHIP_MODEL")
-    text_model: str = Field(default="anthropic/claude-sonnet-4", alias="GTM_TEXT_MODEL")
-    vision_model: str = Field(default="google/gemini-2.5-flash", alias="GTM_VISION_MODEL")
+    # Stage model defaults (live-verified active endpoints)
+    fast_model: str = Field(default="anthropic/claude-haiku-5.5", alias="GTM_FAST_MODEL")
+    flagship_model: str = Field(default="anthropic/claude-haiku-5.5", alias="GTM_FLAGSHIP_MODEL")
+    text_model: str = Field(default="anthropic/claude-haiku-5.5", alias="GTM_TEXT_MODEL")
+    vision_model: str = Field(default="google/gemini-3.8-flash", alias="GTM_VISION_MODEL")
     image_model: str = Field(default="fal-ai/flux/schnell", alias="GTM_IMAGE_MODEL")
     video_model: str = Field(
-        default="fal-ai/kling-video/v2.1/standard/text-to-video",
+        default="kling/v4/flash/text-to-video",
         alias="GTM_VIDEO_MODEL",
     )
     voice_model: str = Field(default="fal-ai/elevenlabs/tts/eleven-v3", alias="GTM_VOICE_MODEL")

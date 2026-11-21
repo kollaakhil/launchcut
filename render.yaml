@@ -14,17 +14,21 @@ services:
         sync: false
       - key: FAL_KEY
         sync: false
-      - key: GTM_PLANNER_MODEL
-        value: anthropic/claude-haiku-5.5
       - key: GTM_FAST_MODEL
+        value: anthropic/claude-haiku-5.5
+      - key: GTM_FLAGSHIP_MODEL
+        value: anthropic/claude-haiku-5.5
+      - key: GTM_TEXT_MODEL
         value: anthropic/claude-haiku-5.5
       - key: GTM_VISION_MODEL
         value: google/gemini-3.8-flash
-      - key: GTM_DEFAULT_VIDEO_MODEL
+      - key: GTM_IMAGE_MODEL
+        value: fal-ai/flux/schnell
+      - key: GTM_VIDEO_MODEL
         value: kling/v4/flash/text-to-video
-      - key: GTM_DEFAULT_VOICE_MODEL
+      - key: GTM_VOICE_MODEL
         value: fal-ai/elevenlabs/tts/eleven-v3
-      - key: GTM_DEFAULT_SFX_MODEL
+      - key: GTM_SFX_MODEL
         value: mirelo-ai/sfx2.0/text-to-audio
-      - key: GTM_DEFAULT_MUSIC_MODEL
+      - key: GTM_MUSIC_MODEL
         value: fal-ai/stable-audio-25/text-to-audio
