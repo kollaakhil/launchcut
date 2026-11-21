@@ -51,7 +51,13 @@ class ClipShortageError(ValueError):
 
 
 def _pinned_h264_flags(fps: int, *, threads: int | None = None) -> list[str]:
+    eff_threads = threads
+    if eff_threads is None:
+        raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
+        eff_threads = max(1, int(raw_t)) if raw_t.isdigit() else 2
     flags = [
+        "-threads",
+        str(eff_threads),
         "-c:v",
         "libx264",
         "-preset",
@@ -77,8 +83,6 @@ def _pinned_h264_flags(fps: int, *, threads: int | None = None) -> list[str]:
         "-r",
         str(fps),
     ]
-    if threads is not None:
-        flags = ["-threads", str(threads), *flags]
     return flags
 
 
@@ -132,7 +136,9 @@ class FFmpegStitcher:
         self.ffmpeg_bin = ffmpeg_bin or settings.ffmpeg_bin
         self.ffprobe_bin = ffprobe_bin or settings.ffprobe_bin
         self.fonts_dir = fonts_dir
-        self.max_workers = max_workers or min(4, os.cpu_count() or 2)
+        raw_w = os.getenv("GTM_FFMPEG_WORKERS", "").strip()
+        env_workers = max(1, int(raw_w)) if raw_w.isdigit() else None
+        self.max_workers = max_workers or env_workers or min(2, os.cpu_count() or 2)
 
     async def _normalize_single_clip(
         self,

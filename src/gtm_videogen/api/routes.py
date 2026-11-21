@@ -16,6 +16,7 @@ import asyncio
 import inspect
 import json
 import mimetypes
+import os
 import re
 import shutil
 from collections import OrderedDict
@@ -368,6 +369,7 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             "ffprobe": ffprobe_ok,
             "tesseract": tesseract_ok,
             "fonts": fonts_ok,
+            "ffmpeg_threads": int(os.getenv("GTM_FFMPEG_THREADS", "2") or "2"),
             "manim": bool(manim_info.get("available", False)),
         },
         "api_keys": {

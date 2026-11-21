@@ -9,6 +9,7 @@ Addresses:
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import textwrap
@@ -407,6 +408,8 @@ class GraphicsCardRenderer:
                 "1:a:0",
                 "-vf",
                 ",".join(vf_parts),
+                "-threads",
+                str(max(1, int(os.getenv("GTM_FFMPEG_THREADS", "2") or "2"))),
                 "-c:v",
                 "libx264",
                 "-preset",

@@ -108,14 +108,18 @@ class MediaQA:
         ffprobe_bin: str | None = None,
         tesseract_bin: str | None = None,
         ocr_lang: str | None = None,
-        max_concurrency: int = 4,
+        max_concurrency: int | None = None,
     ) -> None:
+        import os
+
         settings = get_settings()
         self.ffmpeg_bin = ffmpeg_bin or settings.ffmpeg_bin
         self.ffprobe_bin = ffprobe_bin or settings.ffprobe_bin
         self.tesseract_bin = tesseract_bin or settings.tesseract_bin
         self.ocr_lang = ocr_lang or settings.ocr_lang
-        self.max_concurrency = max(1, max_concurrency)
+        raw_w = os.getenv("GTM_FFMPEG_WORKERS", "").strip()
+        env_conc = max(1, int(raw_w)) if raw_w.isdigit() else 2
+        self.max_concurrency = max(1, max_concurrency if max_concurrency is not None else env_conc)
 
     def is_tesseract_available(self) -> bool:
         return shutil.which(self.tesseract_bin) is not None

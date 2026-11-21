@@ -438,6 +438,8 @@ class MockVideoProvider(VideoProvider):
             f"anullsrc=r=48000:cl=stereo:d={dur_str}",
             "-t",
             dur_str,
+            "-threads",
+            "1",
             "-c:v",
             "libx264",
             "-preset",

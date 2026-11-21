@@ -158,7 +158,7 @@ async def _render_single_shot(
     if cancel is not None:
         cancel.raise_if_cancelled()
 
-    width, height = aspect_to_dimensions(sheet.aspect)
+    width, height = aspect_to_dimensions(sheet.aspect, preview=(render_mode == "preview"))
     clips_dir.mkdir(parents=True, exist_ok=True)
 
     if shot.engine == "motion_card":
@@ -270,7 +270,11 @@ async def render_assets_overlapped(
     valid_prod_imgs = [p for p in (product_image_paths or []) if p.is_file()]
 
     first_video_ok = asyncio.Event()
-    clip_sem = asyncio.Semaphore(4)
+    import os
+
+    raw_w = os.getenv("GTM_FFMPEG_WORKERS", "").strip()
+    clip_conc = max(1, int(raw_w)) if raw_w.isdigit() else 4
+    clip_sem = asyncio.Semaphore(clip_conc)
 
     async def _render_shot_task(shot: Shot) -> RenderedClip:
         async with clip_sem:

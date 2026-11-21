@@ -4,7 +4,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     PORT=8000 \
-    GTM_FONTS_DIR=/app/assets/fonts
+    GTM_FONTS_DIR=/app/assets/fonts \
+    GTM_FFMPEG_WORKERS=1 \
+    GTM_FFMPEG_THREADS=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
