@@ -286,11 +286,23 @@ class WhisperProvider:
             b64 = base64.b64encode(raw_bytes).decode("ascii")
             data_url = f"data:{_mime_for_audio(audio_path)};base64,{b64}"
 
+            lang = self._effective_lang()
+            fal_lang_map = {
+                "en": "english",
+                "es": "spanish",
+                "fr": "french",
+                "de": "german",
+                "it": "italian",
+                "pt": "portuguese",
+                "ja": "japanese",
+                "ko": "korean",
+                "zh": "chinese",
+            }
             payload: dict[str, Any] = {
                 "audio_url": data_url,
                 "task": "transcribe",
                 "chunk_level": "segment",
-                "language": self._effective_lang(),
+                "language": fal_lang_map.get(lang.lower(), lang),
             }
             if vocabulary:
                 prompt_str = ", ".join(term.strip() for term in vocabulary if term and term.strip())

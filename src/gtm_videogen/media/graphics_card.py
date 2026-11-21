@@ -167,8 +167,34 @@ class GraphicsCardRenderer:
         sub_font = _load_pil_font(reg_path, sub_size)
         footer_font = _load_pil_font(reg_path, footer_size)
 
+        # Editorial radial studio lighting backdrop tinted subtly with brand accent
         img = Image.new("RGB", (width, height), color=bg_rgb)
+        grad_w, grad_h = 160, 90
+        grad_small = Image.new("RGB", (grad_w, grad_h), color=bg_rgb)
+        gpx = grad_small.load()
+        cx, cy = grad_w * 0.5, grad_h * 0.42
+        max_r = (grad_w * grad_w + grad_h * grad_h) ** 0.5 * 0.65
+        for gy in range(grad_h):
+            for gx in range(grad_w):
+                dist = ((gx - cx) ** 2 + (gy - cy) ** 2) ** 0.5
+                t = max(0.0, 1.0 - dist / max_r)
+                glow = (t * t) * 0.14
+                vig = (1.0 - t) * 0.10
+                r_c = int(max(0, min(255, bg_rgb[0] * (1.0 - vig) + accent_rgb[0] * glow)))
+                g_c = int(max(0, min(255, bg_rgb[1] * (1.0 - vig) + accent_rgb[1] * glow)))
+                b_c = int(max(0, min(255, bg_rgb[2] * (1.0 - vig) + accent_rgb[2] * glow)))
+                gpx[gx, gy] = (r_c, g_c, b_c)
+        img = grad_small.resize((width, height), resample=Image.Resampling.BILINEAR)
         draw = ImageDraw.Draw(img)
+
+        # Subtle editorial framing hairline
+        frame_pad = max(18, int(min(width, height) * 0.045))
+        border_rgb = tuple(int(bg_rgb[i] * 0.78 + text_rgb[i] * 0.22) for i in range(3))
+        draw.rectangle(
+            [frame_pad, frame_pad, width - frame_pad, height - frame_pad],
+            outline=border_rgb,
+            width=max(1, int(min(width, height) * 0.002)),
+        )
 
         margin_x = max(32, int(width * 0.09))
         max_text_w = max(100, width - 2 * margin_x)
@@ -292,25 +318,27 @@ class GraphicsCardRenderer:
             )
             img.save(png_path, format="PNG")
 
+            total_frames = max(1, int(round(duration_sec * fps)))
+            fade_dur = min(0.22, duration_sec * 0.15)
+            fade_out_st = max(0.0, duration_sec - fade_dur)
             motion = (bible.typography_and_layout.motion_feel or "crisp").lower()
-            fade_dur = min(0.25, duration_sec * 0.15)
-            vf_parts = [f"fps={fps}", "format=yuv420p"]
+
+            zoom_step = 0.045
+            vf_parts = [
+                (
+                    f"zoompan=z='1+{zoom_step:.3f}*(on/{total_frames})'"
+                    f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                    f":d={total_frames}:s={even_w}x{even_h}:fps={fps}"
+                ),
+                f"fade=t=in:st=0:d={fade_dur:.3f}",
+            ]
             if "smooth" in motion or "measured" in motion or "gentle" in motion:
-                fade_out_st = max(0.0, duration_sec - fade_dur)
-                vf_parts.insert(
-                    1,
-                    f"fade=t=in:st=0:d={fade_dur:.3f},fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}",
-                )
+                vf_parts.append(f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}")
+            vf_parts.append("format=yuv420p")
 
             cmd = [
                 self.ffmpeg_bin,
                 "-y",
-                "-loop",
-                "1",
-                "-framerate",
-                str(fps),
-                "-t",
-                f"{duration_sec:.4f}",
                 "-i",
                 str(png_path),
                 "-f",

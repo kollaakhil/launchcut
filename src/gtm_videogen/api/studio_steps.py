@@ -44,9 +44,12 @@ from gtm_videogen.api.routes import (
 )
 from gtm_videogen.core.cost_meter import CostMeter
 from gtm_videogen.core.job_registry import CancellationToken
+from gtm_videogen.media.vision_critic import VisionQualityCritic
 from gtm_videogen.models.schemas import (
     CostEntry,
     CreativeBible,
+    CreativeFingerprint,
+    HumanScore,
     RunState,
     Script,
     ShotSheet,
@@ -54,6 +57,7 @@ from gtm_videogen.models.schemas import (
     Version,
     VoiceCue,
 )
+from gtm_videogen.providers.storyboard import StoryboardGenerator
 from gtm_videogen.rules.creative_history import CreativeHistoryStore
 from gtm_videogen.rules.script_gate import evaluate_script_gate
 
@@ -63,27 +67,29 @@ studio_router = APIRouter(prefix="/api")
 PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
     {
         "id": "kling_flash",
-        "label": "Kling v4 Flash",
+        "label": "Kling v4 Flash (Keyframe-Anchored)",
         "description": (
-            "Fast live AI video ($0.094/s) + ElevenLabs v3 voiceover. "
-            "Best speed/cost balance for previews."
+            "Animates your approved Step 4 keyframes via Kling v4 Flash I2V ($0.094/s) "
+            "+ ElevenLabs v3 voiceover for crisp visual continuity."
         ),
         "video_model": "kling/v4/flash/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
         "hybrid_motion_cards": False,
+        "use_keyframes": True,
         "mock": False,
         "est_per_ai_shot_usd": 0.35,
     },
     {
         "id": "hybrid_motion",
-        "label": "Hybrid Hero + Motion Cards",
+        "label": "Hybrid Hero + Kinetic Motion Screens",
         "description": (
-            "Renders opening/hero beats with Kling v4 Flash and "
-            "closing/supporting beats as $0 kinetic typography cards."
+            "Anthropic/OpenAI style mix: Kling v4 Flash hero shots + $0 radial-studio "
+            "kinetic typography screens and closing brand lockup."
         ),
         "video_model": "kling/v4/flash/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
         "hybrid_motion_cards": True,
+        "use_keyframes": True,
         "mock": False,
         "est_per_ai_shot_usd": 0.35,
     },
@@ -96,6 +102,7 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
         "video_model": "kling/v4/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
         "hybrid_motion_cards": False,
+        "use_keyframes": True,
         "mock": False,
         "est_per_ai_shot_usd": 0.55,
     },
@@ -109,6 +116,7 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
         "video_model": "mock-lavfi-mp4",
         "voice_model": "mock-lavfi-wav",
         "hybrid_motion_cards": False,
+        "use_keyframes": False,
         "mock": True,
         "est_per_ai_shot_usd": 0.0,
     },
@@ -147,8 +155,18 @@ class SheetPatchRequest(BaseModel):
     script: Script | None = None
 
 
+class KeyframeRegenRequest(BaseModel):
+    """Regenerate or approve a single shot's visual storyboard keyframe."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    visual_prompt: str | None = None
+    approved: bool | None = None
+    regenerate: bool = True
+
+
 class PreviewStackSpec(BaseModel):
-    """Single preview option / model stack chosen for Step 4 A/B comparison."""
+    """Single preview option / model stack chosen for A/B comparison."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -157,6 +175,7 @@ class PreviewStackSpec(BaseModel):
     video_model: str = "kling/v4/flash/text-to-video"
     voice_model: str = "fal-ai/elevenlabs/tts/eleven-v3"
     hybrid_motion_cards: bool = False
+    use_keyframes: bool = True
     mock: bool = False
 
 
@@ -169,7 +188,7 @@ class PreviewsRequest(BaseModel):
 
 
 class FinalRenderRequest(BaseModel):
-    """Optional override for Step 5 Final Cut."""
+    """Optional override for Final Cut."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -183,6 +202,17 @@ class CapPatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     cap_usd: float = Field(ge=0.0, le=500.0)
+
+
+class ReiterateRequest(BaseModel):
+    """Targeted quality reiteration on weak or user-flagged shots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    shot_ids: list[str] | None = None
+    version_id: str | None = None
+    notes: str = ""
+    regenerate_keyframes: bool = True
 
 
 def _estimate_stack_usd(sheet: ShotSheet | None, stack: dict[str, Any]) -> float:
@@ -717,6 +747,17 @@ async def step_render_previews(
                         if stack.hybrid_motion_cards
                         else run_state.shot_sheet.model_copy(deep=True)
                     )
+                    if stack.use_keyframes and not (stack.mock or run_state.input.mock):
+                        for sh in ver_sheet.shots:
+                            if (
+                                sh.engine == "ai_video"
+                                and sh.keyframe_approved
+                                and sh.keyframe_url
+                                and sh.keyframe_url.startswith(("http://", "https://"))
+                            ):
+                                sh.engine = "image_to_video"
+                                sh.reference_image = sh.keyframe_url
+
                     ver_input = run_state.input.model_copy(deep=True)
                     ver_input.render_mode = "preview"
                     ver_input.mock = bool(stack.mock or run_state.input.mock)
@@ -774,6 +815,17 @@ async def step_render_previews(
                             raise_on_failure=False,
                         )
                         _merge_cost_ledger(run_state, a3.cost_ledger.entries)
+                        scorecard = None
+                        if a3.render_manifest.stitched_path:
+                            critic = VisionQualityCritic(settings=services.settings)
+                            scorecard = await critic.score_video(
+                                a3.render_manifest.stitched_path,
+                                ver_sheet,
+                                run_state.creative_bible,
+                                qa=a3.qa_report,
+                                mock=ver_input.mock,
+                                cancel=cancel_token,
+                            )
                         ver = Version(
                             version_id=ver_id,
                             label=stack.label,
@@ -786,6 +838,7 @@ async def step_render_previews(
                             sound_plan=run_state.sound_plan,
                             render_manifest=a3.render_manifest,
                             qa_report=a3.qa_report,
+                            quality_scorecard=scorecard,
                             warnings=a3.render_manifest.warnings,
                             error=a3.render_manifest.error,
                         )
@@ -1011,7 +1064,7 @@ async def step_render_final(
                 if payload and payload.mock is not None:
                     final_input.mock = payload.mock
                 elif stack.get("mock") is not None:
-                    final_input.mock = bool(stack.get("mock"))
+                    final_input.mock = bool(run_state.input.mock or stack.get("mock"))
 
                 remaining_cap = max(
                     0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd
@@ -1052,8 +1105,20 @@ async def step_render_final(
                     return None
 
                 _merge_cost_ledger(run_state, a3.cost_ledger.entries)
+                final_scorecard = None
+                if a3.render_manifest.stitched_path:
+                    critic = VisionQualityCritic(settings=services.settings)
+                    final_scorecard = await critic.score_video(
+                        a3.render_manifest.stitched_path,
+                        final_sheet,
+                        run_state.creative_bible,
+                        qa=a3.qa_report,
+                        mock=final_input.mock,
+                        cancel=cancel_token,
+                    )
                 run_state.render_manifest = a3.render_manifest
                 run_state.qa_report = a3.qa_report
+                run_state.quality_scorecard = final_scorecard
                 run_state.rubric_evaluations["agent3_producer"] = a3.rubric_evaluations
                 run_state.versions.append(
                     Version(
@@ -1069,6 +1134,7 @@ async def step_render_final(
                         sound_plan=run_state.sound_plan,
                         render_manifest=a3.render_manifest,
                         qa_report=a3.qa_report,
+                        quality_scorecard=final_scorecard,
                     )
                 )
                 run_state.step = "final"
@@ -1080,7 +1146,12 @@ async def step_render_final(
                         "stage_completed",
                         run_id,
                         stage="final",
-                        data={"stitched_path": a3.render_manifest.stitched_path},
+                        data={
+                            "stitched_path": a3.render_manifest.stitched_path,
+                            "overall_score": (
+                                final_scorecard.overall_score if final_scorecard else None
+                            ),
+                        },
                     ),
                 )
                 services.event_broker.publish(
@@ -1113,3 +1184,466 @@ async def step_render_final(
         job = await services.job_registry.submit(run_id, _job, stage="final")
         services.run_store.save(run_state)
     return {"run_id": run_id, "job": job.model_dump(mode="json")}
+
+
+@studio_router.post("/runs/{run_id}/step/storyboards", status_code=202)
+async def step_generate_storyboards(
+    run_id: str,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Step 3 -> 4: Generate low-cost visual keyframes ($0.005/still) for every shot."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    if run_state.shot_sheet is None or run_state.creative_bible is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Complete Step 3 (Shot Sheet) before generating visual storyboards.",
+        )
+
+    async with services.run_lock(run_id):
+        if services.job_registry.is_run_active(run_id):
+            raise HTTPException(status_code=409, detail=f"Run {run_id!r} already has an active job")
+
+        run_state = services.run_store.load(run_id) or run_state
+        gen = services.next_generation(run_id)
+        run_state.status = "working"
+        run_state.error = None
+        services.event_broker.reset_run(run_id)
+
+        async def _job(cancel_token: CancellationToken) -> RunState | None:
+            services.event_broker.publish(
+                run_id,
+                make_sse_event(
+                    "stage_started", run_id, stage="storyboard", data={"step": "storyboard"}
+                ),
+            )
+            try:
+                assert run_state.shot_sheet is not None and run_state.creative_bible is not None
+                kf_dir = services.data_dir / "work" / run_id / "keyframes"
+                remaining = max(
+                    0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd
+                )
+                meter = CostMeter(
+                    run_id=f"{run_id}_kf",
+                    cap_usd=remaining
+                    if not run_state.input.mock
+                    else run_state.cost_ledger.cap_usd,
+                )
+                generator = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+                results = await generator.generate_all_keyframes(
+                    run_state.shot_sheet,
+                    run_state.creative_bible,
+                    kf_dir,
+                    mock=run_state.input.mock,
+                    cancel=cancel_token,
+                )
+                if not services.is_current_generation(run_id, gen):
+                    return None
+                by_id = {sid: (p, url) for sid, p, url, _ in results}
+                for shot in run_state.shot_sheet.shots:
+                    if shot.id in by_id:
+                        p, url = by_id[shot.id]
+                        shot.keyframe_path = str(p)
+                        shot.keyframe_url = url
+                        shot.keyframe_approved = True
+                        if url and shot.engine == "ai_video":
+                            shot.reference_image = url
+
+                _merge_cost_ledger(run_state, meter.to_ledger().entries)
+                run_state.step = "storyboard"
+                run_state.status = "idle"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "stage_completed",
+                        run_id,
+                        stage="storyboard",
+                        data={"keyframes": len(results), "step": "storyboard"},
+                    ),
+                )
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_completed",
+                        run_id,
+                        stage="storyboard",
+                        data={"status": "idle", "step": "storyboard"},
+                    ),
+                )
+                return run_state
+            except asyncio.CancelledError:
+                run_state.status = "cancelled"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id, make_sse_event("run_cancelled", run_id, stage="storyboard")
+                )
+                raise
+            except Exception as exc:
+                run_state.status = "failed"
+                run_state.error = str(exc)
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_failed", run_id, stage="storyboard", data={"error": str(exc)}
+                    ),
+                )
+                raise
+
+        job = await services.job_registry.submit(run_id, _job, stage="storyboard")
+        services.run_store.save(run_state)
+    return {"run_id": run_id, "job": job.model_dump(mode="json")}
+
+
+@studio_router.post("/runs/{run_id}/shots/{shot_id}/keyframe")
+async def regenerate_shot_keyframe(
+    run_id: str,
+    shot_id: str,
+    payload: KeyframeRegenRequest,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """HITL Step 4: Regenerate or approve/unapprove a single shot's visual keyframe."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    async with services.run_lock(run_id):
+        run_state = services.run_store.load(run_id) or run_state
+        if run_state.shot_sheet is None or run_state.creative_bible is None:
+            raise HTTPException(status_code=400, detail="Run has no shot_sheet yet.")
+        shot = next((s for s in run_state.shot_sheet.shots if s.id == shot_id), None)
+        if shot is None:
+            raise HTTPException(status_code=404, detail=f"Shot {shot_id!r} not found")
+
+        if payload.visual_prompt is not None and payload.visual_prompt.strip():
+            shot.visual_prompt = payload.visual_prompt.strip()
+
+        if payload.regenerate:
+            kf_dir = services.data_dir / "work" / run_id / "keyframes"
+            meter = CostMeter(
+                run_id=f"{run_id}_kf_{shot_id}",
+                cap_usd=max(0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd)
+                if not run_state.input.mock
+                else run_state.cost_ledger.cap_usd,
+            )
+            gen = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+            p, url, _ = await gen.generate_shot_keyframe(
+                shot,
+                run_state.shot_sheet,
+                run_state.creative_bible,
+                kf_dir,
+                mock=run_state.input.mock,
+            )
+            shot.keyframe_path = str(p)
+            shot.keyframe_url = url
+            if url:
+                shot.reference_image = url
+            _merge_cost_ledger(run_state, meter.to_ledger().entries)
+
+        if payload.approved is not None:
+            shot.keyframe_approved = payload.approved
+        elif payload.regenerate:
+            shot.keyframe_approved = True
+
+        services.run_store.save(run_state)
+    return run_state.model_dump(mode="json")
+
+
+@studio_router.get("/runs/{run_id}/shots/{shot_id}/keyframe")
+async def serve_shot_keyframe(
+    run_id: str,
+    shot_id: str,
+    services: ServicesDep,
+) -> Response:
+    """Serve the generated keyframe JPEG for a shot."""
+    if not run_id or len(run_id) > MAX_RUN_ID_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+    state = services.run_store.load(run_id)
+    if state is None or state.shot_sheet is None:
+        raise HTTPException(status_code=404, detail="Run or shot sheet not found")
+    shot = next((s for s in state.shot_sheet.shots if s.id == shot_id), None)
+    if shot is None or not shot.keyframe_path:
+        raise HTTPException(status_code=404, detail=f"Keyframe for {shot_id!r} not found")
+    path = Path(shot.keyframe_path).resolve()
+    try:
+        path.relative_to(services.data_dir.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Keyframe path outside data directory") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Keyframe file missing on disk")
+    return Response(content=path.read_bytes(), media_type="image/jpeg")
+
+
+@studio_router.post("/runs/{run_id}/score")
+async def submit_human_score(
+    run_id: str,
+    payload: HumanScore,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Capture human 1-5 star rating + critique tags and feed brand taste into CreativeHistory."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    async with services.run_lock(run_id):
+        run_state = services.run_store.load(run_id) or run_state
+        run_state.human_scores.append(payload)
+        if payload.target_version_id:
+            ver = next(
+                (v for v in run_state.versions if v.version_id == payload.target_version_id),
+                None,
+            )
+            if ver is not None:
+                ver.human_score = payload
+
+        # Persist human approval/rejection signal into per-brand CreativeHistory taste memory
+        if run_state.creative_bible is not None:
+            history = CreativeHistoryStore(services.data_dir / "creative_history.json")
+            first_hook = (
+                run_state.shot_sheet.shots[0].vo_line
+                if run_state.shot_sheet and run_state.shot_sheet.shots
+                else run_state.creative_bible.concept_thesis[:80]
+            )
+            fp = CreativeFingerprint(
+                run_id=run_id,
+                brand_url=run_state.input.brand_url,
+                arc_name=run_state.creative_bible.narrative_structure.arc_name,
+                hook_opening=first_hook or run_state.creative_bible.concept_thesis[:80],
+                visual_world=run_state.creative_bible.visual_language.world,
+                lighting_style=run_state.creative_bible.visual_language.lighting_style,
+                camera_style=run_state.creative_bible.camera_grammar.dominant_style,
+                voice_id=run_state.sound_plan.voice_id if run_state.sound_plan else None,
+                outcome="approved" if payload.rating_overall >= 4 else "rejected",
+            )
+            history.record(fp)
+
+        services.run_store.save(run_state)
+    return run_state.model_dump(mode="json")
+
+
+@studio_router.post("/runs/{run_id}/reiterate", status_code=202)
+async def reiterate_weak_shots(
+    run_id: str,
+    payload: ReiterateRequest,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Targeted Quality Reiteration: refine & re-render ONLY weak/flagged shots, then re-score."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    if run_state.shot_sheet is None or run_state.creative_bible is None:
+        raise HTTPException(status_code=400, detail="Run has no shot_sheet to reiterate.")
+
+    async with services.run_lock(run_id):
+        if services.job_registry.is_run_active(run_id):
+            raise HTTPException(status_code=409, detail=f"Run {run_id!r} already has an active job")
+
+        run_state = services.run_store.load(run_id) or run_state
+        gen = services.next_generation(run_id)
+        run_state.status = "working"
+        run_state.error = None
+        services.event_broker.reset_run(run_id)
+
+        target_ver = (
+            next((v for v in run_state.versions if v.version_id == payload.version_id), None)
+            if payload.version_id
+            else (next((v for v in reversed(run_state.versions) if v.status == "done"), None))
+        )
+        scorecard = (
+            target_ver.quality_scorecard
+            if target_ver and target_ver.quality_scorecard
+            else run_state.quality_scorecard
+        )
+
+        # Pick explicit shot_ids or auto-select weak shots from Vision Critic / Media QA
+        chosen_ids = list(payload.shot_ids or [])
+        if not chosen_ids and scorecard:
+            chosen_ids = [
+                sc.shot_id
+                for sc in scorecard.shot_scores
+                if sc.verdict == "reiterate" or sc.score < 8.0
+            ]
+        if not chosen_ids and run_state.qa_report and run_state.qa_report.failed_shot_ids:
+            chosen_ids = list(run_state.qa_report.failed_shot_ids)
+        if not chosen_ids and run_state.shot_sheet.shots:
+            chosen_ids = [run_state.shot_sheet.shots[0].id]
+
+        async def _on_event(ev: dict[str, Any]) -> None:
+            if not services.is_current_generation(run_id, gen):
+                return
+            if ev.get("type") not in TERMINAL_EVENT_TYPES:
+                services.event_broker.publish(run_id, ev)
+
+        async def _job(cancel_token: CancellationToken) -> RunState | None:
+            services.event_broker.publish(
+                run_id,
+                make_sse_event(
+                    "stage_started",
+                    run_id,
+                    stage="reiterate",
+                    data={"shot_ids": chosen_ids, "notes": payload.notes},
+                ),
+            )
+            try:
+                assert run_state.shot_sheet is not None and run_state.creative_bible is not None
+                base_sheet = (
+                    target_ver.shot_sheet.model_copy(deep=True)
+                    if target_ver and target_ver.shot_sheet
+                    else run_state.shot_sheet.model_copy(deep=True)
+                )
+                fixes = (
+                    {sc.shot_id: sc.suggested_prompt_fix for sc in scorecard.shot_scores}
+                    if scorecard
+                    else {}
+                )
+                for sh in base_sheet.shots:
+                    if sh.id in chosen_ids:
+                        if fixes.get(sh.id):
+                            sh.visual_prompt = fixes[sh.id]
+                        if payload.notes.strip():
+                            sh.visual_prompt = (
+                                f"{sh.visual_prompt.strip()}; Director revision: "
+                                f"{payload.notes.strip()}"
+                            )
+
+                iter_id = f"iter_{uuid4().hex[:6]}"
+                iter_dir = services.data_dir / "work" / run_id / "versions" / iter_id
+                iter_dir.mkdir(parents=True, exist_ok=True)
+
+                stack = target_ver.stack if target_ver else {}
+                iter_input = run_state.input.model_copy(deep=True)
+                if stack.get("mock") is not None:
+                    iter_input.mock = bool(run_state.input.mock or stack.get("mock"))
+
+                remaining = max(
+                    0.0, run_state.cost_ledger.cap_usd - run_state.cost_ledger.actual_usd
+                )
+                meter = CostMeter(
+                    run_id=f"{run_id}_{iter_id}",
+                    cap_usd=remaining if not iter_input.mock else run_state.cost_ledger.cap_usd,
+                    ledger_path=iter_dir / "spend_ledger.jsonl",
+                )
+
+                # Optionally regenerate keyframes for reiterated shots first
+                if payload.regenerate_keyframes:
+                    kf_gen = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+                    kf_dir = services.data_dir / "work" / run_id / "keyframes"
+                    for sh in base_sheet.shots:
+                        if sh.id in chosen_ids:
+                            p, url, _ = await kf_gen.generate_shot_keyframe(
+                                sh,
+                                base_sheet,
+                                run_state.creative_bible,
+                                kf_dir,
+                                mock=iter_input.mock,
+                                cancel=cancel_token,
+                            )
+                            sh.keyframe_path = str(p)
+                            sh.keyframe_url = url
+                            if url and not iter_input.mock and sh.engine == "ai_video":
+                                sh.engine = "image_to_video"
+                                sh.reference_image = url
+
+                providers = _build_step_providers(
+                    services,
+                    run_state,
+                    iter_dir,
+                    meter,
+                    force_mock=iter_input.mock,
+                    video_model_override=stack.get("video_model"),
+                    voice_model_override=stack.get("voice_model"),
+                )
+                a3 = await run_agent3_producer(
+                    run_id=f"{run_id}_{iter_id}",
+                    run_input=iter_input,
+                    shot_sheet=base_sheet,
+                    sound_plan=run_state.sound_plan,
+                    creative_bible=run_state.creative_bible,
+                    providers=providers,
+                    cost_meter=meter,
+                    work_dir=iter_dir,
+                    director_qa=run_state.qa_report,
+                    event_cb=_on_event,
+                    cancel=cancel_token,
+                    max_iterations=1,
+                    raise_on_failure=False,
+                )
+                if not services.is_current_generation(run_id, gen):
+                    return None
+
+                _merge_cost_ledger(run_state, a3.cost_ledger.entries)
+                new_scorecard = None
+                if a3.render_manifest.stitched_path:
+                    critic = VisionQualityCritic(settings=services.settings)
+                    new_scorecard = await critic.score_video(
+                        a3.render_manifest.stitched_path,
+                        base_sheet,
+                        run_state.creative_bible,
+                        qa=a3.qa_report,
+                        mock=iter_input.mock,
+                        cancel=cancel_token,
+                    )
+
+                run_state.shot_sheet = base_sheet
+                run_state.versions.append(
+                    Version(
+                        version_id=iter_id,
+                        label=f"Reiterated ({', '.join(chosen_ids)})",
+                        tier="preview",
+                        status="done" if a3.render_manifest.stitched_path else "failed",
+                        stack=stack,
+                        usd=round(a3.cost_ledger.actual_usd, 4),
+                        creative_bible=run_state.creative_bible,
+                        shot_sheet=base_sheet,
+                        sound_plan=run_state.sound_plan,
+                        render_manifest=a3.render_manifest,
+                        qa_report=a3.qa_report,
+                        quality_scorecard=new_scorecard,
+                    )
+                )
+                run_state.quality_scorecard = new_scorecard
+                run_state.status = "idle"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "stage_completed",
+                        run_id,
+                        stage="reiterate",
+                        data={
+                            "version_id": iter_id,
+                            "shot_ids": chosen_ids,
+                            "overall_score": (
+                                new_scorecard.overall_score if new_scorecard else None
+                            ),
+                        },
+                    ),
+                )
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_completed",
+                        run_id,
+                        stage="reiterate",
+                        data={"status": "idle", "version_id": iter_id},
+                    ),
+                )
+                return run_state
+            except asyncio.CancelledError:
+                run_state.status = "cancelled"
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id, make_sse_event("run_cancelled", run_id, stage="reiterate")
+                )
+                raise
+            except Exception as exc:
+                run_state.status = "failed"
+                run_state.error = str(exc)
+                services.run_store.save(run_state)
+                services.event_broker.publish(
+                    run_id,
+                    make_sse_event(
+                        "run_failed", run_id, stage="reiterate", data={"error": str(exc)}
+                    ),
+                )
+                raise
+
+        job = await services.job_registry.submit(run_id, _job, stage="reiterate")
+        services.run_store.save(run_state)
+    return {"run_id": run_id, "shot_ids": chosen_ids, "job": job.model_dump(mode="json")}

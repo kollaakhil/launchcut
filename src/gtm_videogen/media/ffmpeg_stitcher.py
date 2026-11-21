@@ -178,7 +178,18 @@ class FFmpegStitcher:
                 )
             vf_parts.extend([f"fps={fps}", "format=yuv420p"])
 
-            cmd = [self.ffmpeg_bin, "-y", "-i", str(src_path)]
+            # AI video generators (e.g. Kling) often ease in over the first 0.35-0.45s.
+            # When the raw clip has ample slack above planned_duration, trim the initial ease-in
+            # so cuts open directly on live motion without tripping freezedetect.
+            lead_in_sec = 0.0
+            slack = actual_dur - planned_duration
+            if slack >= 0.65:
+                lead_in_sec = round(min(0.40, slack * 0.45), 3)
+
+            cmd = [self.ffmpeg_bin, "-y"]
+            if lead_in_sec > 0.0:
+                cmd.extend(["-ss", f"{lead_in_sec:.3f}"])
+            cmd.extend(["-i", str(src_path)])
             if probe.has_audio:
                 cmd.extend(
                     [

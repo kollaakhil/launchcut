@@ -617,6 +617,151 @@
     }
     .mode-pill.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
+    /* Storyboard Keyframe Cards */
+    .kf-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .kf-card.approved { border-color: rgba(63, 185, 132, 0.45); }
+    .kf-img-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #0d0e11;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink-muted);
+      font-size: 12px;
+    }
+    .kf-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .kf-body {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    /* Multimodal Vision Scorecard & Human Rating */
+    .scorecard-box {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .score-dims {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .score-dim {
+      padding: 5px 6px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      text-align: center;
+    }
+    .score-dim-k {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-muted);
+    }
+    .score-dim-v {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    .shot-score-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .shot-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--rule);
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+    }
+    .shot-chip.weak {
+      border-color: rgba(232, 93, 74, 0.5);
+      background: var(--fail-soft);
+      color: #f8b4aa;
+    }
+    .shot-chip.strong {
+      border-color: rgba(63, 185, 132, 0.45);
+      background: var(--pass-soft);
+      color: #9ae5c2;
+    }
+    .human-rate-box {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .star-row {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .star-btn {
+      appearance: none;
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      color: var(--ink-muted);
+      font-size: 13px;
+      width: 28px;
+      height: 26px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .star-btn.on {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .tag-pill {
+      appearance: none;
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      color: var(--ink-secondary);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .tag-pill.on {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--ink);
+    }
+
     @media (max-width: 900px) {
       .grid-2, .grid-3, .grid-4, .metrics-row { grid-template-columns: 1fr; }
     }
@@ -627,7 +772,7 @@
   <header class="topbar">
     <div class="brand-group">
       <h1>Launch<span>Cut</span></h1>
-      <span class="flow-crumb">Brand → Concept → Shot Sheet → Previews → Final</span>
+      <span class="flow-crumb">Brand → Concept → Shot Sheet → Storyboard → Previews &amp; QA → Final</span>
     </div>
     <div class="topbar-controls">
       <span class="chip" id="chipApis"><span class="dot"></span>Checking…</span>
@@ -645,7 +790,7 @@
     </div>
   </header>
 
-  <!-- 5-Step Interactive Navigation -->
+  <!-- 6-Step Interactive Navigation -->
   <nav class="stepper-bar" aria-label="Production workflow steps">
     <button type="button" class="step-btn active" data-step="brand" id="nav-brand">
       <span class="step-num">1</span> Brand &amp; Goal
@@ -656,15 +801,19 @@
     </button>
     <span class="step-arrow">→</span>
     <button type="button" class="step-btn" data-step="sheet" id="nav-sheet" disabled>
-      <span class="step-num">3</span> Script &amp; Shot Sheet
+      <span class="step-num">3</span> Shot Sheet
+    </button>
+    <span class="step-arrow">→</span>
+    <button type="button" class="step-btn" data-step="storyboard" id="nav-storyboard" disabled>
+      <span class="step-num">4</span> Storyboard Stills
     </button>
     <span class="step-arrow">→</span>
     <button type="button" class="step-btn" data-step="previews" id="nav-previews" disabled>
-      <span class="step-num">4</span> Previews
+      <span class="step-num">5</span> Previews &amp; Score
     </button>
     <span class="step-arrow">→</span>
     <button type="button" class="step-btn" data-step="final" id="nav-final" disabled>
-      <span class="step-num">5</span> Final Cut
+      <span class="step-num">6</span> Final Cut
     </button>
   </nav>
 
@@ -894,18 +1043,44 @@
 
         <div class="btn-bar">
           <button type="button" class="btn" id="btnSaveSheet">Save Edits &amp; Validate Rules</button>
-          <button type="button" class="btn btn-primary" id="btnApproveSheet">Approve Shot Sheet → Previews</button>
+          <div class="btn-group">
+            <button type="button" class="btn" id="btnSkipToPreviews">Skip Stills → Previews</button>
+            <button type="button" class="btn btn-primary" id="btnApproveSheet">Generate Storyboard Stills (~$0.02) →</button>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- STEP 4: MULTI-OPTION PREVIEWS & A/B COMPARISON (HITL) -->
+    <!-- STEP 4: VISUAL STORYBOARD KEYFRAMES ($0.005/STILL BEFORE VIDEO!) -->
+    <section class="step-view" id="view-storyboard">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">4. Visual Storyboard Keyframes</h2>
+            <p class="panel-sub">Verify every screen as a low-cost still ($0.005/frame via Flux Schnell) before spending video credits. Approved stills automatically anchor Kling v4 Image-to-Video for crisp visual continuity.</p>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-sm" id="btnRegenAllKeyframes">Regenerate All Stills</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btnApproveStoryboard">Approve Stills → Previews</button>
+          </div>
+        </div>
+
+        <div class="grid-2" id="storyboardGrid"></div>
+
+        <div class="btn-bar">
+          <span style="font-size:12px; color:var(--ink-muted);">Edit any shot's visual prompt and click <strong>Regenerate Frame</strong> until every screen matches your brand taste.</span>
+          <button type="button" class="btn btn-primary" id="btnApproveStoryboardBottom">Approve Storyboard → Previews</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 5: MULTI-OPTION PREVIEWS, VISION SCORECARD & HUMAN RATING -->
     <section class="step-view" id="view-previews">
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">4. Preview Options &amp; Side-by-Side Comparison</h2>
-            <p class="panel-sub">Select 1–4 preview stacks (different AI video models, hybrid motion cards, or $0 pacing animatic), compare them side-by-side, and pick your winner.</p>
+            <h2 class="panel-title">5. Previews, Quality Scorecard &amp; Reiterate</h2>
+            <p class="panel-sub">Compare 1–4 preview stacks side-by-side, inspect the Multimodal Vision Critic &amp; Audio-Sync scores, rate cuts yourself, and reiterate only weak shots.</p>
           </div>
           <div class="btn-group">
             <span class="chip" id="previewEstChip">Selected est: $0.00</span>
@@ -946,13 +1121,13 @@
       </div>
     </section>
 
-    <!-- STEP 5: FINAL CUT -->
+    <!-- STEP 6: FINAL CUT -->
     <section class="step-view" id="view-final">
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">5. Final Production Cut</h2>
-            <p class="panel-sub" id="finalSub">Render the winning preview stack at full Final quality, verify deterministic Media QA, and download your master MP4.</p>
+            <h2 class="panel-title">6. Final Production Cut</h2>
+            <p class="panel-sub" id="finalSub">Render the winning preview stack at full Final quality, verify deterministic Media QA + Multimodal Vision Critic, and download your master MP4.</p>
           </div>
           <div class="btn-group">
             <button type="button" class="btn btn-primary" id="btnRenderFinal">Render Final Cut</button>
@@ -971,9 +1146,16 @@
           Click <strong>Render Final Cut</strong> above to produce the final full-quality stitched master MP4.
         </div>
 
+        <div id="finalScorecardWrap" style="margin-bottom:14px; display:none;">
+          <div style="padding:14px 16px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule);">
+            <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Multimodal Vision Quality Scorecard &amp; Human Ratings</h3>
+            <div id="finalScorecardBox"></div>
+          </div>
+        </div>
+
         <div class="grid-2">
           <div style="padding:14px 16px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule);">
-            <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Media QA &amp; Rubric Summary</h3>
+            <h3 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted);">Media QA, Whisper Audio Sync &amp; Rubric Summary</h3>
             <div id="finalQaBox" style="font-size:12.5px; color:var(--ink-secondary);">No final QA report yet.</div>
           </div>
           <div style="padding:14px 16px; border-radius:var(--radius); background:var(--bg-subtle); border:1px solid var(--rule);">
@@ -987,7 +1169,8 @@
 
   <script>
     const ACTOR_ID = "studio";
-    const STEPS = ["brand", "concept", "sheet", "previews", "final"];
+    const STEPS = ["brand", "concept", "sheet", "storyboard", "previews", "final"];
+    const HUMAN_TAGS = ["Too static", "Wrong product detail", "VO too fast", "Off-brand", "Nail this look"];
 
     const state = {
       run: null,
@@ -998,6 +1181,8 @@
       selectedStackIds: new Set(),
       customStacks: [],
       draftShots: [],
+      ratingDrafts: {},
+      kfBust: Date.now(),
       sse: null,
     };
 
@@ -1072,6 +1257,7 @@
             await loadRuns();
             const fresh = await api(`/api/runs/${encodeURIComponent(runId)}`);
             state.run = fresh;
+            state.kfBust = Date.now();
             if (fresh.status === "failed" || fresh.error) {
               setBanner("error", fresh.error || "Step failed");
             } else if (fresh.status === "cancelled") {
@@ -1088,9 +1274,9 @@
 
     function maxReachedStepIndex(run) {
       if (!run) return 0;
-      if (run.render_manifest?.stitched_path || run.winning_version_id || run.step === "final") return 4;
-      if (run.versions?.length || run.step === "previews") return 3;
-      if (run.shot_sheet || run.step === "sheet") return 3; // allow clicking Previews once sheet exists
+      if (run.render_manifest?.stitched_path || run.winning_version_id || run.step === "final") return 5;
+      if (run.versions?.length || run.step === "previews") return 4;
+      if (run.shot_sheet || run.step === "storyboard" || run.step === "sheet") return 4; // allow Storyboard or Previews once sheet exists
       if (run.creative_bible || run.concepts?.length || run.step === "concept") return 1;
       return 0;
     }
@@ -1108,6 +1294,7 @@
       const currentStepIdx = state.run ? STEPS.indexOf(state.run.step || "brand") : 0;
       STEPS.forEach((s, i) => {
         const btn = $(`nav-${s}`);
+        if (!btn) return;
         btn.disabled = i > reachedIdx;
         btn.classList.toggle("active", state.view === s);
         btn.classList.toggle("done", Boolean(state.run && i < currentStepIdx));
@@ -1128,12 +1315,44 @@
       fill.classList.toggle("high", pct > 85);
     }
 
+    function renderScorecardHtml(sc) {
+      if (!sc) return "";
+      const overall = Number(sc.overall_score || 0);
+      const badgeCls = overall >= 8.0 ? "pass" : (overall >= 6.5 ? "accent" : "fail");
+      const dims = [
+        ["Visual", sc.visual_craft],
+        ["Brand", sc.brand_fidelity],
+        ["Continuity", sc.continuity],
+        ["Audio Sync", sc.audio_sync],
+        ["Hook", sc.hook_impact],
+      ];
+      const shotsHtml = (sc.shot_scores || []).map((s) => {
+        const isWeak = s.verdict === "reiterate" || Number(s.score || 0) < 8.0;
+        const tip = [s.critique, s.suggested_prompt_fix ? `Fix: ${s.suggested_prompt_fix}` : ""].filter(Boolean).join(" | ");
+        return `<span class="shot-chip ${isWeak ? "weak" : "strong"}" title="${esc(tip)}">${esc(s.shot_id)}: ${Number(s.score || 0).toFixed(1)}${isWeak ? " ↻" : ""}</span>`;
+      }).join("");
+      return `
+        <div class="scorecard-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-muted);">Vision Quality Critic ${sc.model ? `· ${esc(sc.model)}` : ""}</span>
+            <span class="badge ${badgeCls}">${overall.toFixed(1)} / 10</span>
+          </div>
+          <div class="score-dims">
+            ${dims.map(([k, val]) => `<div class="score-dim"><div class="score-dim-k">${k}</div><div class="score-dim-v">${Number(val || 0).toFixed(1)}</div></div>`).join("")}
+          </div>
+          ${sc.summary ? `<div style="font-size:12px; color:var(--ink-secondary);">${esc(sc.summary)}</div>` : ""}
+          ${shotsHtml ? `<div class="shot-score-row">${shotsHtml}</div>` : ""}
+        </div>
+      `;
+    }
+
     function renderAll() {
       renderStepper();
       renderCostMeter();
       if (state.run) {
         renderConceptStep();
         renderSheetStep();
+        renderStoryboardStep();
         renderPreviewsStep();
         renderFinalStep();
       }
@@ -1264,7 +1483,7 @@
 
       const errs = qa.blocking_errors || [];
       if (!errs.length) {
-        box.innerHTML = `<div style="padding:10px 12px; border-radius:var(--radius-sm); background:var(--pass-soft); color:#9ae5c2; font-size:12.5px;">All pure script rules passed (claim grounding, speakability budget, timing math, schema, anti-garbled text). Ready for Previews.</div>`;
+        box.innerHTML = `<div style="padding:10px 12px; border-radius:var(--radius-sm); background:var(--pass-soft); color:#9ae5c2; font-size:12.5px;">All pure script rules passed (claim grounding, speakability budget, timing math, schema, anti-garbled text). Ready for Storyboard Stills or Previews.</div>`;
       } else {
         box.innerHTML = `<div style="padding:10px 14px; border-radius:var(--radius-sm); background:var(--fail-soft); color:#f8b4aa; font-size:12.5px;"><strong>Fix before rendering:</strong><ul class="gate-list">${errs.map((e) => `<li><code>${esc(e.code)}</code> (${esc(e.shot_id || "sheet")}): ${esc(e.message)}</li>`).join("")}</ul></div>`;
       }
@@ -1284,16 +1503,100 @@
       return updated;
     }
 
-    // ---- STEP 4: MULTI-OPTION PREVIEWS ----
+    // ---- STEP 4: VISUAL STORYBOARD KEYFRAMES ----
+    function renderStoryboardStep() {
+      const r = state.run;
+      const shots = r?.shot_sheet?.shots || [];
+      const grid = $("storyboardGrid");
+      if (!grid) return;
+      if (!shots.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1; padding:28px; text-align:center; border:1px dashed var(--rule); border-radius:var(--radius); color:var(--ink-muted);">Complete Step 3 (Shot Sheet) to generate visual storyboard stills.</div>`;
+        return;
+      }
+
+      grid.innerHTML = shots.map((sh) => {
+        const hasKf = Boolean(sh.keyframe_path);
+        const kfUrl = `/api/runs/${encodeURIComponent(r.run_id)}/shots/${encodeURIComponent(sh.id)}/keyframe?t=${state.kfBust}`;
+        const approved = Boolean(sh.keyframe_approved);
+        return `
+          <article class="kf-card ${approved ? "approved" : ""}" data-shot-id="${esc(sh.id)}">
+            <div class="kf-img-wrap">
+              ${hasKf
+                ? `<img src="${kfUrl}" alt="Keyframe ${esc(sh.id)}" loading="lazy" />`
+                : `<span>No still generated yet — click Regenerate All Stills</span>`}
+            </div>
+            <div class="kf-body">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <strong style="font-family:var(--font-mono); font-size:12.5px;">${esc(sh.id)} · ${esc(sh.beat)} (${Number(sh.duration_sec).toFixed(1)}s)</strong>
+                <span class="badge ${approved ? "pass" : ""}">${sh.engine === "motion_card" ? "motion_card · $0" : (approved ? "I2V Anchored" : esc(sh.engine))}</span>
+              </div>
+              ${sh.vo_line ? `<div style="font-size:12px; color:var(--ink-secondary); font-style:italic;">“${esc(sh.vo_line)}”</div>` : ""}
+              <div class="field">
+                <label style="font-size:10px;">Visual Prompt (editable before regen)</label>
+                <textarea rows="2" class="kf-prompt" data-shot-id="${esc(sh.id)}">${esc(sh.visual_prompt || "")}</textarea>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <label style="display:inline-flex; align-items:center; gap:6px; font-size:11.5px; text-transform:none; letter-spacing:0; color:var(--ink-secondary); cursor:pointer;">
+                  <input type="checkbox" class="kf-approve-chk" data-shot-id="${esc(sh.id)}" ${approved ? "checked" : ""} style="width:auto;" />
+                  Approved for I2V
+                </label>
+                <button type="button" class="btn btn-sm kf-regen-btn" data-shot-id="${esc(sh.id)}">Regenerate Frame ($0.005)</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      grid.querySelectorAll(".kf-regen-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const sid = btn.dataset.shotId;
+          const promptEl = grid.querySelector(`.kf-prompt[data-shot-id="${CSS.escape(sid)}"]`);
+          btn.disabled = true;
+          btn.textContent = "Generating…";
+          setBanner("working", `Regenerating storyboard still for ${sid}…`);
+          try {
+            const updated = await api(`/api/runs/${encodeURIComponent(r.run_id)}/shots/${encodeURIComponent(sid)}/keyframe`, {
+              method: "POST",
+              body: JSON.stringify({ visual_prompt: promptEl ? promptEl.value : null, regenerate: true, approved: true }),
+            });
+            state.run = updated;
+            state.kfBust = Date.now();
+            setBanner("ok", `Updated visual keyframe for ${sid}.`);
+            renderAll();
+          } catch (err) {
+            setBanner("error", err.message);
+            btn.disabled = false;
+            btn.textContent = "Regenerate Frame ($0.005)";
+          }
+        });
+      });
+
+      grid.querySelectorAll(".kf-approve-chk").forEach((chk) => {
+        chk.addEventListener("change", async () => {
+          const sid = chk.dataset.shotId;
+          try {
+            const updated = await api(`/api/runs/${encodeURIComponent(r.run_id)}/shots/${encodeURIComponent(sid)}/keyframe`, {
+              method: "POST",
+              body: JSON.stringify({ approved: chk.checked, regenerate: false }),
+            });
+            state.run = updated;
+            renderStoryboardStep();
+          } catch (err) {
+            setBanner("error", err.message);
+          }
+        });
+      });
+    }
+
+    // ---- STEP 5: MULTI-OPTION PREVIEWS, SCORECARD & REITERATE ----
     async function loadPresets() {
       const q = state.run ? `?run_id=${encodeURIComponent(state.run.run_id)}` : "";
       try {
         const res = await api(`/api/studio/presets${q}`);
         state.presets = res.presets || [];
         if (state.selectedStackIds.size === 0 && state.presets.length) {
-          // Default to mock_pacing in mock mode, or kling_flash + hybrid_motion in live mode
           if (state.run?.input?.mock) state.selectedStackIds.add("mock_pacing");
-          else state.selectedStackIds.add("kling_flash");
+          else state.selectedStackIds.add("hybrid_motion");
         }
         renderPreviewsStep();
       } catch (err) {
@@ -1303,6 +1606,18 @@
 
     function allStacks() {
       return [...state.presets, ...state.customStacks];
+    }
+
+    function getRatingDraft(v) {
+      if (!state.ratingDrafts[v.version_id]) {
+        const existing = v.human_score;
+        state.ratingDrafts[v.version_id] = {
+          rating: existing?.rating_overall || 4,
+          tags: new Set(existing?.tags || []),
+          notes: existing?.notes || "",
+        };
+      }
+      return state.ratingDrafts[v.version_id];
     }
 
     function renderPreviewsStep() {
@@ -1345,6 +1660,16 @@
           const isWin = v.is_winner || v.version_id === state.run?.winning_version_id;
           const qa = v.qa_report || {};
           const vUrl = `/api/runs/${encodeURIComponent(state.run.run_id)}/versions/${encodeURIComponent(v.version_id)}/video`;
+          const syncList = qa.sync_checks || [];
+          const syncPct = syncList.length ? Math.round((syncList.reduce((a, c) => a + Number(c.similarity || 0), 0) / syncList.length) * 100) : null;
+          const draft = getRatingDraft(v);
+          const starsHtml = [1, 2, 3, 4, 5].map((n) =>
+            `<button type="button" class="star-btn ${n <= draft.rating ? "on" : ""}" data-star-vid="${esc(v.version_id)}" data-star-val="${n}" title="Rate ${n}/5">★</button>`
+          ).join("");
+          const tagsHtml = HUMAN_TAGS.map((tag) =>
+            `<button type="button" class="tag-pill ${draft.tags.has(tag) ? "on" : ""}" data-tag-vid="${esc(v.version_id)}" data-tag-val="${esc(tag)}">${esc(tag)}</button>`
+          ).join("");
+
           return `
             <article class="version-card ${isWin ? "winner" : ""}">
               ${v.render_manifest?.stitched_path
@@ -1356,11 +1681,29 @@
                   <span class="badge ${isWin ? "pass" : (v.status === "done" ? "accent" : "fail")}">${isWin ? "★ Winner" : v.status}</span>
                 </div>
                 <div style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-muted);">
-                  Spend: ${fmtUsd(v.usd)} · LUFS: ${qa.loudness_lufs != null ? Number(qa.loudness_lufs).toFixed(1) : "—"} · Orig/Coh: ${qa.originality_score != null ? `${Number(qa.originality_score).toFixed(1)}/${Number(qa.bible_coherence_score).toFixed(1)}` : "—"}
+                  Spend: ${fmtUsd(v.usd)} · LUFS: ${qa.loudness_lufs != null ? Number(qa.loudness_lufs).toFixed(1) : "—"} · Sync: ${syncPct != null ? `${syncPct}%` : "—"}
                 </div>
+
+                ${renderScorecardHtml(v.quality_scorecard)}
+
+                <div class="human-rate-box">
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-muted);">Your Quality Rating ${v.human_score ? `(Saved: ${v.human_score.rating_overall}/5)` : ""}</span>
+                    <div class="star-row">${starsHtml}</div>
+                  </div>
+                  <div class="tag-row">${tagsHtml}</div>
+                  <div style="display:flex; gap:6px;">
+                    <input type="text" class="rate-note-inp" data-note-vid="${esc(v.version_id)}" value="${esc(draft.notes)}" placeholder="Director revision note (e.g. Make s2 closer on product)…" style="font-size:12px; padding:6px 8px;" />
+                    <button type="button" class="btn btn-sm" data-save-score="${esc(v.version_id)}">Save Score</button>
+                  </div>
+                </div>
+
                 <div class="btn-group">
                   <button type="button" class="btn btn-sm ${isWin ? "btn-pass" : "btn-primary"}" data-pick="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
                     ${isWin ? "★ Selected Winner" : "Pick Winner"}
+                  </button>
+                  <button type="button" class="btn btn-sm" data-reiterate="${esc(v.version_id)}" ${v.status !== "done" ? "disabled" : ""}>
+                    ↻ Reiterate Weak Shots
                   </button>
                   ${v.render_manifest?.stitched_path ? `<a class="btn btn-sm" href="${vUrl}" download="${esc(v.version_id)}.mp4">Download</a>` : ""}
                 </div>
@@ -1369,12 +1712,96 @@
           `;
         }).join("");
 
+        // Wire Stars
+        $("versionsGrid").querySelectorAll("[data-star-vid]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const vid = btn.dataset.starVid;
+            const val = Number(btn.dataset.starVal);
+            if (state.ratingDrafts[vid]) state.ratingDrafts[vid].rating = val;
+            renderPreviewsStep();
+          });
+        });
+
+        // Wire Tags
+        $("versionsGrid").querySelectorAll("[data-tag-vid]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const vid = btn.dataset.tagVid;
+            const tag = btn.dataset.tagVal;
+            const d = state.ratingDrafts[vid];
+            if (d) {
+              if (d.tags.has(tag)) d.tags.delete(tag);
+              else d.tags.add(tag);
+            }
+            renderPreviewsStep();
+          });
+        });
+
+        // Wire Note inputs
+        $("versionsGrid").querySelectorAll("[data-note-vid]").forEach((inp) => {
+          inp.addEventListener("input", () => {
+            const vid = inp.dataset.noteVid;
+            if (state.ratingDrafts[vid]) state.ratingDrafts[vid].notes = inp.value;
+          });
+        });
+
+        // Wire Save Human Score
+        $("versionsGrid").querySelectorAll("[data-save-score]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const vid = btn.dataset.saveScore;
+            const d = state.ratingDrafts[vid] || { rating: 4, tags: new Set(), notes: "" };
+            try {
+              const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/score`, {
+                method: "POST",
+                body: JSON.stringify({
+                  rating_overall: d.rating,
+                  hook: d.rating,
+                  visuals: d.rating,
+                  audio_sync: d.rating,
+                  brand_feel: d.rating,
+                  tags: Array.from(d.tags),
+                  notes: d.notes,
+                  target_version_id: vid,
+                }),
+              });
+              state.run = updated;
+              setBanner("ok", `Saved ${d.rating}/5 human score & updated per-brand taste memory.`);
+              renderAll();
+            } catch (err) {
+              setBanner("error", err.message);
+            }
+          });
+        });
+
+        // Wire Targeted Reiterate Weak Shots
+        $("versionsGrid").querySelectorAll("[data-reiterate]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const vid = btn.dataset.reiterate;
+            const d = state.ratingDrafts[vid] || { notes: "", tags: new Set() };
+            const combinedNotes = [d.notes, ...Array.from(d.tags)].filter(Boolean).join("; ");
+            setBanner("working", "Reiterating weak/flagged shots with targeted prompt fixes & re-scoring…", true);
+            try {
+              await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/reiterate`, {
+                method: "POST",
+                body: JSON.stringify({
+                  version_id: vid,
+                  notes: combinedNotes,
+                  regenerate_keyframes: true,
+                }),
+              });
+              subscribeSse(state.run.run_id, () => setView("previews"));
+            } catch (err) {
+              setBanner("error", err.message);
+            }
+          });
+        });
+
+        // Wire Pick Winner
         $("versionsGrid").querySelectorAll("[data-pick]").forEach((btn) => {
           btn.addEventListener("click", async () => {
             try {
               const updated = await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/versions/${encodeURIComponent(btn.dataset.pick)}/pick`, { method: "POST" });
               state.run = updated;
-              setBanner("ok", "Winner selected! You can now render the full-quality Final Cut in Step 5.");
+              setBanner("ok", "Winner selected! You can now render the full-quality Final Cut in Step 6.");
               renderAll();
             } catch (err) {
               setBanner("error", err.message);
@@ -1386,13 +1813,13 @@
       $("btnGoFinal").disabled = !previews.some((v) => v.status === "done");
     }
 
-    // ---- STEP 5: FINAL CUT ----
+    // ---- STEP 6: FINAL CUT ----
     function renderFinalStep() {
       const r = state.run;
       if (!r) return;
       const win = (r.versions || []).find((v) => v.version_id === r.winning_version_id) || (r.versions || []).find((v) => v.tier === "preview" && v.status === "done");
       $("finalSub").textContent = win
-        ? `Winner selected: "${win.label}" (${win.stack?.video_model || "default"}). Render at full Final quality and verify deterministic Media QA.`
+        ? `Winner selected: "${win.label}" (${win.stack?.video_model || "default"}). Render at full Final quality and verify Vision Critic + Media QA.`
         : "Render the approved Shot Sheet at full Final quality and verify deterministic Media QA.";
 
       const hasFinal = Boolean(r.render_manifest?.stitched_path);
@@ -1408,22 +1835,39 @@
         $("btnDownloadFinal").download = `${(r.input.brand_name || r.run_id).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-final.mp4`;
 
         const qa = r.qa_report || {};
+        const sc = r.quality_scorecard;
         $("finalMetrics").innerHTML = [
+          ["Vision Score", sc ? `${Number(sc.overall_score || 0).toFixed(1)} / 10` : "—"],
           ["Duration", qa.ffprobe_summary?.duration_sec ? `${Number(qa.ffprobe_summary.duration_sec).toFixed(2)}s` : `${r.input.target_duration_sec}s`],
-          ["Resolution", qa.ffprobe_summary?.width ? `${qa.ffprobe_summary.width}×${qa.ffprobe_summary.height}` : r.input.aspect],
           ["Loudness", qa.loudness_lufs != null ? `${Number(qa.loudness_lufs).toFixed(1)} LUFS` : "—"],
           ["Total Spend", `${fmtUsd(r.cost_ledger?.actual_usd)} / ${fmtUsd(r.cost_ledger?.cap_usd)}`],
         ].map(([k, val]) => `<div class="metric"><div class="metric-k">${k}</div><div class="metric-v">${val}</div></div>`).join("");
       }
 
+      const scWrap = $("finalScorecardWrap");
+      if (r.quality_scorecard || (r.human_scores && r.human_scores.length)) {
+        scWrap.style.display = "block";
+        const humanHtml = (r.human_scores || []).length
+          ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-secondary);"><strong>Human Ratings (${r.human_scores.length}):</strong> ${r.human_scores.map((h) => `${h.rating_overall}/5 ★${h.tags?.length ? ` [${h.tags.join(", ")}]` : ""}${h.notes ? ` — ${esc(h.notes)}` : ""}`).join(" · ")}</div>`
+          : "";
+        $("finalScorecardBox").innerHTML = renderScorecardHtml(r.quality_scorecard) + humanHtml;
+      } else {
+        scWrap.style.display = "none";
+      }
+
       const qa = r.qa_report;
       if (qa) {
+        const syncChecks = qa.sync_checks || [];
+        const syncLine = syncChecks.length
+          ? `<div style="margin-top:8px; font-family:var(--font-mono); font-size:11.5px;">Whisper Sync (${syncChecks.length} shots): ${syncChecks.map((s) => `${esc(s.shot_id)} ${Math.round(Number(s.similarity || 0) * 100)}%`).join(" · ")}</div>`
+          : "";
         $("finalQaBox").innerHTML = `
           <div style="margin-bottom:8px;">
             <span class="badge ${qa.passed ? "pass" : "fail"}">${qa.passed ? "QA Passed" : `${(qa.blocking_errors || []).length} Blocking`}</span>
             <span style="margin-left:8px; font-family:var(--font-mono);">Orig ${Number(qa.originality_score || 0).toFixed(1)} · Coh ${Number(qa.bible_coherence_score || 0).toFixed(1)} · Peak ${qa.peak_dbtp != null ? `${Number(qa.peak_dbtp).toFixed(1)} dBTP` : "—"}</span>
           </div>
           ${(qa.blocking_errors || []).length ? `<ul class="gate-list">${qa.blocking_errors.map((e) => `<li><code>${esc(e.code)}</code> (${esc(e.shot_id || "—")}): ${esc(e.message)}</li>`).join("")}</ul>` : "Zero blocking Media QA issues detected."}
+          ${syncLine}
         `;
       }
 
@@ -1467,7 +1911,8 @@
       $("sseMiniLog").classList.remove("visible");
       const r = await api(`/api/runs/${encodeURIComponent(runId)}`);
       state.run = r;
-      // Populate Step 1 form for reference
+      state.kfBust = Date.now();
+      state.ratingDrafts = {};
       $("inBrand").value = r.input.brand_name || "";
       $("inUrl").value = r.input.brand_url || "";
       $("inGoal").value = r.input.goal || "";
@@ -1482,11 +1927,11 @@
       $("inMustSay").value = (r.input.must_say || []).join(", ");
       setMode(Boolean(r.input.mock));
 
-      // Infer best landing step (handles older runs without explicit step)
       let targetStep = r.step || "brand";
       if (targetStep === "brand") {
         if (r.render_manifest?.stitched_path) targetStep = "final";
         else if (r.versions?.length) targetStep = "previews";
+        else if (r.shot_sheet?.shots?.some((s) => s.keyframe_path)) targetStep = "storyboard";
         else if (r.shot_sheet) targetStep = "sheet";
         else if (r.creative_bible) targetStep = "concept";
       }
@@ -1507,13 +1952,15 @@
     $("inDuration").addEventListener("input", (e) => { $("lblDuration").textContent = `${e.target.value}s`; });
 
     STEPS.forEach((s) => {
-      $(`nav-${s}`).addEventListener("click", () => { if (!$(`nav-${s}`).disabled) setView(s); });
+      const btn = $(`nav-${s}`);
+      if (btn) btn.addEventListener("click", () => { if (!btn.disabled) setView(s); });
     });
 
     $("btnNewVideo").addEventListener("click", () => {
       closeSse();
       state.run = null;
       state.draftShots = [];
+      state.ratingDrafts = {};
       state.selectedStackIds.clear();
       $("runsSelect").value = "";
       $("sseMiniLog").classList.remove("visible");
@@ -1697,15 +2144,42 @@
       } catch (err) { setBanner("error", err.message); }
     });
 
-    $("btnApproveSheet").addEventListener("click", async () => {
+    $("btnSkipToPreviews").addEventListener("click", async () => {
       try {
         await saveSheetDraft();
-        setBanner("ok", "Shot Sheet approved! Pick 1–4 preview stacks to render side-by-side.");
+        setBanner("ok", "Shot Sheet saved! Pick 1–4 preview stacks to render side-by-side.");
         setView("previews");
       } catch (err) { setBanner("error", err.message); }
     });
 
-    // Step 4: Previews Actions
+    $("btnApproveSheet").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Saving Shot Sheet & generating low-cost Storyboard Stills (~$0.005/frame)…", true);
+      try {
+        await saveSheetDraft();
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/storyboards`, { method: "POST" });
+        subscribeSse(state.run.run_id, () => setView("storyboard"));
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    // Step 4: Storyboard Actions
+    $("btnRegenAllKeyframes").addEventListener("click", async () => {
+      if (!state.run) return;
+      setBanner("working", "Regenerating all storyboard stills…", true);
+      try {
+        await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/storyboards`, { method: "POST" });
+        subscribeSse(state.run.run_id, () => setView("storyboard"));
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    const goToPreviewsFromStoryboard = () => {
+      setBanner("ok", "Storyboard stills approved! Pick 1–4 preview stacks to animate side-by-side.");
+      setView("previews");
+    };
+    $("btnApproveStoryboard").addEventListener("click", goToPreviewsFromStoryboard);
+    $("btnApproveStoryboardBottom").addEventListener("click", goToPreviewsFromStoryboard);
+
+    // Step 5: Previews Actions
     $("btnAddCustomStack").addEventListener("click", () => {
       const label = $("custLabel").value.trim() || `Custom Stack ${state.customStacks.length + 1}`;
       const id = `custom_${Date.now().toString(36)}`;
@@ -1716,6 +2190,7 @@
         video_model: $("custVideoModel").value.trim() || "kling/v4/flash/text-to-video",
         voice_model: $("custVoiceModel").value.trim() || "fal-ai/elevenlabs/tts/eleven-v3",
         hybrid_motion_cards: false,
+        use_keyframes: true,
         mock: false,
         estimated_usd: 1.4,
       };
@@ -1732,10 +2207,11 @@
         video_model: s.video_model,
         voice_model: s.voice_model,
         hybrid_motion_cards: Boolean(s.hybrid_motion_cards),
+        use_keyframes: s.use_keyframes !== false,
         mock: Boolean(s.mock),
       }));
       if (!chosen.length || !state.run) return;
-      setBanner("working", `Rendering ${chosen.length} preview stack(s) side-by-side…`, true);
+      setBanner("working", `Rendering ${chosen.length} preview stack(s) + running Vision Quality Critic…`, true);
       try {
         await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/previews`, {
           method: "POST",
@@ -1747,10 +2223,10 @@
 
     $("btnGoFinal").addEventListener("click", () => setView("final"));
 
-    // Step 5: Render Final Cut
+    // Step 6: Render Final Cut
     $("btnRenderFinal").addEventListener("click", async () => {
       if (!state.run) return;
-      setBanner("working", "Rendering full-quality Final Cut & Media QA…", true);
+      setBanner("working", "Rendering full-quality Final Cut, Whisper Sync QA & Vision Quality Critic…", true);
       try {
         await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/step/final`, {
           method: "POST",

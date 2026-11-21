@@ -286,6 +286,9 @@ class Shot(BaseModel):
     vo_line: str | None = None
     sfx_note: str | None = None
     reference_image: str | None = None
+    keyframe_path: str | None = None
+    keyframe_url: str | None = None
+    keyframe_approved: bool = False
 
 
 class ShotSheet(BaseModel):
@@ -468,6 +471,44 @@ class ChatOptions(BaseModel):
     json_schema: dict[str, Any] | None = None
 
 
+class ShotScore(BaseModel):
+    """Per-shot quality critique produced by the Multimodal Vision Critic."""
+
+    shot_id: str
+    score: float = Field(0.0, ge=0.0, le=10.0)
+    verdict: Literal["keep", "reiterate"] = "keep"
+    critique: str = ""
+    suggested_prompt_fix: str = ""
+
+
+class VideoQualityScorecard(BaseModel):
+    """Multimodal 0-10 quality scorecard combining vision critique, audio sync, and craft."""
+
+    overall_score: float = Field(0.0, ge=0.0, le=10.0)
+    visual_craft: float = Field(0.0, ge=0.0, le=10.0)
+    brand_fidelity: float = Field(0.0, ge=0.0, le=10.0)
+    continuity: float = Field(0.0, ge=0.0, le=10.0)
+    audio_sync: float = Field(0.0, ge=0.0, le=10.0)
+    hook_impact: float = Field(0.0, ge=0.0, le=10.0)
+    summary: str = ""
+    shot_scores: list[ShotScore] = Field(default_factory=list)
+    model: str = ""
+
+
+class HumanScore(BaseModel):
+    """Human-in-the-loop rating and critique captured in Studio UI to guide reiteration."""
+
+    rating_overall: int = Field(ge=1, le=5)
+    hook: int = Field(3, ge=1, le=5)
+    visuals: int = Field(3, ge=1, le=5)
+    audio_sync: int = Field(3, ge=1, le=5)
+    brand_feel: int = Field(3, ge=1, le=5)
+    tags: list[str] = Field(default_factory=list)
+    notes: str = ""
+    target_version_id: str | None = None
+    created_at: datetime = Field(default_factory=_utc_now)
+
+
 class Version(BaseModel):
     """Individual creative/render version supporting A/B Creative Bibles and preview stacks."""
 
@@ -483,6 +524,8 @@ class Version(BaseModel):
     sound_plan: SoundPlan | None = None
     render_manifest: RenderManifest | None = None
     qa_report: QAReport | None = None
+    quality_scorecard: VideoQualityScorecard | None = None
+    human_score: HumanScore | None = None
     warnings: list[str] = Field(default_factory=list)
     error: str | None = None
 
@@ -495,7 +538,7 @@ class RunState(BaseModel):
     created_at: datetime = Field(default_factory=_utc_now)
     updated_at: datetime = Field(default_factory=_utc_now)
     status: Literal["idle", "working", "done", "cancelled", "failed", "interrupted"] = "idle"
-    step: Literal["brand", "concept", "sheet", "previews", "final"] = "brand"
+    step: Literal["brand", "concept", "sheet", "storyboard", "previews", "final"] = "brand"
     selected_concept_id: str | None = None
     winning_version_id: str | None = None
     input: RunInput
@@ -509,6 +552,8 @@ class RunState(BaseModel):
     versions: list[Version] = Field(default_factory=list)
     cost_ledger: CostLedger
     qa_report: QAReport | None = None
+    quality_scorecard: VideoQualityScorecard | None = None
+    human_scores: list[HumanScore] = Field(default_factory=list)
     rubric_evaluations: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     repair_result: dict[str, Any] | None = None
     gate_override: bool = False

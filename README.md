@@ -140,23 +140,46 @@ uv run gtm-videogen serve --host 127.0.0.1 --port 8000
 
 ---
 
+## LaunchCut 6-Step HITL Studio (Web UI)
+
+LaunchCut includes a built-in **6-step Human-in-the-Loop Studio** served directly at `/` by FastAPI:
+
+1. **Brand & Goal** — Enter brand URL, goal, verified facts, duration, aspect ratio, audio mode, and USD budget cap (Live or `$0` Mock mode).
+2. **Concept & Creative Bible** — Review scraped brand colors/claims, choose from 4 orthogonal concept pitches, and edit the Creative Bible inline.
+3. **Script & Shot-by-Shot Sheet** — Edit every shot's beat, duration, engine (`ai_video`, `image_to_video`, `motion_card`, `manim`), camera move, visual prompt, VO line, and on-screen text with instant pure-script-rule validation.
+4. **Visual Storyboard Keyframes (`$0.005/still`)** — Generate low-cost Flux Schnell stills (and `$0` radial-studio typography cards) before spending video credits. Edit prompts and regenerate any single frame; approved frames automatically anchor Kling v4 Image-to-Video (`start_image_url`).
+5. **Previews, Multimodal Quality Scorecard & Reiteration** — Render 1–4 preview stacks side-by-side (`Hybrid Hero + Kinetic Motion Screens`, `Kling v4 Flash I2V`, `Kling v4 Cinema`, or `$0` Pacing Animatic). Every cut is automatically graded `0–10` across **Visual Craft, Brand Fidelity, Continuity, Audio Sync (Whisper), and Hook Impact** by `VisionQualityCritic` (`google/gemini-3.8-flash`), paired with a **1–5 ★ Human Rating** box (persisted into per-brand `CreativeHistory` taste memory) and **1-click Reiterate Weak Shots**.
+6. **Final Production Cut** — Render the winning stack at full quality with AI lead-in freeze trimming, radial-studio kinetic motion cards, LUFS mastering, Whisper audio-sync verification, itemized USD ledger, and master MP4 download.
+
+### Quickstart (Local Browser in 1 Command)
+
+```bash
+git clone https://github.com/kollaakhil/launchcut.git
+cd launchcut
+cp .env.example .env   # Add OPENROUTER_API_KEY and FAL_KEY for live renders (optional for Mock mode)
+./start.sh
+# Open http://127.0.0.1:8000 in your browser
+```
+
+### Docker / 1-Click Cloud Deploy (Railway, Render, Fly.io, Cloud Run)
+
+```bash
+# Run locally with Docker Compose (bundles Python 3.12 + FFmpeg + Tesseract OCR)
+docker compose up --build
+# Open http://localhost:8000
+```
+
+For cloud hosting (Railway, Render, Google Cloud Run, Fly.io), point your service directly at the included [`Dockerfile`](./Dockerfile), set `OPENROUTER_API_KEY` and `FAL_KEY` as environment secrets, and expose `$PORT` (defaults to `8000`).
+
+---
+
 ## Testing
 
 ```bash
 # Run the full offline test suite
 uv run pytest -v
 
-# Run API & CLI tests only
-uv run pytest tests/test_api_cli.py -v
+# Run API, 6-step HITL Studio & Media tests
+uv run pytest tests/test_api_cli.py tests/test_studio_hitl.py tests/test_media_ffmpeg_qa.py -v
 ```
 
----
-
-## Repository Status (Honest Git Note)
-
-This repository is maintained locally (`git init -b main`) at `/home/antigravity/kollaakhil/gtm-videogen-deepagents` with intended GitHub remote target `https://github.com/kollaakhil/GTMTickner.git` (branch `main`). Because `gh repo create` in this environment previously returned `GraphQL: Resource not accessible by integration (createRepository)`, pushing to `https://github.com/kollaakhil/GTMTickner.git` requires valid push credentials:
-
-```bash
-git remote add origin https://github.com/kollaakhil/GTMTickner.git
-git push -u origin main
-```
