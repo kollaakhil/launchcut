@@ -1234,7 +1234,7 @@
       </div>
     </div>
 
-    <div class="status-banner" id="dirBanner" role="status">
+    <div class="status-banner" id="dirBanner" role="status" style="position:sticky; top:62px; z-index:45; box-shadow:0 8px 24px rgba(0,0,0,0.45);">
       <div class="banner-left">
         <div class="spinner" id="dirSpinner" style="display:none;"></div>
         <span id="dirBannerText"></span>
@@ -3323,6 +3323,12 @@
 
     $("dirModeLive").addEventListener("click", () => setDirMockMode(false));
     $("dirModeMock").addEventListener("click", () => setDirMockMode(true));
+    $("dirIdeaInput").addEventListener("input", () => {
+      if (dirState.recipeId) {
+        dirState.recipeId = null;
+        document.querySelectorAll("#dirRecipesGrid .recipe-card").forEach((c) => c.classList.remove("active"));
+      }
+    });
 
     document.querySelectorAll("[data-dir-dur]").forEach((btn) => {
       btn.addEventListener("click", () => {

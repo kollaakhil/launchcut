@@ -814,7 +814,7 @@ async def generate_director_blueprint(
                 system_prompt=sys_prompt,
                 user_prompt=usr_prompt,
                 settings=resolved_settings,
-                max_tokens=5000 if num_acts > 1 else 3000,
+                max_tokens=10000 if num_acts > 1 else 6000,
                 temperature=0.78,
                 cancel=cancel,
             )
@@ -932,7 +932,7 @@ async def refine_director_blueprint(
                 system_prompt=sys_prompt,
                 user_prompt=usr_prompt,
                 settings=resolved_settings,
-                max_tokens=5000 if len(bp.acts) > 1 else 3000,
+                max_tokens=10000 if len(bp.acts) > 1 else 6000,
                 temperature=0.55,
                 cancel=cancel,
             )
