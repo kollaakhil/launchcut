@@ -1361,6 +1361,7 @@
       <div class="cat-bar">
         <div class="cat-chips" id="gallery-cats">
           <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Themes</button>
+          <button class="cat-chip" data-cat="cinema" onclick="filterGallery('cinema', this)">🎬 Cinema &amp; Film</button>
           <button class="cat-chip" data-cat="launch" onclick="filterGallery('launch', this)">🚀 AI &amp; Brand Launch</button>
           <button class="cat-chip" data-cat="saas" onclick="filterGallery('saas', this)">💼 SaaS &amp; Product</button>
           <button class="cat-chip" data-cat="social" onclick="filterGallery('social', this)">📱 9:16 Social</button>
@@ -1500,8 +1501,18 @@
           </div>
 
           <details class="pro-disclosure">
-            <summary>🎚 Audio &amp; Transition Options</summary>
+            <summary>🎚 Cinema Finish, Audio &amp; Transitions</summary>
             <div style="display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0;">
+                <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;">
+                  <input type="checkbox" id="chk-letterbox" />
+                  2.39:1 Cinema Letterbox
+                </label>
+                <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;cursor:pointer;">
+                  <input type="checkbox" id="chk-film-grain" />
+                  35mm Optical Film Grain
+                </label>
+              </div>
               <div>
                 <div class="field-label" style="margin-bottom:6px;">Seam Transitions</div>
                 <div class="option-cards" id="seam-options">
@@ -3237,6 +3248,10 @@
         const capSel = document.getElementById('caption-style-select');
         if (capSel && p.caption_style) capSel.value = p.caption_style;
       }
+      const lbChk = document.getElementById('chk-letterbox');
+      if (lbChk) lbChk.checked = Boolean(p.cinema_letterbox);
+      const fgChk = document.getElementById('chk-film-grain');
+      if (fgChk) fgChk.checked = Boolean(p.film_grain);
 
       const packWrap = document.getElementById('campaign-pack-links');
       if (packWrap) {
@@ -3320,6 +3335,8 @@
             timeline_mode: state.project.timeline_mode || 'sequential_acts',
             enable_captions: Boolean(document.getElementById('chk-captions')?.checked),
             caption_style: document.getElementById('caption-style-select')?.value || 'minimal_bottom',
+            cinema_letterbox: Boolean(document.getElementById('chk-letterbox')?.checked),
+            film_grain: Boolean(document.getElementById('chk-film-grain')?.checked),
             mock: state.mockMode,
           }),
         });
@@ -3354,6 +3371,8 @@
             timeline_mode: state.project.timeline_mode || 'sequential_acts',
             enable_captions: Boolean(document.getElementById('chk-captions')?.checked),
             caption_style: document.getElementById('caption-style-select')?.value || 'minimal_bottom',
+            cinema_letterbox: Boolean(document.getElementById('chk-letterbox')?.checked),
+            film_grain: Boolean(document.getElementById('chk-film-grain')?.checked),
             mock: state.mockMode,
           }),
         });

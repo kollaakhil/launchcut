@@ -862,6 +862,9 @@ async def compile_stitch_project(
     if scraped.get("colors"):
         lighting_spec.color_palette = list(scraped["colors"][:3])
 
+    theme_rec = _find_gallery_recipe(recipe_id)
+    is_cinema_theme = bool(theme_rec and theme_rec.get("category") == "cinema")
+
     project = StitchProject(
         project_id=project_id,
         title=title,
@@ -889,6 +892,9 @@ async def compile_stitch_project(
         brand_tagline=eff_tagline,
         add_brand_outro=bool(eff_brand),
         enable_captions=(recipe_id == "viral_vertical_reel"),
+        cinema_letterbox=is_cinema_theme and aspect_ratio == "16:9",
+        film_grain=is_cinema_theme,
+        seam_transition="micro_dissolve" if is_cinema_theme else "invisible_chain",
         status="draft",
         status_message=f"Drafted {len(scenes)} Scene(s) ({sum(durations)}s). Review & edit on your Pinboard.",
     )
@@ -2463,7 +2469,14 @@ async def stitch_master_cut(
         if rc_mix != 0 or not final_tmp.is_file():
             shutil.copyfile(assembled_mp4, final_tmp)
 
-        # Optional ASS Captions burn-in (bundled open-license fonts, Render-512MB safe)
+        # Optional Cinematic Finishing (35mm Film Grain + 2.39:1 Letterbox) & ASS Captions in one clean pass
+        finish_filters: list[str] = []
+        if project.film_grain:
+            finish_filters.append("noise=alls=7:allf=t+u")
+        if project.cinema_letterbox and width > height:
+            bar_h = max(16, int(round((height - (width / 2.39)) / 2.0)))
+            finish_filters.append(f"drawbox=x=0:y=0:w=iw:h={bar_h}:color=black:t=fill")
+            finish_filters.append(f"drawbox=x=0:y=ih-{bar_h}:w=iw:h={bar_h}:color=black:t=fill")
         if project.enable_captions:
             ass_path = _write_project_captions_ass(
                 project=project,
@@ -2473,35 +2486,38 @@ async def stitch_master_cut(
                 out_path=tmp_dir / "captions.ass",
             )
             if ass_path is not None and ass_path.is_file():
-                cap_tmp = tmp_dir / "master_captioned.mp4"
                 fonts_dir_resolved = resolved.fonts_dir
                 if not fonts_dir_resolved.exists():
                     fonts_dir_resolved = resolve_font_path("Roboto", bold=True).parent
                 esc_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
                 esc_fonts = str(fonts_dir_resolved.resolve()).replace("\\", "/").replace(":", "\\:")
-                rc_cap, _, _ = await run_subprocess(
-                    [
-                        resolved.ffmpeg_bin,
-                        "-y",
-                        "-threads",
-                        str(eff_threads),
-                        "-i",
-                        str(final_tmp),
-                        "-vf",
-                        f"ass='{esc_ass}':fontsdir='{esc_fonts}'",
-                        *_pinned_h264_flags(fps, threads=eff_threads),
-                        "-c:a",
-                        "copy",
-                        "-movflags",
-                        "+faststart",
-                        str(cap_tmp),
-                    ],
-                    timeout_sec=180.0,
-                    cancel=cancel,
-                    check=False,
-                )
-                if rc_cap == 0 and cap_tmp.is_file():
-                    final_tmp = cap_tmp
+                finish_filters.append(f"ass='{esc_ass}':fontsdir='{esc_fonts}'")
+
+        if finish_filters:
+            fin_tmp = tmp_dir / "master_finished.mp4"
+            rc_fin, _, _ = await run_subprocess(
+                [
+                    resolved.ffmpeg_bin,
+                    "-y",
+                    "-threads",
+                    str(eff_threads),
+                    "-i",
+                    str(final_tmp),
+                    "-vf",
+                    ",".join(finish_filters),
+                    *_pinned_h264_flags(fps, threads=eff_threads),
+                    "-c:a",
+                    "copy",
+                    "-movflags",
+                    "+faststart",
+                    str(fin_tmp),
+                ],
+                timeout_sec=180.0,
+                cancel=cancel,
+                check=False,
+            )
+            if rc_fin == 0 and fin_tmp.is_file():
+                final_tmp = fin_tmp
 
         master_out = media_dir / f"master_{uuid4().hex[:6]}.mp4"
         _move_output_atomically(final_tmp, master_out)

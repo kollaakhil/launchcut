@@ -314,6 +314,8 @@ class StitchProject(BaseModel):
     brand_logo_path: str | None = None
 
     # Master Cut & Multi-Format Campaign Pack Telemetry
+    cinema_letterbox: bool = False
+    film_grain: bool = False
     master_video_path: str | None = None
     campaign_pack_paths: dict[str, str] = Field(default_factory=dict)
     status: str = "draft"  # draft | validated | shooting | stitching | done | failed
@@ -882,6 +884,142 @@ STITCH_GALLERY_RECIPES: list[dict[str, Any]] = [
         "lighting_preset": "crisp_daylight",
         "motion_preset": "epic_slowmo",
         "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:customer_quote_proof", "motion_graphic:benchmark_bars"],
+    },
+    {
+        "id": "a24_indie_35mm",
+        "category": "cinema",
+        "badge": "35mm Film · Emotional",
+        "title": "A24 Indie 35mm Manifesto",
+        "lens_tag": "Kodak 500T",
+        "idea": (
+            "Intimate Kodak Vision3 500T 35mm grain, warm tungsten halation, and poetic human "
+            "moments unfolding in a single nostalgic cinematic story."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_a24.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_a24.jpg",
+        "world_preset": "a24_indie_35mm",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "epic_slowmo",
+    },
+    {
+        "id": "imax_70mm_epic",
+        "category": "cinema",
+        "badge": "70mm IMAX · Trailer",
+        "title": "IMAX 70mm Frontier Epic",
+        "lens_tag": "65mm IMAX",
+        "idea": (
+            "Monumental Villeneuve-scale vistas, sweeping atmospheric mist, and slow colossal "
+            "camera push-ins converging onto an iconic centerpiece."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_imax.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_imax.jpg",
+        "world_preset": "imax_70mm_epic",
+        "camera_preset": "fpv_glide",
+        "lighting_preset": "volumetric_gold",
+        "motion_preset": "epic_slowmo",
+    },
+    {
+        "id": "luxury_maison_noir",
+        "category": "cinema",
+        "badge": "Luxury · 120fps Noir",
+        "title": "Luxury Maison Chiaroscuro",
+        "lens_tag": "120fps Macro",
+        "idea": (
+            "Parisian haute-couture chiaroscuro shadow drama with liquid silk, 24k gold "
+            "specular ribbons, and hypnotic 120fps phantom slow-motion."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_noir.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_noir.jpg",
+        "world_preset": "luxury_maison_noir",
+        "camera_preset": "continuous_orbit",
+        "lighting_preset": "volumetric_gold",
+        "motion_preset": "epic_slowmo",
+    },
+    {
+        "id": "blade_runner_anamorphic",
+        "category": "cinema",
+        "badge": "Anamorphic · Neo-Noir",
+        "title": "Neon Rain Anamorphic",
+        "lens_tag": "2.39:1 Flare",
+        "idea": (
+            "Rain-slicked nocturnal streets mirroring cyan and amber light with horizontal "
+            "blue anamorphic lens flares and volumetric steam."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_neon.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_neon.jpg",
+        "world_preset": "blade_runner_anamorphic",
+        "camera_preset": "fpv_glide",
+        "lighting_preset": "volumetric_gold",
+        "motion_preset": "seamless_morph",
+    },
+    {
+        "id": "wes_pastel_symmetry",
+        "category": "cinema",
+        "badge": "35mm · Symmetrical",
+        "title": "Symmetrical Pastel Storybook",
+        "lens_tag": "Dead-Center",
+        "idea": (
+            "Dead-center planimetric symmetry, curated warm pastel production design, and "
+            "crisp mechanical dolly framing with whimsical charm."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_pastel.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_pastel.jpg",
+        "world_preset": "wes_pastel_symmetry",
+        "camera_preset": "overhead_topdown",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "asmr_tactile",
+    },
+    {
+        "id": "kinetic_sports_grit",
+        "category": "cinema",
+        "badge": "16mm · High-Energy",
+        "title": "16mm Kinetic Grit & Sweat",
+        "lens_tag": "16mm Film",
+        "idea": (
+            "Raw 16mm film grain, harsh stadium rim lighting cutting through cold mist, and "
+            "explosive athletic momentum."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_grit.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_grit.jpg",
+        "world_preset": "kinetic_sports_grit",
+        "camera_preset": "fpv_glide",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "epic_slowmo",
+    },
+    {
+        "id": "painted_anime_cinema",
+        "category": "cinema",
+        "badge": "2D Cel · Gouache",
+        "title": "Hand-Painted Anime Cinema",
+        "lens_tag": "Painted Sky",
+        "idea": (
+            "Lush hand-painted gouache clouds, wind sweeping across sunlit emerald grass, "
+            "and nostalgic theatrical 2D animation warmth."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_anime.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_anime.jpg",
+        "world_preset": "painted_anime_cinema",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "seamless_morph",
+    },
+    {
+        "id": "natgeo_natural_world",
+        "category": "cinema",
+        "badge": "8K Earth · Telephoto",
+        "title": "Natural World Documentary",
+        "lens_tag": "Telephoto",
+        "idea": (
+            "Crystalline morning dew, alpine valley fog pierced by golden-hour sunbeams, and "
+            "patient stabilized telephoto Earth cinematography."
+        ),
+        "image_url": "/api/stitch/gallery/cinema_natgeo.jpg",
+        "end_image_url": "/api/stitch/gallery/cinema_natgeo.jpg",
+        "world_preset": "natgeo_natural_world",
+        "camera_preset": "macro_tilt_shift",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "epic_slowmo",
     },
 ]
 

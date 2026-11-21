@@ -59,14 +59,32 @@ async def test_new_agency_templates_in_16x9_and_9x16_portrait(tmp_path: Path) ->
 def test_catalog_18_themes_vo_sync_and_three_format_campaign_pack(tmp_path: Path) -> None:
     client = _make_client(tmp_path)
 
-    # 1. Verify 18 curated themes + 10 motion templates + new thumbnails
+    # 1. Verify 26 curated themes (including 8 pure Cinema themes) + 10 motion templates + new thumbnails
     cat = client.get("/api/stitch/catalog").json()
-    assert len(cat["gallery"]) == 18
+    assert len(cat["gallery"]) == 26
     assert len(cat["motion_templates"]) == 10
-    for thumb in ("theme_apple.jpg", "theme_linear.jpg", "theme_stripe.jpg", "theme_reel.jpg"):
+    for thumb in ("theme_apple.jpg", "theme_linear.jpg", "cinema_a24.jpg", "cinema_imax.jpg"):
         r = client.get(f"/api/stitch/gallery/{thumb}")
         assert r.status_code == 200
         assert len(r.content) > 5_000
+
+    # Verify A24 Indie 35mm cinema theme defaults to pure chained ai_sequence + 2.39:1 letterbox + 35mm grain
+    cin_r = client.post(
+        "/api/stitch/projects",
+        json={
+            "idea": "A watchmaker crafting a brass timepiece at twilight",
+            "world_preset": "a24_indie_35mm",
+            "recipe_id": "a24_indie_35mm",
+            "target_duration_sec": 20,
+            "mock": True,
+        },
+    )
+    assert cin_r.status_code == 200
+    cin_proj = cin_r.json()
+    assert cin_proj["cinema_letterbox"] is True
+    assert cin_proj["film_grain"] is True
+    assert cin_proj["seam_transition"] == "micro_dissolve"
+    assert all(s["kind"] == "ai_sequence" for s in cin_proj["scenes"])
 
     # 2. Create a Stripe Living Architecture project (all motion_graphic hybrid plan)
     create_r = client.post(

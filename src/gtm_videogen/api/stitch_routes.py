@@ -241,6 +241,8 @@ class PatchProjectRequest(BaseModel):
     timeline_mode: TimelineMode | None = None
     enable_captions: bool | None = None
     caption_style: CaptionStyle | None = None
+    cinema_letterbox: bool | None = None
+    film_grain: bool | None = None
     negative_constraints: list[str] | None = None
     scenes: list[dict[str, Any]] | None = None
 
@@ -335,6 +337,8 @@ class StitchMasterRequest(BaseModel):
     timeline_mode: TimelineMode | None = None
     enable_captions: bool | None = None
     caption_style: CaptionStyle | None = None
+    cinema_letterbox: bool | None = None
+    film_grain: bool | None = None
     mock: bool = False
 
 
@@ -518,6 +522,8 @@ async def patch_project(
         "timeline_mode",
         "enable_captions",
         "caption_style",
+        "cinema_letterbox",
+        "film_grain",
         "negative_constraints",
     ):
         val = getattr(payload, field)
@@ -1201,6 +1207,8 @@ async def stitch_master_endpoint(
         "timeline_mode",
         "enable_captions",
         "caption_style",
+        "cinema_letterbox",
+        "film_grain",
     ):
         val = getattr(payload, field)
         if val is not None:
@@ -1258,6 +1266,8 @@ async def export_campaign_pack_endpoint(
         "timeline_mode",
         "enable_captions",
         "caption_style",
+        "cinema_letterbox",
+        "film_grain",
     ):
         val = getattr(payload, field)
         if val is not None:
