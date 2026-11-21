@@ -89,6 +89,11 @@ async def test_director_blueprint_generation_10s_20s_30s_and_refine() -> None:
     assert master10["resolution"] == "4K"
     assert "camera" in master10 and "environment" in master10 and "lighting" in master10
     assert "final_frame" in master10 and len(master10["timeline"]) == 5
+    import json as _json
+
+    compiled_str = bp10.compile_act_model_prompt(0)
+    assert len(compiled_str) <= 2400
+    assert isinstance(_json.loads(compiled_str), dict)
 
     # Refine globally + single beat
     await refine_director_blueprint(

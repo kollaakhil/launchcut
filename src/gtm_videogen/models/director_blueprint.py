@@ -8,6 +8,7 @@ invariants (style, camera, environment, lighting, subject_details, motion) and
 
 from __future__ import annotations
 
+import copy
 import json
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -287,9 +288,59 @@ class DirectorBlueprint(BaseModel):
             "avoid": self.negative_constraints,
         }
 
-    def compile_act_model_prompt(self, act_index: int = 0) -> str:
-        """Compile an Act into a clean, compact JSON string ready for Kling v4 / Veo 3."""
-        return json.dumps(self.to_act_prompt_dict(act_index), ensure_ascii=False, indent=2)
+    def compile_act_model_prompt(self, act_index: int = 0, *, max_chars: int = 2400) -> str:
+        """Compile an Act into valid compact JSON strictly within provider char limits (<= 2400)."""
+        doc = self.to_act_prompt_dict(act_index)
+        compact = json.dumps(doc, ensure_ascii=False, separators=(",", ":"))
+        if len(compact) <= max_chars:
+            return compact
+
+        # Stage 1: drop verbose secondary top-level keys first (keeps style/camera/env/lighting/timeline/final_frame)
+        trimmed = copy.deepcopy(doc)
+        for drop_key in ("avoid", "subject_details", "audio"):
+            trimmed.pop(drop_key, None)
+            compact = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))
+            if len(compact) <= max_chars:
+                return compact
+
+        # Stage 2: drop optional color_palette/atmosphere/per-beat sound when over budget
+        if isinstance(trimmed.get("lighting"), dict):
+            trimmed["lighting"].pop("color_palette", None)
+        if isinstance(trimmed.get("environment"), dict):
+            trimmed["environment"].pop("atmosphere", None)
+        if isinstance(trimmed.get("timeline"), list):
+            for beat in trimmed["timeline"]:
+                if isinstance(beat, dict):
+                    beat.pop("sound", None)
+        compact = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))
+        if len(compact) <= max_chars:
+            return compact
+
+        # Stage 3: proportionally condense beat strings while preserving 100% valid JSON & all 5 beats
+        tl = trimmed.get("timeline")
+        if isinstance(tl, list) and tl:
+            for cap in (150, 120, 95, 75, 60):
+                for beat in tl:
+                    if isinstance(beat, dict):
+                        for k in ("scene", "action", "camera"):
+                            val = beat.get(k)
+                            if isinstance(val, str) and len(val) > cap:
+                                beat[k] = val[: cap - 1].rstrip() + "…"
+                compact = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))
+                if len(compact) <= max_chars:
+                    return compact
+
+        # Stage 4: compact remaining global strings if still slightly over
+        for sec in ("environment", "camera", "lighting", "motion", "final_frame"):
+            obj = trimmed.get(sec)
+            if isinstance(obj, dict):
+                for k, v in list(obj.items()):
+                    if isinstance(v, str) and len(v) > 70:
+                        obj[k] = v[:69].rstrip() + "…"
+                    elif isinstance(v, list) and len(v) > 3:
+                        obj[k] = v[:3]
+        compact = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))
+        return compact if len(compact) <= max_chars else compact[:max_chars]
 
     def compile_keyframe_prompt(self, act_index: int = 0, *, is_end: bool = False) -> str:
         """Compile a static photographic Flux Schnell / Kontext prompt for Act start or end frame."""

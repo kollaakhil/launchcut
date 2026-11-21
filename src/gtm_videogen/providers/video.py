@@ -88,12 +88,12 @@ def build_fal_video_payload(
     if "kling-video/v3" in low_model or "kling-video/o3" in low_model:
         dur_str = str(max(3, min(15, int(round(float(shot.duration_sec))))))
         payload = {
-            "prompt": compiled_prompt,
+            "prompt": compiled_prompt[:2450],
             "duration": dur_str,
             "generate_audio": bool(generate_audio),
         }
         if shot.negative_prompt:
-            payload["negative_prompt"] = shot.negative_prompt
+            payload["negative_prompt"] = shot.negative_prompt[:500]
         has_start = bool(
             shot.engine == "image_to_video" and _is_valid_image_ref(shot.reference_image)
         )
@@ -108,7 +108,7 @@ def build_fal_video_payload(
     if "kling/v4" in low_model:
         dur_int = max(3, min(20, int(round(float(shot.duration_sec)))))
         payload = {
-            "prompt": compiled_prompt,
+            "prompt": compiled_prompt[:2450],
             "duration": dur_int,
             "resolution": "720p",
         }
