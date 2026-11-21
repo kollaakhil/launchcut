@@ -44,6 +44,7 @@ from gtm_videogen.core.http_client import ResilientHttpClient
 from gtm_videogen.core.job_registry import CancellationToken
 from gtm_videogen.core.media_store import MediaStore
 from gtm_videogen.media._subprocess import aspect_to_dimensions, probe_media, run_subprocess
+from gtm_videogen.media.audio_sync import detect_audio_beats
 from gtm_videogen.media.captions import resolve_font_path
 from gtm_videogen.media.ffmpeg_stitcher import _move_output_atomically, _pinned_h264_flags
 from gtm_videogen.media.kinetic_motion import render_kinetic_card_mp4
@@ -80,6 +81,7 @@ from gtm_videogen.models.stitch_project import (
     SceneOverlaySpec,
     StitchAspect,
     StitchBeat,
+    StitchElement,
     StitchProject,
     StitchScene,
     StitchTake,
@@ -89,6 +91,7 @@ from gtm_videogen.models.stitch_project import (
 from gtm_videogen.providers.audio import AudioProvider
 from gtm_videogen.providers.scraper import BrandScraper
 from gtm_videogen.providers.transcription import transcribe_video_words
+from gtm_videogen.providers.url_capture import capture_url_viewport_png, download_public_image
 from gtm_videogen.providers.video import VideoProvider
 
 
@@ -474,13 +477,63 @@ def _default_graphic_spec(
     scraped: dict[str, Any],
     world_id: str,
 ) -> MotionGraphicSpec:
-    """Build a brand-tailored MotionGraphicSpec for any of the 6 launch templates."""
-    theme_mode: MotionThemeMode = "warm_editorial" if world_id == "anthropic_editorial" else "dark_glass"
+    """Build a brand-tailored MotionGraphicSpec for any of the 10 launch templates."""
+    if world_id == "stripe_living_flow":
+        theme_mode: MotionThemeMode = "clean_light"
+    elif world_id in ("anthropic_editorial", "notion_playful", "airbnb_human_story"):
+        theme_mode = "warm_editorial"
+    else:
+        theme_mode = "dark_glass"
     hero = brand or "LaunchCut"
     tagline = str(scraped.get("tagline") or "").strip()
     facts = [str(f).strip() for f in (scraped.get("facts") or []) if str(f).strip()]
     clean_idea = idea.strip()
 
+    if template_id == "device_showcase_25d":
+        return MotionGraphicSpec(
+            template_id="device_showcase_25d",
+            theme_mode=theme_mode,
+            eyebrow=f"{hero.upper()} LIVE TOUR",
+            headline=tagline[:60] or f"Inside {hero}",
+            subheadline=clean_idea[:90],
+            response_lines=[
+                facts[0][:44] if len(facts) > 0 else f"Live {hero} interface in 2.5D motion",
+                facts[1][:44] if len(facts) > 1 else "Smooth cursor-tracked focus zoom",
+                facts[2][:44] if len(facts) > 2 else "Built for instant product clarity",
+            ],
+        )
+    if template_id == "node_flow_diagram":
+        return MotionGraphicSpec(
+            template_id="node_flow_diagram",
+            theme_mode=theme_mode,
+            eyebrow=f"{hero.upper()} ARCHITECTURE",
+            headline=f"How {hero} works end-to-end",
+            subheadline=tagline[:86] or clean_idea[:86],
+            metrics=[
+                {"label": f"{hero} Input"},
+                {"label": facts[0][:24] if facts else "Automated Engine"},
+                {"label": "Production Output"},
+            ],
+        )
+    if template_id == "customer_quote_proof":
+        return MotionGraphicSpec(
+            template_id="customer_quote_proof",
+            theme_mode=theme_mode,
+            eyebrow="VERIFIED CUSTOMER PROOF",
+            headline=f"{hero} transformed how our team ships.",
+            prompt_text=facts[0][:100] if facts else f"Switching to {hero} cut our turnaround time from weeks to minutes.",
+            subheadline=f"Head of Product · {hero} Customer",
+            metrics=[{"display": "+73% Faster"}],
+        )
+    if template_id == "kinetic_hook_reel":
+        hook_words = " ".join((clean_idea or f"Meet {hero} built for speed").split()[:6]).upper()
+        return MotionGraphicSpec(
+            template_id="kinetic_hook_reel",
+            theme_mode=theme_mode,
+            eyebrow=hero.upper(),
+            headline=hook_words[:56],
+            subheadline=tagline[:42] or f"Discover {hero}",
+        )
     if template_id == "kinetic_headline":
         return MotionGraphicSpec(
             template_id="kinetic_headline",
@@ -773,6 +826,7 @@ async def compile_stitch_project(
     brand_tagline: str | None = None,
     registry_store: ModelRegistryStore | None = None,
     settings: Settings | None = None,
+    media_dir: Path | None = None,
     mock: bool = False,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
@@ -803,8 +857,13 @@ async def compile_stitch_project(
         scraped=scraped,
     )
 
+    project_id = f"st_{uuid4().hex[:10]}"
+    lighting_spec = LightingSpec.model_validate(lighting_data["lighting"])
+    if scraped.get("colors"):
+        lighting_spec.color_palette = list(scraped["colors"][:3])
+
     project = StitchProject(
-        project_id=f"st_{uuid4().hex[:10]}",
+        project_id=project_id,
         title=title,
         idea=idea.strip() or main_subject,
         source_url=(source_url or "").strip() or None,
@@ -822,16 +881,58 @@ async def compile_stitch_project(
         main_subject=main_subject,
         camera=CameraSpec.model_validate(camera_data["camera"]),
         environment=EnvironmentSpec.model_validate(world_data["environment"]),
-        lighting=LightingSpec.model_validate(lighting_data["lighting"]),
+        lighting=lighting_spec,
         subject_details=SubjectDetailsSpec.model_validate(world_data.get("subject_details") or {}),
         motion=MotionSpec.model_validate(motion_data["motion"]),
         scenes=scenes,
         brand_name=eff_brand,
         brand_tagline=eff_tagline,
         add_brand_outro=bool(eff_brand),
+        enable_captions=(recipe_id == "viral_vertical_reel"),
         status="draft",
         status_message=f"Drafted {len(scenes)} Scene(s) ({sum(durations)}s). Review & edit on your Pinboard.",
     )
+
+    # Auto-Brand-Kit Injection: capture live URL viewport + scraped hero photo into @Element1 & 2.5D UI scenes
+    if source_url and source_url.strip():
+        kit_dir = media_dir if media_dir is not None else (resolved.data_dir / "stitch" / project_id / "media")
+        kit_parts: list[str] = []
+        if scraped.get("colors"):
+            kit_parts.append("Palette")
+        if eff_brand:
+            kit_parts.append("Outro")
+        if not mock:
+            kit_dir.mkdir(parents=True, exist_ok=True)
+            cap_task = capture_url_viewport_png(source_url, kit_dir / "brand_viewport.png", cancel=cancel)
+            photos = list(scraped.get("photos") or [])
+            hero_task = (
+                download_public_image(photos[0], kit_dir / "brand_hero.jpg", cancel=cancel)
+                if photos
+                else asyncio.sleep(0, result=None)
+            )
+            viewport_path, hero_path = await asyncio.gather(cap_task, hero_task)
+            ui_img = viewport_path or hero_path
+            if ui_img and Path(ui_img).is_file():
+                kit_parts.append("Live UI")
+                for sc in project.scenes:
+                    if sc.graphic_spec and sc.graphic_spec.template_id in ("device_showcase_25d", "prompt_ui_demo"):
+                        sc.graphic_spec.screenshot_path = str(ui_img)
+            el_img = hero_path or viewport_path
+            if el_img and Path(el_img).is_file():
+                project.elements = [
+                    StitchElement(
+                        slot=1,
+                        tag="@Element1",
+                        role="product",
+                        label=(eff_brand or "Brand Hero")[:48],
+                        image_path=str(el_img),
+                        filename=Path(el_img).name,
+                    )
+                ]
+                kit_parts.append("@Element1")
+        if kit_parts:
+            project.brand_kit_loaded = True
+            project.brand_kit_summary = " · ".join(kit_parts)
 
     # Upgrade with live OpenRouter LLM choreography when live & API key configured
     if not mock and resolved.openrouter_api_key.strip():
@@ -2405,6 +2506,7 @@ async def stitch_master_cut(
         master_out = media_dir / f"master_{uuid4().hex[:6]}.mp4"
         _move_output_atomically(final_tmp, master_out)
         project.master_video_path = str(master_out)
+        project.campaign_pack_paths[project.aspect_ratio] = str(master_out)
         project.status = "done"
         project.status_message = (
             f"Master Cut ready ({len(norm_paths)} segment(s), {project.seam_transition.replace('_', ' ')})."
@@ -2414,9 +2516,137 @@ async def stitch_master_cut(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+async def sync_vo_pacing(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    settings: Settings | None = None,
+    mock: bool = False,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Measure per-scene VO duration (ElevenLabs or 2.6 wps cadence) and snap motion_graphic durations."""
+    resolved = settings or get_settings()
+    media_dir.mkdir(parents=True, exist_ok=True)
+    synced = 0
+    for sc in project.scenes:
+        line = (sc.vo_line or "").strip()
+        if not line:
+            continue
+        words_cnt = max(1, len(line.split()))
+        est_dur = max(2.2, words_cnt / 2.6)
+        if not mock and resolved.fal_key.strip():
+            try:
+                ap = AudioProvider(settings=resolved, media_store=MediaStore(media_dir / "store"))
+                rendered = await ap.generate_voice(
+                    VoiceCue(shot_id=f"{sc.scene_id}_vo", text=line[:240], voice=project.voice_name or "Rachel"),
+                    cancel=cancel,
+                )
+                if Path(rendered.path).is_file():
+                    vo_p = media_dir / f"{sc.scene_id}_vo.mp3"
+                    shutil.copyfile(rendered.path, vo_p)
+                    sc.vo_audio_path = str(vo_p)
+                    probe = await probe_media(vo_p, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+                    est_dur = max(2.0, float(probe.duration_sec or est_dur))
+                    project.actual_usd = round(project.actual_usd + float(rendered.usd), 4)
+            except Exception:
+                pass
+        if sc.kind in ("motion_graphic", "kinetic_ui"):
+            sc.duration_sec = max(3, min(20, int(math.ceil(est_dur + 0.8))))
+        synced += 1
+    project.target_duration_sec = project.total_duration_sec()
+    project.status_message = f"VO-synced pacing across {synced} scene(s) ({project.total_duration_sec()}s total)."
+    return project
+
+
+async def export_campaign_pack(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    settings: Settings | None = None,
+    mock: bool = False,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Export 3-format Campaign Pack (16:9, 9:16, 1:1) with native reflowed motion graphics at $0 AI cost."""
+    resolved = settings or get_settings()
+    media_dir.mkdir(parents=True, exist_ok=True)
+    orig_aspect = project.aspect_ratio
+    orig_master = project.master_video_path
+    orig_takes = [(sc.scene_id, list(sc.takes), sc.winning_take_id) for sc in project.scenes]
+    palette = project.lighting.color_palette or ["#191512", "#E54D3A", "#F6E7D4"]
+    accent_rgb = _hex_to_rgb(palette[1] if len(palette) > 1 else "#E54D3A", (229, 77, 58))
+
+    pack_paths: dict[str, str] = {}
+    try:
+        for aspect in ("16:9", "9:16", "1:1"):
+            project.aspect_ratio = aspect  # type: ignore[assignment]
+            w, h = aspect_to_dimensions(aspect)
+            # Natively re-render $0 motion_graphic scenes at each aspect ratio so text/bento/devices never crop
+            for idx, sc in enumerate(project.scenes):
+                if sc.kind == "motion_graphic" or (sc.kind == "kinetic_ui" and sc.graphic_spec is not None):
+                    gspec = sc.graphic_spec or _default_graphic_spec(
+                        "prompt_ui_demo",
+                        brand=project.brand_name or project.title,
+                        idea=project.idea,
+                        scraped={},
+                        world_id=project.world_preset,
+                    )
+                    tag = aspect.replace(":", "x")
+                    out_clip = media_dir / f"{sc.scene_id}_pack_{tag}.mp4"
+                    await render_motion_template_mp4(
+                        spec=gspec,
+                        output_path=out_clip,
+                        width=w,
+                        height=h,
+                        fps=24,
+                        duration_sec=float(sc.duration_sec),
+                        brand_name=project.brand_name or project.title,
+                        accent_rgb=accent_rgb,
+                        ffmpeg_bin=resolved.ffmpeg_bin,
+                        ffprobe_bin=resolved.ffprobe_bin,
+                        fonts_dir=resolved.fonts_dir,
+                        cancel=cancel,
+                    )
+                    sc.takes = [
+                        StitchTake(
+                            take_id=1,
+                            engine_id=f"motion_graphic:{gspec.template_id}",
+                            engine_label=f"Campaign {aspect} ($0)",
+                            clip_path=str(out_clip),
+                            duration_sec=float(sc.duration_sec),
+                            usd=0.0,
+                        )
+                    ]
+                    sc.winning_take_id = 1
+                else:
+                    # Restore original takes for AI / user clips (reframed automatically by stitch_master_cut at $0)
+                    _, saved_takes, saved_win = orig_takes[idx]
+                    sc.takes = list(saved_takes)
+                    sc.winning_take_id = saved_win
+
+            await stitch_master_cut(project, media_dir, settings=resolved, mock=mock, cancel=cancel)
+            if project.master_video_path:
+                # Also probe beats on the primary 16:9 master for telemetry
+                if aspect == "16:9":
+                    await detect_audio_beats(project.master_video_path, ffmpeg_bin=resolved.ffmpeg_bin, cancel=cancel)
+                pack_paths[aspect] = project.master_video_path
+    finally:
+        # Restore original aspect ratio, takes, and primary master
+        project.aspect_ratio = orig_aspect
+        for idx, sc in enumerate(project.scenes):
+            _, saved_takes, saved_win = orig_takes[idx]
+            sc.takes = list(saved_takes)
+            sc.winning_take_id = saved_win
+        project.campaign_pack_paths = pack_paths
+        project.master_video_path = pack_paths.get(orig_aspect) or orig_master
+        project.status = "done"
+        project.status_message = "3-Format Campaign Pack ready (16:9 · 9:16 · 1:1)!"
+    return project
+
+
 __all__ = [
     "StitchProjectStore",
     "compile_stitch_project",
+    "export_campaign_pack",
     "generate_all_keyframes",
     "generate_scene_keyframe",
     "pitch_three_concepts",
@@ -2425,4 +2655,5 @@ __all__ = [
     "render_single_scene_take",
     "scrape_optional_url",
     "stitch_master_cut",
+    "sync_vo_pacing",
 ]

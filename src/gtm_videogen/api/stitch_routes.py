@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from gtm_videogen.agents.stitch_engine import (
     StitchProjectStore,
     compile_stitch_project,
+    export_campaign_pack,
     generate_all_keyframes,
     generate_scene_keyframe,
     pitch_three_concepts,
@@ -24,6 +25,7 @@ from gtm_videogen.agents.stitch_engine import (
     render_all_scenes,
     render_single_scene_take,
     stitch_master_cut,
+    sync_vo_pacing,
 )
 from gtm_videogen.api.routes import ServicesDep, _iter_file_range, _parse_byte_range
 from gtm_videogen.media._subprocess import probe_media
@@ -152,6 +154,9 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
     data["master_video_url"] = _murl(project.master_video_path)
     data["brand_logo_url"] = _murl(project.brand_logo_path)
     data["aroll_video_url"] = _murl(project.aroll_clip_path)
+    data["campaign_pack_urls"] = {
+        k: u for k, p in (project.campaign_pack_paths or {}).items() if (u := _murl(p))
+    }
     data["total_duration_sec"] = project.total_duration_sec()
 
     est_usd = 0.0
@@ -1211,6 +1216,61 @@ async def stitch_master_endpoint(
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/sync-vo")
+async def sync_vo_endpoint(
+    project_id: str, payload: ArollActionRequest, services: ServicesDep
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    await sync_vo_pacing(
+        project,
+        store.media_dir(project_id),
+        settings=services.settings,
+        mock=payload.mock,
+    )
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/campaign-pack")
+async def export_campaign_pack_endpoint(
+    project_id: str, payload: StitchMasterRequest, services: ServicesDep
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    for field in (
+        "audio_mode",
+        "seam_transition",
+        "voice_name",
+        "add_brand_outro",
+        "brand_name",
+        "brand_tagline",
+        "timeline_mode",
+        "enable_captions",
+        "caption_style",
+    ):
+        val = getattr(payload, field)
+        if val is not None:
+            setattr(project, field, val)
+    try:
+        await export_campaign_pack(
+            project,
+            store.media_dir(project_id),
+            settings=services.settings,
+            mock=payload.mock,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     store.save(project)
     return _serialize_project(project, reg)
 

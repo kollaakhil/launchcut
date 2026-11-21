@@ -93,8 +93,8 @@ def test_root_serves_stitch_ui_and_gallery_photos(tmp_path: Path) -> None:
     cat = client.get("/api/stitch/catalog")
     assert cat.status_code == 200
     body = cat.json()
-    assert len(body["gallery"]) >= 10
-    assert len(body["motion_templates"]) == 6
+    assert len(body["gallery"]) >= 18
+    assert len(body["motion_templates"]) >= 10
     assert len(body["video_models"]) >= 6
 
     img_r = client.get("/api/stitch/gallery/jar_open.jpg")

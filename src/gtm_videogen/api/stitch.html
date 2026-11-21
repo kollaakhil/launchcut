@@ -1361,11 +1361,13 @@
       <div class="cat-bar">
         <div class="cat-chips" id="gallery-cats">
           <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Themes</button>
-          <button class="cat-chip" data-cat="launch" onclick="filterGallery('launch', this)">🚀 Tech &amp; AI Launch</button>
-          <button class="cat-chip" data-cat="diorama" onclick="filterGallery('diorama', this)">Miniature Diorama</button>
-          <button class="cat-chip" data-cat="hardware" onclick="filterGallery('hardware', this)">Hardware &amp; Brand</button>
+          <button class="cat-chip" data-cat="launch" onclick="filterGallery('launch', this)">🚀 AI &amp; Brand Launch</button>
+          <button class="cat-chip" data-cat="saas" onclick="filterGallery('saas', this)">💼 SaaS &amp; Product</button>
+          <button class="cat-chip" data-cat="social" onclick="filterGallery('social', this)">📱 9:16 Social</button>
+          <button class="cat-chip" data-cat="hardware" onclick="filterGallery('hardware', this)">Hardware</button>
+          <button class="cat-chip" data-cat="diorama" onclick="filterGallery('diorama', this)">Diorama</button>
           <button class="cat-chip" data-cat="craft" onclick="filterGallery('craft', this)">Paper &amp; Craft</button>
-          <button class="cat-chip" data-cat="asmr" onclick="filterGallery('asmr', this)">ASMR Macro</button>
+          <button class="cat-chip" data-cat="asmr" onclick="filterGallery('asmr', this)">ASMR</button>
         </div>
         <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Pick a theme to style your brand/idea</span>
       </div>
@@ -1539,6 +1541,8 @@
           </details>
 
           <button class="spark-cta" id="btn-stitch-master" style="width:100%;" onclick="stitchMasterCutUI()">⚡ Stitch Master Cut (&lt;5s)</button>
+          <button class="pill-btn" id="btn-campaign-pack" style="width:100%;justify-content:center;" onclick="exportCampaignPackUI()">📦 Export 3-Format Campaign Pack (16:9 · 9:16 · 1:1)</button>
+          <div id="campaign-pack-links" style="display:none;gap:8px;flex-wrap:wrap;"></div>
         </div>
       </div>
     </section>
@@ -1979,6 +1983,9 @@
       document.getElementById('preset-camera').value = rec.camera_preset;
       document.getElementById('preset-lighting').value = rec.lighting_preset;
       document.getElementById('preset-motion').value = rec.motion_preset;
+      if (rec.default_aspect) {
+        document.getElementById('spark-aspect').value = rec.default_aspect;
+      }
       renderGallery();
       const hasInput = Boolean(
         document.getElementById('spark-idea').value.trim() ||
@@ -2160,6 +2167,7 @@
       document.getElementById('board-meta-pills').innerHTML = `
         <span class="tag-pill">${p.scenes.length} Scene(s) · ${p.total_duration_sec}s</span>
         <span class="tag-pill">${esc(p.aspect_ratio)}</span>
+        ${p.brand_kit_loaded ? `<span class="tag-pill ok">✓ Brand Kit (${esc(p.brand_kit_summary || 'Loaded')})</span>` : ''}
         ${p.timeline_mode === 'aroll_with_cutaways' ? '<span class="tag-pill coral">📹 Continuous Founder A-Roll</span>' : ''}
         <span class="tag-pill">${esc(activeM.label || p.video_model_id)} · est. $${Number(p.estimated_usd || 0).toFixed(2)}</span>
         <span class="tag-pill ${gate.valid ? 'ok' : 'warn'}">${gate.valid ? '✓ Script Gate Verified' : `⚠ ${gate.total_warnings} Script Gate Warning(s)`}</span>
@@ -3229,6 +3237,23 @@
         const capSel = document.getElementById('caption-style-select');
         if (capSel && p.caption_style) capSel.value = p.caption_style;
       }
+
+      const packWrap = document.getElementById('campaign-pack-links');
+      if (packWrap) {
+        const urls = p.campaign_pack_urls || {};
+        const entries = Object.entries(urls);
+        if (entries.length) {
+          packWrap.style.display = 'flex';
+          const lblMap = { '16:9': '⬇ 16:9 YouTube / X', '9:16': '⬇ 9:16 Reels / Shorts', '1:1': '⬇ 1:1 LinkedIn' };
+          const slug = p.title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          packWrap.innerHTML = entries.map(([asp, url]) =>
+            `<a class="pill-btn sage" href="${esc(url)}" download="${esc(slug)}_${asp.replace(':', 'x')}.mp4" style="text-decoration:none;flex:1;justify-content:center;">${esc(lblMap[asp] || asp)}</a>`
+          ).join('');
+        } else {
+          packWrap.style.display = 'none';
+          packWrap.innerHTML = '';
+        }
+      }
     }
 
     function selectSeam(seam) {
@@ -3303,6 +3328,40 @@
         finishProgress(proj.status_message || 'Master Cut ready!', 'success');
       } catch (err) {
         finishProgress(`Stitch failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
+    async function exportCampaignPackUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-campaign-pack');
+      setButtonLoading(btn, true, 'Building 3-Format Pack…');
+      startProgress({
+        message: 'Exporting 3-Format Campaign Pack (16:9 · 9:16 · 1:1) with native mobile reflow ($0 AI cost)…',
+        steps: ['16:9 Cinema Master', '9:16 Vertical Reflow', '1:1 Square Reflow'],
+        avgDurationSec: state.mockMode ? 6 : 16,
+      });
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/campaign-pack`, {
+          method: 'POST',
+          body: JSON.stringify({
+            audio_mode: state.project.audio_mode,
+            seam_transition: state.project.seam_transition,
+            add_brand_outro: document.getElementById('chk-brand-outro').checked,
+            brand_name: document.getElementById('outro-brand-name').value.trim() || null,
+            brand_tagline: document.getElementById('outro-brand-tagline').value.trim() || null,
+            timeline_mode: state.project.timeline_mode || 'sequential_acts',
+            enable_captions: Boolean(document.getElementById('chk-captions')?.checked),
+            caption_style: document.getElementById('caption-style-select')?.value || 'minimal_bottom',
+            mock: state.mockMode,
+          }),
+        });
+        setProject(proj);
+        renderScreeningRoom();
+        finishProgress(proj.status_message || '3-Format Campaign Pack ready!', 'success');
+      } catch (err) {
+        finishProgress(`Campaign Pack failed: ${err.message}`, 'error');
       } finally {
         setButtonLoading(btn, false);
       }

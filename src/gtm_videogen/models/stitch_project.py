@@ -41,6 +41,10 @@ MotionTemplateId = Literal[
     "bento_feature_grid",
     "terminal_code",
     "split_comparison",
+    "device_showcase_25d",
+    "node_flow_diagram",
+    "customer_quote_proof",
+    "kinetic_hook_reel",
 ]
 MotionThemeMode = Literal["dark_glass", "warm_editorial", "clean_light"]
 UserClipFraming = Literal["cover_crop", "contain_blur", "device_bezel"]
@@ -56,9 +60,19 @@ MOTION_TEMPLATE_CATALOG: list[dict[str, str]] = [
         "tagline": "Anthropic-style warm masked typography with spring reveal",
     },
     {
+        "id": "device_showcase_25d",
+        "label": "2.5D Screen-Studio UI Zoom",
+        "tagline": "3D-tilted MacBook/iPhone product walkthrough with smooth cursor zoom",
+    },
+    {
         "id": "prompt_ui_demo",
         "label": "Live Prompt & UI Demo",
         "tagline": "OpenAI/Gemini-style typing prompt bar, cursor click & response card",
+    },
+    {
+        "id": "node_flow_diagram",
+        "label": "Living Architecture Node Flow",
+        "tagline": "Stripe-style animated connected pipeline nodes with glowing data packets",
     },
     {
         "id": "benchmark_bars",
@@ -68,7 +82,7 @@ MOTION_TEMPLATE_CATALOG: list[dict[str, str]] = [
     {
         "id": "bento_feature_grid",
         "label": "Bento Feature Grid",
-        "tagline": "3 glassmorphic capability cards staggering in with spotlight sweep",
+        "tagline": "3 glassmorphic capability cards staggering in (auto-stacks in 9:16)",
     },
     {
         "id": "terminal_code",
@@ -78,7 +92,17 @@ MOTION_TEMPLATE_CATALOG: list[dict[str, str]] = [
     {
         "id": "split_comparison",
         "label": "Before vs. After Split",
-        "tagline": "Crisp split-screen comparison wipe from legacy workflow to your brand",
+        "tagline": "Crisp split-screen comparison wipe (auto-stacks in 9:16)",
+    },
+    {
+        "id": "customer_quote_proof",
+        "label": "Customer Quote & ROI Proof",
+        "tagline": "Editorial testimonial card with attribution & animated ROI metric badge",
+    },
+    {
+        "id": "kinetic_hook_reel",
+        "label": "Pattern-Interrupt Social Hook",
+        "tagline": "High-contrast 1.5s word slam reveal engineered for Reels, Shorts & TikTok",
     },
 ]
 
@@ -191,6 +215,7 @@ class StitchScene(BaseModel):
     camera_spec: str = "90mm macro tilt-shift · smooth continuous push-in"
     colors: list[str] = Field(default_factory=lambda: ["#141210", "#E8A838", "#F4E8D1"])
     vo_line: str = ""
+    vo_audio_path: str | None = None
     end_frame: str = "Locked-off hero composition with balanced negative space"
     beats: list[StitchBeat] = Field(default_factory=list)
 
@@ -234,6 +259,8 @@ class StitchProject(BaseModel):
     source_url: str | None = None
     scraped_context: str = ""
     recipe_id: str | None = None
+    brand_kit_loaded: bool = False
+    brand_kit_summary: str = ""
 
     aspect_ratio: StitchAspect = "16:9"
     target_duration_sec: int = 15
@@ -286,8 +313,9 @@ class StitchProject(BaseModel):
     brand_tagline: str | None = None
     brand_logo_path: str | None = None
 
-    # Master Cut Telemetry
+    # Master Cut & Multi-Format Campaign Pack Telemetry
     master_video_path: str | None = None
+    campaign_pack_paths: dict[str, str] = Field(default_factory=dict)
     status: str = "draft"  # draft | validated | shooting | stitching | done | failed
     status_message: str = "Ready to review on your Pinboard."
     error: str | None = None
@@ -709,6 +737,151 @@ STITCH_GALLERY_RECIPES: list[dict[str, Any]] = [
         "lighting_preset": "golden_hour",
         "motion_preset": "seamless_morph",
         "hybrid_plan": ["user_clip", "motion_graphic:terminal_code", "ai_sequence"],
+    },
+    {
+        "id": "apple_titanium",
+        "category": "hardware",
+        "badge": "Keynote · Flagship",
+        "title": "Apple Titanium Keynote",
+        "lens_tag": "Obsidian Rim",
+        "idea": (
+            "Pitch-black cyclorama with razor-thin rim lighting reveals your flagship product, "
+            "gliding into a 2.5D hardware showcase and bold centered keynote performance stats."
+        ),
+        "image_url": "/api/stitch/gallery/theme_apple.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_apple.jpg",
+        "world_preset": "apple_titanium",
+        "camera_preset": "continuous_orbit",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "epic_slowmo",
+        "hybrid_plan": ["ai_sequence", "motion_graphic:device_showcase_25d", "motion_graphic:bento_feature_grid"],
+    },
+    {
+        "id": "linear_dark_craft",
+        "category": "saas",
+        "badge": "Dark SaaS · DevTools",
+        "title": "Linear / Vercel Dark Craft",
+        "lens_tag": "2.5D UI + CLI",
+        "idea": (
+            "Obsidian grid typography snaps into a 2.5D perspective software walkthrough with "
+            "indigo edge glow and a live terminal SDK deployment reveal."
+        ),
+        "image_url": "/api/stitch/gallery/theme_linear.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_linear.jpg",
+        "world_preset": "linear_dark_craft",
+        "camera_preset": "macro_tilt_shift",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:device_showcase_25d", "motion_graphic:terminal_code"],
+    },
+    {
+        "id": "stripe_living_flow",
+        "category": "saas",
+        "badge": "Fintech · Architecture",
+        "title": "Stripe Living Architecture",
+        "lens_tag": "Node Flow",
+        "idea": (
+            "Crisp light editorial typography introduces your platform, flowing into an animated "
+            "living node-and-connector architecture diagram and rolling benchmark proof."
+        ),
+        "image_url": "/api/stitch/gallery/theme_stripe.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_stripe.jpg",
+        "world_preset": "stripe_living_flow",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:node_flow_diagram", "motion_graphic:benchmark_bars"],
+    },
+    {
+        "id": "notion_playful",
+        "category": "saas",
+        "badge": "Editorial · Productivity",
+        "title": "Notion / Figma Editorial",
+        "lens_tag": "Warm Paper UI",
+        "idea": (
+            "Warm stationery-paper editorial typography flows into a friendly live prompt tour "
+            "and a crisp before-and-after workflow comparison."
+        ),
+        "image_url": "/api/stitch/gallery/theme_notion.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_notion.jpg",
+        "world_preset": "notion_playful",
+        "camera_preset": "overhead_topdown",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:prompt_ui_demo", "motion_graphic:split_comparison"],
+    },
+    {
+        "id": "screen_studio_tour",
+        "category": "saas",
+        "badge": "Product Hunt · 2.5D",
+        "title": "Screen-Studio Product Tour",
+        "lens_tag": "2.5D Zoom",
+        "idea": (
+            "No-fluff product tour framing your live website and app inside a 2.5D tilted display "
+            "with cursor-tracked camera zooms and a crisp capability bento grid."
+        ),
+        "image_url": "/api/stitch/gallery/theme_screenstudio.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_screenstudio.jpg",
+        "world_preset": "screen_studio_tour",
+        "camera_preset": "macro_tilt_shift",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["motion_graphic:device_showcase_25d", "motion_graphic:prompt_ui_demo", "motion_graphic:bento_feature_grid"],
+    },
+    {
+        "id": "airbnb_human_story",
+        "category": "launch",
+        "badge": "Brand Film · 35mm",
+        "title": "Airbnb Warm Human Story",
+        "lens_tag": "35mm + Proof",
+        "idea": (
+            "Sunlit 35mm human storytelling bridges naturally into your live product experience "
+            "and closes with a warm customer quote and brand outro."
+        ),
+        "image_url": "/api/stitch/gallery/theme_airbnb.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_airbnb.jpg",
+        "world_preset": "airbnb_human_story",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "epic_slowmo",
+        "hybrid_plan": ["ai_sequence", "motion_graphic:device_showcase_25d", "motion_graphic:customer_quote_proof"],
+    },
+    {
+        "id": "viral_vertical_reel",
+        "category": "social",
+        "badge": "9:16 Social · Hook",
+        "title": "9:16 Hook-First Growth Reel",
+        "lens_tag": "9:16 Vertical",
+        "default_aspect": "9:16",
+        "idea": (
+            "Scroll-stopping 1.5-second vertical kinetic hook slams into a mobile iPhone UI "
+            "showcase and high-contrast benchmark proof built for Reels, TikTok, and Shorts."
+        ),
+        "image_url": "/api/stitch/gallery/theme_reel.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_reel.jpg",
+        "world_preset": "viral_vertical_reel",
+        "camera_preset": "fpv_glide",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "asmr_tactile",
+        "hybrid_plan": ["motion_graphic:kinetic_hook_reel", "motion_graphic:device_showcase_25d", "motion_graphic:benchmark_bars"],
+    },
+    {
+        "id": "enterprise_case_study",
+        "category": "saas",
+        "badge": "Enterprise GTM · ROI",
+        "title": "Customer Proof & ROI Cut",
+        "lens_tag": "Quote + Chart",
+        "idea": (
+            "Authoritative executive metric hook leading into a verified customer testimonial "
+            "quote card and animated benchmark bars proving measurable ROI."
+        ),
+        "image_url": "/api/stitch/gallery/theme_casestudy.jpg",
+        "end_image_url": "/api/stitch/gallery/theme_casestudy.jpg",
+        "world_preset": "enterprise_case_study",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "epic_slowmo",
+        "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:customer_quote_proof", "motion_graphic:benchmark_bars"],
     },
 ]
 

@@ -213,6 +213,30 @@ def _synthesize_ui_foley_wav(duration_sec: float, out_path: Path) -> Path:
     return out_path
 
 
+def _find_perspective_coeffs(
+    src_quad: list[tuple[float, float]],
+    dst_quad: list[tuple[float, float]],
+) -> tuple[float, ...]:
+    """Pure-Python 8x8 Gaussian elimination for PIL.Image.Transform.PERSPECTIVE (zero NumPy)."""
+    matrix: list[list[float]] = []
+    for (sx, sy), (dx, dy) in zip(src_quad, dst_quad, strict=True):
+        matrix.append([dx, dy, 1.0, 0.0, 0.0, 0.0, -sx * dx, -sx * dy, sx])
+        matrix.append([0.0, 0.0, 0.0, dx, dy, 1.0, -sy * dx, -sy * dy, sy])
+    n = 8
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(matrix[r][i]))
+        matrix[i], matrix[pivot] = matrix[pivot], matrix[i]
+        div = matrix[i][i] or 1e-12
+        for j in range(i, n + 1):
+            matrix[i][j] /= div
+        for r in range(n):
+            if r != i:
+                factor = matrix[r][i]
+                for j in range(i, n + 1):
+                    matrix[r][j] -= factor * matrix[i][j]
+    return tuple(matrix[i][n] for i in range(n))
+
+
 def render_motion_template_frame(
     *,
     spec: MotionGraphicSpec,
@@ -224,15 +248,194 @@ def render_motion_template_frame(
     brand_name: str = "",
     screenshot_img: Image.Image | None = None,
 ) -> Image.Image:
-    """Render a single crisp frame at timestamp `t_sec` for any of the 6 launch templates."""
+    """Render a single crisp aspect-aware frame at timestamp `t_sec` for any of the 10 launch templates."""
     frame = backdrop.copy()
     draw = ImageDraw.Draw(frame)
     w, h = frame.size
+    is_portrait = h > w
     p = max(0.0, min(1.0, t_sec / max(0.25, duration_sec)))
     tpl = spec.template_id
     eyebrow = (spec.eyebrow or brand_name or "INTRODUCING").upper()[:36]
     headline = (spec.headline or brand_name or "Built for what comes next")[:90]
     subheadline = (spec.subheadline or "")[:130]
+
+    if tpl == "device_showcase_25d":
+        # Screen-Studio 2.5D tilted MacBook (16:9/1:1) or iPhone (9:16) showcase + cursor zoom
+        pad_x = int(w * 0.07)
+        _draw_pill(draw, pad_x, int(h * 0.06), eyebrow, fonts["label"], bg=_blend_rgb(pal["bg"], pal["accent"], 0.18), fg=pal["accent"])
+        draw.text((pad_x, int(h * 0.115)), headline[:48], font=fonts["title"], fill=pal["text"])
+
+        # Build crisp flat device card on RGBA canvas, then apply 2.5D perspective tilt + zoom
+        dw = int(w * (0.76 if is_portrait else 0.72))
+        dh = int(h * (0.64 if is_portrait else 0.64))
+        dev = Image.new("RGBA", (dw, dh), (0, 0, 0, 0))
+        dd = ImageDraw.Draw(dev)
+        bezel_r = 38 if is_portrait else 22
+        dd.rounded_rectangle([0, 0, dw - 1, dh - 1], radius=bezel_r, fill=(*pal["surface"], 255), outline=(*pal["accent"], 190), width=3)
+
+        bar_h = max(30, int(dh * 0.08))
+        if is_portrait:
+            # iPhone Dynamic Island pill
+            iw = int(dw * 0.28)
+            dd.rounded_rectangle([(dw - iw) // 2, 14, (dw + iw) // 2, 30], radius=8, fill=(10, 12, 16, 255))
+        else:
+            _draw_window_chrome(dd, 4, 4, dw - 4, bar_h, pal=pal, title=(brand_name or "app").lower() + ".app", font=fonts["label"])
+
+        inner_box = (14, bar_h + 10, dw - 14, dh - 14)
+        inner_w = max(64, inner_box[2] - inner_box[0])
+        inner_h = max(64, inner_box[3] - inner_box[1])
+
+        if screenshot_img is not None:
+            # Smooth Screen-Studio zoom (1.0x -> 1.28x) centered slightly toward active focal area
+            zoom = 1.0 + 0.26 * _ease_out_quint(max(0.0, (p - 0.18) / 0.65))
+            sw, sh = screenshot_img.size
+            crop_w = max(64, int(sw / zoom))
+            crop_h = max(64, int(sh / zoom))
+            cx = int(sw * (0.5 + 0.06 * math.sin(p * math.pi)))
+            cy = int(sh * (0.45 + 0.04 * math.cos(p * math.pi)))
+            x0 = max(0, min(sw - crop_w, cx - crop_w // 2))
+            y0 = max(0, min(sh - crop_h, cy - crop_h // 2))
+            cropped = screenshot_img.crop((x0, y0, x0 + crop_w, y0 + crop_h)).resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+            dev.paste(cropped.convert("RGBA"), (inner_box[0], inner_box[1]))
+        else:
+            # Crisp synthetic interactive SaaS dashboard UI when no screenshot uploaded
+            dd.rounded_rectangle(list(inner_box), radius=12, fill=(*pal["bg"], 255))
+            dd.text((inner_box[0] + 24, inner_box[1] + 24), (brand_name or "Workspace")[:28], font=fonts["body_bold"], fill=(*pal["text"], 255))
+            dd.text((inner_box[0] + 24, inner_box[1] + 60), (subheadline or headline)[:52], font=fonts["body"], fill=(*pal["muted"], 255))
+            for ri, ln in enumerate(spec.response_lines[:3] or ["Live Brand Intelligence", "Automated 24fps Rendering", "Instant Multi-Format Export"]):
+                ry = inner_box[1] + int(inner_h * 0.36) + ri * int(inner_h * 0.18)
+                dd.rounded_rectangle([inner_box[0] + 24, ry, inner_box[2] - 24, ry + int(inner_h * 0.13)], radius=10, fill=(*pal["surface_alt"], 255), outline=(*pal["border"], 255), width=1)
+                dd.text((inner_box[0] + 42, ry + 12), f"✦  {ln[:44]}", font=fonts["body_bold"], fill=(*pal["text"], 255))
+
+        # Animated precision cursor sweeping onto device UI
+        cur_e = _ease_out_cubic(min(1.0, max(0.0, (p - 0.12) / 0.45)))
+        cx_dev = int(dw * (0.22 + 0.44 * cur_e))
+        cy_dev = int(dh * (0.76 - 0.28 * cur_e))
+        click_t = max(0.0, (p - 0.52) / 0.18) if p >= 0.52 else 0.0
+        _draw_cursor(dd, cx_dev, cy_dev, max(16, int(dh * 0.045)), pal["accent"], click_t)
+
+        # 2.5D Perspective tilt gently leveling as camera zooms in
+        tilt_amt = (1.0 - _ease_out_quint(min(1.0, p / 0.75))) * (0.045 if is_portrait else 0.06)
+        dx_t = int(dw * tilt_amt)
+        dy_t = int(dh * tilt_amt * 0.65)
+        src_q = [(0.0, 0.0), (float(dw), 0.0), (float(dw), float(dh)), (0.0, float(dh))]
+        dst_q = [(float(dx_t), float(dy_t)), (float(dw - dx_t // 2), 0.0), (float(dw), float(dh)), (0.0, float(dh - dy_t))]
+        coeffs = _find_perspective_coeffs(src_q, dst_q)
+        warped = dev.transform((dw, dh), Image.Transform.PERSPECTIVE, coeffs, resample=Image.Resampling.BICUBIC)
+        ox = (w - dw) // 2
+        oy = int(h * 0.23)
+        frame_rgba = frame.convert("RGBA")
+        frame_rgba.alpha_composite(warped, (ox, oy))
+        return frame_rgba.convert("RGB")
+
+    if tpl == "node_flow_diagram":
+        # Stripe-style living architecture node-and-connector pipeline with glowing packets
+        pad_x = int(w * 0.08)
+        _draw_pill(draw, pad_x, int(h * 0.09), eyebrow, fonts["label"], bg=_blend_rgb(pal["bg"], pal["accent"], 0.16), fg=pal["accent"])
+        draw.text((pad_x, int(h * 0.155)), headline[:52], font=fonts["title"], fill=pal["text"])
+        if subheadline:
+            draw.text((pad_x, int(h * 0.225)), subheadline[:78], font=fonts["sub"], fill=pal["muted"])
+
+        nodes = [str(m.get("label") or m.get("display") or "") for m in (spec.metrics[:3] if spec.metrics else []) if m]
+        if len(nodes) < 3:
+            nodes = [
+                f"{brand_name or 'Brand'} Input",
+                "Intelligent Engine",
+                "Verified Output",
+            ]
+        active_node = int(p * 3.0) % 3
+        if is_portrait:
+            # Vertical stacked architecture for 9:16
+            nw = int(w * 0.76)
+            nh = int(h * 0.13)
+            nx = (w - nw) // 2
+            ys = [int(h * 0.34), int(h * 0.54), int(h * 0.74)]
+            for i in range(2):
+                y_top, y_bot = ys[i] + nh, ys[i + 1]
+                draw.line([(w // 2, y_top), (w // 2, y_bot)], fill=pal["border"], width=4)
+                pkt_p = (t_sec * 1.4 - i * 0.4) % 1.0
+                py = int(y_top + (y_bot - y_top) * pkt_p)
+                draw.ellipse([w // 2 - 7, py - 7, w // 2 + 7, py + 7], fill=pal["accent"])
+            for i, lbl in enumerate(nodes[:3]):
+                is_act = i == active_node
+                _draw_rounded_card(draw, (nx, ys[i], nx + nw, ys[i] + nh), radius=18, fill=pal["surface"], outline=pal["accent"] if is_act else pal["border"], width=3 if is_act else 2)
+                _draw_pill(draw, nx + 20, ys[i] + 18, f"0{i + 1}", fonts["label"], bg=pal["accent"] if is_act else pal["surface_alt"], fg=pal["accent_fg"] if is_act else pal["muted"])
+                draw.text((nx + 78, ys[i] + nh // 2 - 14), lbl[:28], font=fonts["body_bold"], fill=pal["text"])
+        else:
+            # Horizontal 3-node Stripe pipeline for 16:9 / 1:1
+            nw = int(w * 0.24)
+            nh = int(h * 0.28)
+            cy = int(h * 0.56)
+            xs = [pad_x, (w - nw) // 2, w - pad_x - nw]
+            for i in range(2):
+                x_left, x_right = xs[i] + nw, xs[i + 1]
+                draw.line([(x_left, cy), (x_right, cy)], fill=pal["border"], width=4)
+                pkt_p = (t_sec * 1.35 - i * 0.35) % 1.0
+                px = int(x_left + (x_right - x_left) * pkt_p)
+                draw.ellipse([px - 8, cy - 8, px + 8, cy + 8], fill=pal["accent"])
+            for i, lbl in enumerate(nodes[:3]):
+                ne = _ease_out_quint((t_sec - 0.15 - i * 0.18) / 0.6)
+                y_sh = int((1.0 - ne) * 28)
+                is_act = i == active_node
+                _draw_rounded_card(draw, (xs[i], cy - nh // 2 + y_sh, xs[i] + nw, cy + nh // 2 + y_sh), radius=20, fill=pal["surface"], outline=pal["accent"] if is_act else pal["border"], width=3 if is_act else 2)
+                _draw_pill(draw, xs[i] + 20, cy - nh // 2 + y_sh + 20, f"STEP 0{i + 1}", fonts["label"], bg=_blend_rgb(pal["surface"], pal["accent"], 0.2), fg=pal["accent"])
+                lns = _wrap_words_to_lines(draw, lbl, fonts["body_bold"], nw - 40)[:2]
+                for li, lw in enumerate(lns):
+                    draw.text((xs[i] + 20, cy - 6 + y_sh + li * 30), " ".join(lw), font=fonts["body_bold"], fill=pal["text"])
+        return frame
+
+    if tpl == "customer_quote_proof":
+        # Editorial social proof quote card + animated ROI metric pill
+        pad_x = int(w * 0.10)
+        card_box = (pad_x, int(h * 0.16), w - pad_x, int(h * 0.84))
+        _draw_rounded_card(draw, card_box, radius=24, fill=pal["surface"], outline=pal["border"], width=2)
+        _draw_pill(draw, pad_x + 34, int(h * 0.21), eyebrow, fonts["label"], bg=_blend_rgb(pal["surface"], pal["accent"], 0.18), fg=pal["accent"])
+        quote_txt = f"“{(spec.prompt_text or headline)[:110]}”"
+        q_lines = _wrap_words_to_lines(draw, quote_txt, fonts["title"], (w - pad_x * 2) - 68)[:4]
+        qe = _ease_out_quint(min(1.0, (t_sec - 0.15) / 0.7))
+        for li, lw in enumerate(q_lines):
+            draw.text(
+                (pad_x + 34, int(h * 0.31 + (1.0 - qe) * 18) + li * int(h * 0.075)),
+                " ".join(lw),
+                font=fonts["title"],
+                fill=_blend_rgb(pal["surface"], pal["text"], max(0.15, qe)),
+            )
+        attr = subheadline or f"Verified Customer · {brand_name or 'Enterprise Team'}"
+        draw.text((pad_x + 34, int(h * 0.72)), f"— {attr[:62]}", font=fonts["body_bold"], fill=pal["muted"])
+        stat_disp = str(spec.metrics[0].get("display") if spec.metrics else "+73% ROI")[:16]
+        if p > 0.35:
+            _draw_pill(draw, w - pad_x - 210, int(h * 0.70), stat_disp, fonts["body_bold"], bg=pal["accent"], fg=pal["accent_fg"], pad_x=20, pad_y=10)
+        return frame
+
+    if tpl == "kinetic_hook_reel":
+        # High-contrast 1.5s pattern-interrupt word slam reveal for 9:16 social feeds
+        words = (headline or "STOP SCROLLING").split()[:8]
+        line_h = int(h * (0.095 if is_portrait else 0.12))
+        lines = _wrap_words_to_lines(draw, " ".join(words), fonts["hero"], int(w * 0.82))[:4]
+        total_h = len(lines) * line_h
+        start_y = (h - total_h) // 2 - int(h * 0.04)
+        w_idx = 0
+        for li, lw in enumerate(lines):
+            full = " ".join(lw)
+            lbb = draw.textbbox((0, 0), full, font=fonts["hero"])
+            cx = (w - (lbb[2] - lbb[0])) // 2
+            y = start_y + li * line_h
+            for word in lw:
+                appear_t = 0.08 + w_idx * 0.13
+                if t_sec >= appear_t:
+                    we = _ease_out_quint((t_sec - appear_t) / 0.24)
+                    wbb = draw.textbbox((0, 0), word + " ", font=fonts["hero"])
+                    if w_idx == len(words) - 1:
+                        # Accent slam pill on final punch word
+                        draw.rounded_rectangle([cx - 12, y - 4, cx + (wbb[2] - wbb[0]) + 4, y + int(line_h * 0.84)], radius=14, fill=pal["accent"])
+                        draw.text((cx, y + int((1.0 - we) * 16)), word, font=fonts["hero"], fill=pal["accent_fg"])
+                    else:
+                        draw.text((cx, y + int((1.0 - we) * 20)), word, font=fonts["hero"], fill=pal["text"])
+                    cx += wbb[2] - wbb[0]
+                w_idx += 1
+        if subheadline and p > 0.45:
+            _draw_pill(draw, (w - min(int(w * 0.76), 420)) // 2, start_y + total_h + 28, subheadline[:38], fonts["body_bold"], bg=pal["surface"], fg=pal["text"])
+        return frame
 
     if tpl == "kinetic_headline":
         # Anthropic-style warm editorial masked word reveal
@@ -346,26 +549,42 @@ def render_motion_template_frame(
         ]
         while len(cards) < 3:
             cards.append({"display": f"0{len(cards) + 1}", "label": "Flagship Craft", "sub": subheadline[:36] or "Engineered for scale"})
-        gap = int(w * 0.025)
-        cw = (w - pad_x * 2 - gap * 2) // 3
-        cy0, cy1 = int(h * 0.30), int(h * 0.84)
+        gap = int((h if is_portrait else w) * 0.025)
         active_idx = int((t_sec / max(0.5, duration_sec)) * 3) % 3
-        for i, c in enumerate(cards[:3]):
-            ce = _ease_out_quint((t_sec - 0.15 - i * 0.16) / 0.65)
-            cx0 = pad_x + i * (cw + gap)
-            y_shift = int((1.0 - ce) * (h * 0.07))
-            is_act = i == active_idx
-            border_c = pal["accent"] if is_act else pal["border"]
-            _draw_rounded_card(draw, (cx0, cy0 + y_shift, cx0 + cw, cy1 + y_shift), radius=22, fill=pal["surface"], outline=border_c, width=3 if is_act else 2)
-            disp = str(c.get("display") or c.get("value") or f"0{i + 1}")[:12]
-            lbl = str(c.get("label") or f"Feature {i + 1}")[:28]
-            sub = str(c.get("sub") or "")[:64]
-            draw.text((cx0 + 26, cy0 + y_shift + 34), disp, font=fonts["metric"], fill=pal["accent"] if is_act else pal["text"])
-            draw.text((cx0 + 26, cy0 + y_shift + int((cy1 - cy0) * 0.42)), lbl, font=fonts["body_bold"], fill=pal["text"])
-            if sub:
-                s_lines = _wrap_words_to_lines(draw, sub, fonts["body"], cw - 52)[:3]
-                for si, sw in enumerate(s_lines):
-                    draw.text((cx0 + 26, cy0 + y_shift + int((cy1 - cy0) * 0.56) + si * int(h * 0.036)), " ".join(sw), font=fonts["body"], fill=pal["muted"])
+        if is_portrait:
+            ch = int((h * 0.62 - gap * 2) // 3)
+            cw = w - pad_x * 2
+            for i, c in enumerate(cards[:3]):
+                ce = _ease_out_quint((t_sec - 0.12 - i * 0.16) / 0.6)
+                cy0 = int(h * 0.25) + i * (ch + gap) + int((1.0 - ce) * 28)
+                is_act = i == active_idx
+                _draw_rounded_card(draw, (pad_x, cy0, pad_x + cw, cy0 + ch), radius=20, fill=pal["surface"], outline=pal["accent"] if is_act else pal["border"], width=3 if is_act else 2)
+                disp = str(c.get("display") or c.get("value") or f"0{i + 1}")[:12]
+                lbl = str(c.get("label") or f"Feature {i + 1}")[:28]
+                sub = str(c.get("sub") or "")[:54]
+                draw.text((pad_x + 24, cy0 + 20), disp, font=fonts["title"], fill=pal["accent"] if is_act else pal["text"])
+                draw.text((pad_x + 24, cy0 + int(ch * 0.48)), lbl, font=fonts["body_bold"], fill=pal["text"])
+                if sub:
+                    draw.text((pad_x + 24, cy0 + int(ch * 0.72)), sub, font=fonts["body"], fill=pal["muted"])
+        else:
+            cw = (w - pad_x * 2 - gap * 2) // 3
+            cy0, cy1 = int(h * 0.30), int(h * 0.84)
+            for i, c in enumerate(cards[:3]):
+                ce = _ease_out_quint((t_sec - 0.15 - i * 0.16) / 0.65)
+                cx0 = pad_x + i * (cw + gap)
+                y_shift = int((1.0 - ce) * (h * 0.07))
+                is_act = i == active_idx
+                border_c = pal["accent"] if is_act else pal["border"]
+                _draw_rounded_card(draw, (cx0, cy0 + y_shift, cx0 + cw, cy1 + y_shift), radius=22, fill=pal["surface"], outline=border_c, width=3 if is_act else 2)
+                disp = str(c.get("display") or c.get("value") or f"0{i + 1}")[:12]
+                lbl = str(c.get("label") or f"Feature {i + 1}")[:28]
+                sub = str(c.get("sub") or "")[:64]
+                draw.text((cx0 + 26, cy0 + y_shift + 34), disp, font=fonts["metric"], fill=pal["accent"] if is_act else pal["text"])
+                draw.text((cx0 + 26, cy0 + y_shift + int((cy1 - cy0) * 0.42)), lbl, font=fonts["body_bold"], fill=pal["text"])
+                if sub:
+                    s_lines = _wrap_words_to_lines(draw, sub, fonts["body"], cw - 52)[:3]
+                    for si, sw in enumerate(s_lines):
+                        draw.text((cx0 + 26, cy0 + y_shift + int((cy1 - cy0) * 0.56) + si * int(h * 0.036)), " ".join(sw), font=fonts["body"], fill=pal["muted"])
         return frame
 
     if tpl == "terminal_code":
