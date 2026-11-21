@@ -1358,6 +1358,9 @@ async def render_single_scene_take(
         sc.render_status = "done"
         sc.render_message = f"Take {take.take_id} ready ({take.engine_label})."
         project.status_message = f"{sc.title} · Take {take.take_id} ready."
+        if not any(s.render_status == "rendering" for s in project.scenes):
+            all_shot = all(s.winning_take() is not None for s in project.scenes)
+            project.status = "done" if all_shot else "validated"
         return project
     except Exception as exc:
         sc.render_status = "failed"
@@ -1365,6 +1368,8 @@ async def render_single_scene_take(
         sc.render_message = f"Render failed: {exc}"
         project.error = str(exc)
         project.status_message = f"{sc.title} failed: {exc}"
+        if not any(s.render_status == "rendering" for s in project.scenes):
+            project.status = "failed"
         raise
 
 

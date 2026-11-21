@@ -462,6 +462,22 @@ async def get_project(project_id: str, services: ServicesDep) -> dict[str, Any]:
     project = store.load(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Stitch project not found")
+    # Self-heal orphaned shooting/rendering state if no background task is active for this project
+    has_active_task = any(
+        k.startswith(f"{project_id}:") and not t.done()
+        for k, t in _ACTIVE_STITCH_TASKS.items()
+    )
+    if not has_active_task and (
+        project.status == "shooting"
+        or any(s.render_status == "rendering" for s in project.scenes)
+    ):
+        for s in project.scenes:
+            if s.render_status == "rendering":
+                s.render_status = "done" if s.winning_take() is not None else "idle"
+                s.render_message = ""
+        all_shot = bool(project.scenes) and all(s.winning_take() is not None for s in project.scenes)
+        project.status = "done" if all_shot else "validated"
+        store.save(project)
     return _serialize_project(project, reg)
 
 
@@ -862,6 +878,9 @@ async def render_scene_endpoint(
                 mock=payload.mock,
                 on_progress=_on_progress,
             )
+            if not any(s.render_status == "rendering" for s in fresh.scenes):
+                all_shot = all(s.winning_take() is not None for s in fresh.scenes)
+                fresh.status = "done" if all_shot else "validated"
             store.save(fresh)
         except Exception as exc:
             fresh = store.load(project_id)
@@ -869,6 +888,7 @@ async def render_scene_endpoint(
                 fresh.scenes[idx].render_status = "failed"
                 fresh.scenes[idx].render_error = str(exc)
                 fresh.scenes[idx].render_message = f"Failed: {exc}"
+                fresh.status = "failed"
                 fresh.error = str(exc)
                 fresh.status_message = f"{fresh.scenes[idx].title} failed: {exc}"
                 store.save(fresh)
@@ -956,6 +976,10 @@ async def render_all_endpoint(
         except Exception as exc:
             fresh = store.load(project_id)
             if fresh:
+                for s in fresh.scenes:
+                    if s.render_status == "rendering":
+                        s.render_status = "failed"
+                        s.render_error = str(exc)
                 fresh.status = "failed"
                 fresh.error = str(exc)
                 fresh.status_message = f"Render failed: {exc}"
