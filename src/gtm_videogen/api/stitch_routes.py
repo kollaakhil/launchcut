@@ -7,10 +7,10 @@ import base64
 import mimetypes
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,11 +20,13 @@ from gtm_videogen.agents.stitch_engine import (
     generate_all_keyframes,
     generate_scene_keyframe,
     pitch_three_concepts,
+    plan_aroll_cutaways,
     render_all_scenes,
     render_single_scene_take,
     stitch_master_cut,
 )
 from gtm_videogen.api.routes import ServicesDep, _iter_file_range, _parse_byte_range
+from gtm_videogen.media._subprocess import probe_media
 from gtm_videogen.models.model_registry import (
     BUILTIN_LLM_MODELS,
     ModelRegistryStore,
@@ -32,6 +34,8 @@ from gtm_videogen.models.model_registry import (
 )
 from gtm_videogen.models.stitch_project import (
     AudioMode,
+    CaptionStyle,
+    MotionGraphicSpec,
     SceneKind,
     SeamTransition,
     StitchAspect,
@@ -39,15 +43,58 @@ from gtm_videogen.models.stitch_project import (
     StitchElement,
     StitchProject,
     StitchScene,
+    TimelineMode,
+    UserClipFraming,
+    UserClipSpec,
     apply_deterministic_script_autofix,
     get_stitch_catalog,
     validate_stitch_project,
 )
+from gtm_videogen.providers.transcription import transcribe_video_words
 
 stitch_router = APIRouter(prefix="/api/stitch", tags=["stitch"])
 
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _ACTIVE_STITCH_TASKS: dict[str, asyncio.Task[Any]] = {}
+_MAX_UPLOAD_VIDEO_BYTES = 150 * 1024 * 1024  # 150 MB streaming cap
+_ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".webm", ".m4v", ".mkv"}
+
+
+async def _save_upload_video_chunked(
+    upload: UploadFile,
+    dest_dir: Path,
+    prefix: str,
+    ffprobe_bin: str = "ffprobe",
+) -> tuple[Path, str, float]:
+    """Stream multipart video upload to disk in 1MB chunks (Render-512MB safe) and probe duration."""
+    orig_name = (upload.filename or "clip.mp4").strip()
+    ext = Path(orig_name).suffix.lower()
+    if ext not in _ALLOWED_VIDEO_EXTS:
+        ext = ".mp4"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    out_path = dest_dir / f"{prefix}_{uuid4().hex[:6]}{ext}"
+    total = 0
+    try:
+        with out_path.open("wb") as fh:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _MAX_UPLOAD_VIDEO_BYTES:
+                    raise HTTPException(status_code=413, detail="Video exceeds 150 MB upload limit.")
+                fh.write(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail="Uploaded video file is empty.")
+        probe = await probe_media(out_path, ffprobe_bin=ffprobe_bin)
+        dur = max(0.5, float(probe.duration_sec or 5.0))
+        return out_path, orig_name, dur
+    except HTTPException:
+        out_path.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        out_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Invalid video file: {exc}") from exc
 
 
 def _gallery_dir() -> Path:
@@ -104,6 +151,7 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
 
     data["master_video_url"] = _murl(project.master_video_path)
     data["brand_logo_url"] = _murl(project.brand_logo_path)
+    data["aroll_video_url"] = _murl(project.aroll_clip_path)
     data["total_duration_sec"] = project.total_duration_sec()
 
     est_usd = 0.0
@@ -113,6 +161,10 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
     for idx, (sc_dict, sc_obj) in enumerate(zip(data.get("scenes", []), project.scenes, strict=False)):
         sc_dict["start_keyframe_media_url"] = _murl(sc_obj.start_keyframe_path)
         sc_dict["end_keyframe_media_url"] = _murl(sc_obj.end_keyframe_path)
+        if sc_obj.user_clip and isinstance(sc_dict.get("user_clip"), dict):
+            sc_dict["user_clip"]["clip_url"] = _murl(sc_obj.user_clip.raw_video_path)
+        if sc_obj.graphic_spec and isinstance(sc_dict.get("graphic_spec"), dict):
+            sc_dict["graphic_spec"]["screenshot_url"] = _murl(sc_obj.graphic_spec.screenshot_path)
         compiled_str = project.compile_scene_model_prompt(idx, max_chars=model_spec.max_prompt_chars)
         sc_dict["compiled_prompt_dict"] = project.to_scene_prompt_dict(idx)
         sc_dict["compiled_prompt_chars"] = len(compiled_str)
@@ -181,6 +233,9 @@ class PatchProjectRequest(BaseModel):
     add_brand_outro: bool | None = None
     brand_name: str | None = None
     brand_tagline: str | None = None
+    timeline_mode: TimelineMode | None = None
+    enable_captions: bool | None = None
+    caption_style: CaptionStyle | None = None
     negative_constraints: list[str] | None = None
     scenes: list[dict[str, Any]] | None = None
 
@@ -189,9 +244,32 @@ class AddSceneRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = "New Scene"
-    duration_sec: int = Field(default=10, ge=4, le=15)
+    duration_sec: int = Field(default=10, ge=3, le=60)
     kind: SceneKind = "ai_sequence"
     continues_from_prev: bool = True
+    template_id: str | None = None
+
+
+class ClipSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trim_start_sec: float | None = Field(default=None, ge=0.0)
+    trim_end_sec: float | None = Field(default=None, ge=0.5)
+    framing: UserClipFraming | None = None
+    keep_original_audio: bool | None = None
+
+
+class UploadScreenshotRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str = "screenshot.png"
+    data_url: str = Field(..., min_length=16)
+
+
+class ArollActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mock: bool = False
 
 
 class UploadElementRequest(BaseModel):
@@ -249,6 +327,9 @@ class StitchMasterRequest(BaseModel):
     add_brand_outro: bool | None = None
     brand_name: str | None = None
     brand_tagline: str | None = None
+    timeline_mode: TimelineMode | None = None
+    enable_captions: bool | None = None
+    caption_style: CaptionStyle | None = None
     mock: bool = False
 
 
@@ -413,6 +494,9 @@ async def patch_project(
         "add_brand_outro",
         "brand_name",
         "brand_tagline",
+        "timeline_mode",
+        "enable_captions",
+        "caption_style",
         "negative_constraints",
     ):
         val = getattr(payload, field)
@@ -440,9 +524,29 @@ async def patch_project(
                     "vo_line",
                     "end_frame",
                     "beats",
+                    "graphic_spec",
+                    "user_clip",
+                    "overlays",
+                    "aroll_window",
                 ):
                     if k in raw_sc and raw_sc[k] is not None:
-                        merged[k] = raw_sc[k]
+                        if k == "user_clip" and isinstance(merged.get("user_clip"), dict) and isinstance(raw_sc[k], dict):
+                            # Preserve server-side raw_video_path unless explicitly provided
+                            uc = dict(merged["user_clip"])
+                            for uk, uv in raw_sc[k].items():
+                                if uk == "raw_video_path" and not uv:
+                                    continue
+                                uc[uk] = uv
+                            merged[k] = uc
+                        elif k == "graphic_spec" and isinstance(merged.get("graphic_spec"), dict) and isinstance(raw_sc[k], dict):
+                            gs = dict(merged["graphic_spec"])
+                            for gk, gv in raw_sc[k].items():
+                                if gk == "screenshot_path" and not gv:
+                                    continue
+                                gs[gk] = gv
+                            merged[k] = gs
+                        else:
+                            merged[k] = raw_sc[k]
                 merged["index"] = idx
                 if idx == 0:
                     merged["continues_from_prev"] = False
@@ -489,18 +593,34 @@ async def add_scene(
 
     idx = len(project.scenes)
     prev = project.scenes[-1] if project.scenes else None
+    gspec: MotionGraphicSpec | None = None
+    uclip: UserClipSpec | None = None
+    if payload.kind == "motion_graphic":
+        tpl = payload.template_id or "prompt_ui_demo"
+        gspec = MotionGraphicSpec(
+            template_id=tpl,  # type: ignore[arg-type]
+            theme_mode="warm_editorial" if project.world_preset == "anthropic_editorial" else "dark_glass",
+            eyebrow=(project.brand_name or "LAUNCH").upper(),
+            headline=payload.title.strip() or project.title,
+            prompt_text=project.idea[:64],
+        )
+    elif payload.kind == "user_clip":
+        uclip = UserClipSpec(filename="", raw_video_path="", source_duration_sec=float(payload.duration_sec))
+
     new_sc = StitchScene(
         scene_id=f"sc_{idx + 1}_{uuid4().hex[:6]}",
         index=idx,
         title=payload.title.strip() or f"Scene {idx + 1} · Next Beat",
         duration_sec=payload.duration_sec,
         kind=payload.kind,
-        continues_from_prev=(payload.continues_from_prev and idx > 0),
+        continues_from_prev=(payload.continues_from_prev and idx > 0 and payload.kind == "ai_sequence"),
         subjects=list(prev.subjects) if prev else [project.main_subject or "hero centerpiece"],
         materials=list(prev.materials) if prev else ["aged oak wood", "optical glass"],
         camera_spec=prev.camera_spec if prev else "85mm studio cinema · smooth continuous push-in",
         colors=list(prev.colors) if prev else ["#191512", "#E54D3A", "#F6E7D4"],
         end_frame="Locked-off hero composition with balanced negative space",
+        graphic_spec=gspec,
+        user_clip=uclip,
         beats=[
             StitchBeat(
                 time=f"0-{max(2, payload.duration_sec // 2)}s",
@@ -852,6 +972,186 @@ async def render_all_endpoint(
 # ---------------------------------------------------------------------------
 
 
+@stitch_router.post("/projects/{project_id}/scenes/{scene_id}/upload-clip")
+async def upload_scene_user_clip(
+    project_id: str,
+    scene_id: str,
+    services: ServicesDep,
+    file: Annotated[UploadFile, File(...)],
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    sc = next((s for s in project.scenes if s.scene_id == scene_id), None)
+    if sc is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    out_path, orig_name, dur = await _save_upload_video_chunked(
+        file,
+        store.media_dir(project_id),
+        f"uclip_{scene_id}",
+        ffprobe_bin=services.settings.ffprobe_bin,
+    )
+    sc.kind = "user_clip"
+    sc.user_clip = UserClipSpec(
+        raw_video_path=str(out_path),
+        filename=orig_name,
+        source_duration_sec=dur,
+        trim_start_sec=0.0,
+        trim_end_sec=min(dur, 60.0),
+        framing=sc.user_clip.framing if sc.user_clip else "cover_crop",
+        keep_original_audio=sc.user_clip.keep_original_audio if sc.user_clip else True,
+    )
+    sc.duration_sec = max(3, min(60, int(round(dur))))
+    project.target_duration_sec = project.total_duration_sec()
+    project.status_message = f"Uploaded '{orig_name}' ({dur:.1f}s) onto {sc.title}."
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.patch("/projects/{project_id}/scenes/{scene_id}/clip-settings")
+async def update_scene_clip_settings(
+    project_id: str,
+    scene_id: str,
+    payload: ClipSettingsRequest,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    sc = next((s for s in project.scenes if s.scene_id == scene_id), None)
+    if sc is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    if sc.user_clip is None:
+        raise HTTPException(status_code=400, detail="Upload a video clip onto this scene first.")
+
+    if payload.trim_start_sec is not None:
+        sc.user_clip.trim_start_sec = payload.trim_start_sec
+    if payload.trim_end_sec is not None:
+        sc.user_clip.trim_end_sec = payload.trim_end_sec
+    if payload.framing is not None:
+        sc.user_clip.framing = payload.framing
+    if payload.keep_original_audio is not None:
+        sc.user_clip.keep_original_audio = payload.keep_original_audio
+
+    t_end = sc.user_clip.trim_end_sec if sc.user_clip.trim_end_sec is not None else sc.user_clip.source_duration_sec
+    eff_dur = max(1.0, min(60.0, t_end - sc.user_clip.trim_start_sec))
+    sc.duration_sec = max(3, min(60, int(round(eff_dur))))
+    project.target_duration_sec = project.total_duration_sec()
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/scenes/{scene_id}/upload-screenshot")
+async def upload_scene_screenshot(
+    project_id: str,
+    scene_id: str,
+    payload: UploadScreenshotRequest,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    sc = next((s for s in project.scenes if s.scene_id == scene_id), None)
+    if sc is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    raw_bytes, ext = _decode_data_url(payload.data_url)
+    out_p = store.media_dir(project_id) / f"shot_{scene_id}_{uuid4().hex[:6]}{ext}"
+    out_p.write_bytes(raw_bytes)
+    if sc.graphic_spec is None:
+        sc.graphic_spec = MotionGraphicSpec(template_id="prompt_ui_demo", headline=sc.title)
+    sc.graphic_spec.screenshot_path = str(out_p)
+    project.status_message = f"Attached product screenshot onto {sc.title}."
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/upload-aroll")
+async def upload_project_aroll(
+    project_id: str,
+    services: ServicesDep,
+    file: Annotated[UploadFile, File(...)],
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+
+    out_path, orig_name, dur = await _save_upload_video_chunked(
+        file,
+        store.media_dir(project_id),
+        "founder_aroll",
+        ffprobe_bin=services.settings.ffprobe_bin,
+    )
+    project.aroll_clip_path = str(out_path)
+    project.aroll_filename = orig_name
+    project.aroll_duration_sec = dur
+    project.aroll_transcript = []
+    project.status_message = f"Uploaded Founder A-Roll '{orig_name}' ({dur:.1f}s)."
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/transcribe-aroll")
+async def transcribe_project_aroll(
+    project_id: str,
+    payload: ArollActionRequest,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    if not project.aroll_clip_path or not Path(project.aroll_clip_path).is_file():
+        raise HTTPException(status_code=400, detail="Upload a Founder A-Roll video first.")
+
+    text, words, dur = await transcribe_video_words(
+        Path(project.aroll_clip_path),
+        fallback_text=project.idea or project.title,
+        settings=services.settings,
+        mock=payload.mock,
+    )
+    project.aroll_transcript = words
+    project.aroll_duration_sec = dur
+    project.status_message = f"Transcribed {len(words)} word(s) across {dur:.1f}s Founder A-Roll."
+    store.save(project)
+    out = _serialize_project(project, reg)
+    out["transcript_text"] = text
+    return out
+
+
+@stitch_router.post("/projects/{project_id}/auto-cutaways")
+async def auto_plan_aroll_cutaways(
+    project_id: str,
+    payload: ArollActionRequest,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    try:
+        await plan_aroll_cutaways(
+            project,
+            settings=services.settings,
+            mock=payload.mock,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
 @stitch_router.post("/projects/{project_id}/stitch")
 async def stitch_master_endpoint(
     project_id: str, payload: StitchMasterRequest, services: ServicesDep
@@ -869,6 +1169,9 @@ async def stitch_master_endpoint(
         "add_brand_outro",
         "brand_name",
         "brand_tagline",
+        "timeline_mode",
+        "enable_captions",
+        "caption_style",
     ):
         val = getattr(payload, field)
         if val is not None:

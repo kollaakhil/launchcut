@@ -487,6 +487,78 @@ WORLD_PRESETS: dict[str, dict[str, Any]] = {
             "scale": "tabletop kinetic diorama expanding seamlessly into full depth",
         },
     },
+    "anthropic_editorial": {
+        "id": "anthropic_editorial",
+        "label": "Anthropic Warm Keynote",
+        "tagline": "Warm alabaster editorial typography, tactile craft & calm human intelligence",
+        "style": "warm editorial studio cinema & minimalist kinetic typography launch film",
+        "environment": {
+            "surface": "warm alabaster architectural plaster and matte travertine studio plinth",
+            "world": "calm sunlit modern design studio balancing human warmth and quiet precision",
+            "materials": "warm cotton rag paper, brushed terracotta anodize, matte limestone, soft linen",
+            "atmosphere": "clean northern window daylight with gentle architectural shadow falloff",
+        },
+        "subject_details": {
+            "appearance": "thoughtful editorial product showcase paired with calm kinetic typography",
+            "textures": "matte mineral paper, fine anodized aluminum, natural daylight skin & fabric tones",
+            "interaction": "unhurried deliberate motion, tactile page-like transitions, quiet focus",
+            "scale": "intimate editorial framing transitioning seamlessly into crisp UI clarity",
+        },
+    },
+    "openai_product_drop": {
+        "id": "openai_product_drop",
+        "label": "OpenAI Minimal Product Drop",
+        "tagline": "High-contrast monochrome glassmorphic UI, live prompt choreography & crisp realism",
+        "style": "ultra-clean minimalist monochrome product launch & live interface cinema",
+        "environment": {
+            "surface": "matte obsidian glass and seamless soft-lit studio cyclorama",
+            "world": "minimalist flagship product stage highlighting effortless human-AI interaction",
+            "materials": "frosted optical glass, precision bead-blasted aluminum, crisp monochrome surfaces",
+            "atmosphere": "high-contrast softbox studio clarity with subtle emerald & white edge light",
+        },
+        "subject_details": {
+            "appearance": "iconic minimalist hero product and ultra-crisp interactive interface choreography",
+            "textures": "micro-textured matte glass, razor-sharp UI geometry, clean specular rim highlights",
+            "interaction": "snappy spring-physics reveals, instant visual feedback, effortless precision",
+            "scale": "clean centered hero framing with generous architectural negative space",
+        },
+    },
+    "gemini_multimodal": {
+        "id": "gemini_multimodal",
+        "label": "Gemini Multimodal Launch",
+        "tagline": "Deep cosmos navy, luminous prism gradients, fast multimodal UI & benchmark proof",
+        "style": "kinetic luminous prism glass & high-energy multimodal tech keynote film",
+        "environment": {
+            "surface": "deep midnight obsidian glass with luminous sapphire and violet refractions",
+            "world": "futuristic luminous optical stage uniting real-world imagery, code, and benchmarks",
+            "materials": "optical prism crystal, glowing sapphire caustics, dark smoked glass, brushed titanium",
+            "atmosphere": "radiant volumetric blue-violet light beams and crisp energetic micro-glints",
+        },
+        "subject_details": {
+            "appearance": "dynamic multimodal showcase blending optical refraction with rapid UI & chart proof",
+            "textures": "iridescent glass dispersion, crisp luminous UI gradients, polished dark metal",
+            "interaction": "energetic beat-synced transitions, fluid optical morphs, bold benchmark roll-ups",
+            "scale": "expansive widescreen keynote framing with bold visual rhythm",
+        },
+    },
+    "founder_keynote_hybrid": {
+        "id": "founder_keynote_hybrid",
+        "label": "Founder + Product Launch",
+        "tagline": "Founder talking-head A-roll seamlessly interwoven with crisp UI graphics & AI B-roll",
+        "style": "authentic founder-led product launch combining real footage, motion graphics & AI B-roll",
+        "environment": {
+            "surface": "warm modern founder studio desk with soft depth-of-field backdrop",
+            "world": "authentic founder storytelling anchored by crisp on-screen UI proof and visual metaphors",
+            "materials": "natural studio lighting, warm wood, clean dark-glass UI frames, subtle brass accents",
+            "atmosphere": "natural documentary-grade key light with clean editorial polish",
+        },
+        "subject_details": {
+            "appearance": "authentic founder presence paired with sharp UI callouts and tactile B-roll cutaways",
+            "textures": "natural 35mm lens depth, crisp vector motion graphics, tactile studio surfaces",
+            "interaction": "continuous founder voiceover with J/L-cut visual cutaways on key product moments",
+            "scale": "conversational medium close-up alternating with full-bleed UI and hero B-roll",
+        },
+    },
 }
 
 CAMERA_PRESETS: dict[str, dict[str, Any]] = {

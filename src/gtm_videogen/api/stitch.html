@@ -1343,6 +1343,7 @@
       <div class="cat-bar">
         <div class="cat-chips" id="gallery-cats">
           <button class="cat-chip active" data-cat="all" onclick="filterGallery('all', this)">All Themes</button>
+          <button class="cat-chip" data-cat="launch" onclick="filterGallery('launch', this)">🚀 Tech &amp; AI Launch</button>
           <button class="cat-chip" data-cat="diorama" onclick="filterGallery('diorama', this)">Miniature Diorama</button>
           <button class="cat-chip" data-cat="hardware" onclick="filterGallery('hardware', this)">Hardware &amp; Brand</button>
           <button class="cat-chip" data-cat="craft" onclick="filterGallery('craft', this)">Paper &amp; Craft</button>
@@ -1363,8 +1364,27 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <button class="pill-btn" id="btn-autofix" onclick="runScriptAutofix()" style="display:none;">✨ Auto-Fix Warnings</button>
-          <button class="pill-btn" onclick="addScenePrompt()">+ Add Scene</button>
+          <button class="pill-btn" onclick="addScenePrompt('motion_graphic')">+ Motion Graphic ($0)</button>
+          <button class="pill-btn" onclick="addScenePrompt('user_clip')">+ My Video Clip</button>
+          <button class="pill-btn" onclick="addScenePrompt('ai_sequence')">+ AI Scene</button>
           <button class="pill-btn primary" onclick="switchStage('shoot')">Shoot &amp; Takes →</button>
+        </div>
+      </div>
+
+      <!-- Founder A-Roll & Auto-Cutaways Studio Bar -->
+      <div class="tray-card" id="aroll-studio-bar" style="margin-bottom:16px;padding:12px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <strong style="font-size:13.5px;">📹 Founder Video / Continuous A-Roll Cutaways</strong>
+            <span id="aroll-status-label" style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Upload a talking-head video to weave graphics &amp; AI B-roll seamlessly over your voice.</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label class="pill-btn" style="cursor:pointer;">
+              ⬆ Upload Founder Video (.mp4/.mov)
+              <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadProjectArollUI(this)" />
+            </label>
+            <button class="pill-btn sage" id="btn-auto-cutaways" onclick="autoPlanCutawaysUI()" style="display:none;">✨ Auto-Transcribe &amp; Plan Cutaways</button>
+          </div>
         </div>
       </div>
 
@@ -1480,6 +1500,20 @@
                 ⬆ Upload Brand Logo
                 <input type="file" accept="image/*" style="display:none;" onchange="uploadBrandLogo(this)" />
               </label>
+            </div>
+          </div>
+
+          <div style="background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="chk-captions" onchange="toggleCaptionsUI(this.checked)" />
+              Burn Crisp Word-Synced Captions ($0)
+            </label>
+            <div id="captions-style-wrap" style="display:none;">
+              <select class="field-select" id="caption-style-select">
+                <option value="minimal_bottom">Minimal Bottom (OpenAI / Gemini)</option>
+                <option value="editorial_serif">Editorial Serif (Anthropic)</option>
+                <option value="karaoke_highlight">Karaoke Highlight</option>
+              </select>
             </div>
           </div>
 
@@ -2105,10 +2139,25 @@
       document.getElementById('board-meta-pills').innerHTML = `
         <span class="tag-pill">${p.scenes.length} Scene(s) · ${p.total_duration_sec}s</span>
         <span class="tag-pill">${esc(p.aspect_ratio)}</span>
+        ${p.timeline_mode === 'aroll_with_cutaways' ? '<span class="tag-pill coral">📹 Continuous Founder A-Roll</span>' : ''}
         <span class="tag-pill">${esc(activeM.label || p.video_model_id)} · est. $${Number(p.estimated_usd || 0).toFixed(2)}</span>
         <span class="tag-pill ${gate.valid ? 'ok' : 'warn'}">${gate.valid ? '✓ Script Gate Verified' : `⚠ ${gate.total_warnings} Script Gate Warning(s)`}</span>
       `;
       document.getElementById('btn-autofix').style.display = gate.valid ? 'none' : 'inline-flex';
+
+      // Sync Founder A-Roll Studio Bar
+      const arollLbl = document.getElementById('aroll-status-label');
+      const arollBtn = document.getElementById('btn-auto-cutaways');
+      if (arollLbl && arollBtn) {
+        if (p.aroll_video_url) {
+          const wCount = (p.aroll_transcript || []).length;
+          arollLbl.textContent = `✓ Loaded "${p.aroll_filename || 'founder.mp4'}" (${Number(p.aroll_duration_sec || 0).toFixed(1)}s${wCount ? ` · ${wCount} words transcribed` : ''})`;
+          arollBtn.style.display = 'inline-flex';
+        } else {
+          arollLbl.textContent = 'Upload a talking-head video to weave graphics & AI B-roll seamlessly over your voice.';
+          arollBtn.style.display = 'none';
+        }
+      }
 
       const warnBar = document.getElementById('gate-warnings-bar');
       if (!gate.valid) {
@@ -2130,12 +2179,25 @@
       const cardsHtml = p.scenes.map((sc, idx) => {
         const sr = (gate.scenes || [])[idx] || { valid: true, issues: [], compiled_chars: sc.compiled_prompt_chars || 0, max_chars: sc.max_prompt_chars || 2400 };
         const tilt = idx % 2 === 0 ? 'tilt-l' : 'tilt-r';
-        const thumbUrl = sc.start_keyframe_media_url || '';
+        const thumbUrl = sc.start_keyframe_media_url || (sc.graphic_spec && sc.graphic_spec.screenshot_url) || '';
         const bgGrad = sc.colors && sc.colors.length >= 2
           ? `linear-gradient(135deg, ${esc(sc.colors[0])}, ${esc(sc.colors[1])})`
           : 'linear-gradient(135deg, #27221E, #46392D)';
         const connHtml = idx > 0
           ? `<div class="chain-connector">${sc.continues_from_prev ? '↳ Pixel-Chained' : '→ Cut'}</div>`
+          : '';
+        const kindBadge = sc.kind === 'motion_graphic'
+          ? `🎨 ${(sc.graphic_spec?.template_id || 'motion_graphic').replace(/_/g, ' ')}`
+          : sc.kind === 'user_clip'
+            ? (sc.user_clip?.clip_url ? `📹 ${sc.user_clip.filename || 'Video Ready'}` : '📹 Upload Video')
+            : sc.kind === 'kinetic_ui'
+              ? '✨ Kinetic UI ($0)'
+              : '✦ AI Cinema';
+        const cutWindow = sc.aroll_window && sc.aroll_window.length === 2
+          ? `<span class="spec-chip">⏱ Cutaway ${Number(sc.aroll_window[0]).toFixed(1)}s–${Number(sc.aroll_window[1]).toFixed(1)}s</span>`
+          : '';
+        const ovBadge = (sc.overlays || []).length
+          ? `<span class="spec-chip">🏷 ${sc.overlays.length} Overlay(s)</span>`
           : '';
         return `
           <div class="scene-node-wrap">
@@ -2145,9 +2207,9 @@
               <div class="polaroid-frame" style="background:${bgGrad};">
                 ${thumbUrl ? `<img src="${esc(thumbUrl)}" alt="${esc(sc.title)}" />` : ''}
                 <div class="polaroid-frame-overlay">
-                  <span class="frame-chip">Scene ${idx + 1} · ${sc.duration_sec}s</span>
+                  <span class="frame-chip">Act ${idx + 1} · ${sc.duration_sec}s</span>
                   <span class="frame-chip" style="background:${sr.valid ? 'rgba(46,125,91,0.9)' : 'rgba(184,110,20,0.92)'};">
-                    ${sr.valid ? '✓ Valid' : `⚠ ${sr.issues.length}`}
+                    ${esc(kindBadge)}
                   </span>
                 </div>
               </div>
@@ -2158,17 +2220,19 @@
               </div>
 
               <div class="spec-chips">
+                ${cutWindow}
+                ${ovBadge}
                 ${(sc.subjects || []).slice(0, 2).map(s => `<span class="spec-chip">👤 ${esc(s)}</span>`).join('')}
-                ${(sc.materials || []).slice(0, 2).map(m => `<span class="spec-chip">◆ ${esc(m)}</span>`).join('')}
+                ${(sc.materials || []).slice(0, 1).map(m => `<span class="spec-chip">◆ ${esc(m)}</span>`).join('')}
               </div>
 
-              <p class="polaroid-cam">🎥 ${esc(sc.camera_spec)}</p>
-              <div class="polaroid-end"><strong>End Lock:</strong> ${esc(sc.end_frame)}</div>
+              <p class="polaroid-cam">${sc.kind === 'motion_graphic' ? `✨ ${esc(sc.graphic_spec?.headline || sc.title)}` : `🎥 ${esc(sc.camera_spec)}`}</p>
+              <div class="polaroid-end"><strong>${sc.kind === 'user_clip' ? 'Framing:' : 'End Lock:'}</strong> ${esc(sc.kind === 'user_clip' ? (sc.user_clip?.framing || 'cover_crop') : sc.end_frame)}</div>
 
               <div class="polaroid-actions" onclick="event.stopPropagation()">
-                <div style="display:flex;gap:6px;">
-                  <button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', false)">✎ Edit Sheet</button>
-                  <button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', true)">&lt;/&gt; JSON</button>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', false)">✎ Edit</button>
+                  ${sc.kind === 'user_clip' ? `<label class="mini-btn" style="cursor:pointer;">⬆ Video<input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" /></label>` : `<button class="mini-btn" onclick="openSceneDrawer('${esc(sc.scene_id)}', true)">&lt;/&gt; JSON</button>`}
                 </div>
                 ${p.scenes.length > 1 ? `<button class="mini-btn danger" onclick="deleteSceneUI('${esc(sc.scene_id)}')" title="Remove scene">✕</button>` : `<span style="font-size:11px;color:var(--ink-muted);">${sr.compiled_chars}/${sr.max_chars} ch</span>`}
               </div>
@@ -2178,10 +2242,107 @@
       }).join('');
 
       const addCard = p.scenes.length < 6
-        ? `<button class="add-scene-card" onclick="addScenePrompt()"><span style="font-size:26px;">＋</span><span>Add Next Scene</span><span style="font-size:11.5px;font-weight:500;">Chain +5s to +15s</span></button>`
+        ? `<button class="add-scene-card" onclick="addScenePrompt('motion_graphic')"><span style="font-size:26px;">＋</span><span>Add Motion Graphic</span><span style="font-size:11.5px;font-weight:500;">UI · Chart · Code ($0)</span></button>`
         : '';
 
       flow.innerHTML = cardsHtml + addCard;
+    }
+
+    async function uploadProjectArollUI(input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      startProgress({
+        message: `Uploading Founder A-Roll "${file.name}"…`,
+        steps: ['Stream Video Upload', 'Probe Duration & Audio', 'Attach to Pinboard'],
+        avgDurationSec: 5,
+      });
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/upload-aroll`, {
+          method: 'POST',
+          body: fd,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        setProject(data);
+        renderPinboard();
+        finishProgress(data.status_message || 'Founder A-Roll uploaded! Click Auto-Transcribe & Plan Cutaways.', 'success');
+      } catch (err) {
+        finishProgress(`Upload failed: ${err.message}`, 'error');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    async function autoPlanCutawaysUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-auto-cutaways');
+      setButtonLoading(btn, true, 'Planning Cutaways…');
+      startProgress({
+        message: 'Transcribing your Founder A-Roll & planning UI/B-Roll cutaways…',
+        steps: ['Extract Speech Track', 'Word-Sync Transcript', 'Place Timed Cutaways'],
+        avgDurationSec: state.mockMode ? 3 : 12,
+      });
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/auto-cutaways`, {
+          method: 'POST',
+          body: JSON.stringify({ mock: state.mockMode }),
+        });
+        setProject(proj);
+        renderPinboard();
+        finishProgress(proj.status_message || 'Cutaways planned over your Founder A-Roll!', 'success');
+      } catch (err) {
+        finishProgress(`Cutaway planning failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
+    async function uploadSceneClipUI(sceneId, input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      startProgress({
+        message: `Uploading "${file.name}" onto Act…`,
+        steps: ['Stream Video Upload', 'Probe Media', 'Attach to Act'],
+        avgDurationSec: 4,
+      });
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/upload-clip`, {
+          method: 'POST',
+          body: fd,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        setProject(data);
+        renderPinboard();
+        if (state.editingSceneId === sceneId) openSceneDrawer(sceneId, false);
+        finishProgress(data.status_message || 'Video clip uploaded!', 'success');
+      } catch (err) {
+        finishProgress(`Clip upload failed: ${err.message}`, 'error');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    async function uploadSceneScreenshotUI(sceneId, input) {
+      const file = input.files && input.files[0];
+      if (!file || !state.project) return;
+      try {
+        const data_url = await fileToDataUrl(file);
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes/${encodeURIComponent(sceneId)}/upload-screenshot`, {
+          method: 'POST',
+          body: JSON.stringify({ filename: file.name, data_url }),
+        });
+        setProject(proj);
+        renderPinboard();
+        if (state.editingSceneId === sceneId) openSceneDrawer(sceneId, false);
+        showBanner('Attached product screenshot into Motion Graphic frame.', 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
+      }
     }
 
     async function saveProjectTitle(val) {
@@ -2212,23 +2373,29 @@
       }
     }
 
-    async function addScenePrompt() {
+    async function addScenePrompt(kind = 'ai_sequence') {
       if (!state.project) return;
       try {
         const activeM = state.project.active_model || {};
-        const defDur = activeM.default_duration_sec || 10;
+        const defDur = kind === 'motion_graphic' ? 5 : (activeM.default_duration_sec || 10);
+        const n = state.project.scenes.length + 1;
+        const title = kind === 'motion_graphic'
+          ? `Act ${n} · Live UI & Motion Graphic`
+          : kind === 'user_clip'
+            ? `Act ${n} · Founder / Product Video`
+            : `Scene ${n} · Next Evolution`;
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/scenes`, {
           method: 'POST',
           body: JSON.stringify({
-            title: `Scene ${state.project.scenes.length + 1} · Next Evolution`,
+            title,
             duration_sec: defDur,
-            kind: 'ai_sequence',
-            continues_from_prev: true,
+            kind,
+            continues_from_prev: kind === 'ai_sequence',
           }),
         });
         setProject(proj);
         renderPinboard();
-        showBanner(`Added Scene ${proj.scenes.length} (total ${proj.total_duration_sec}s).`, 'success');
+        showBanner(`Added ${title} (total ${proj.total_duration_sec}s).`, 'success');
       } catch (err) {
         showBanner(err.message, 'error');
       }
@@ -2302,10 +2469,122 @@
           </div>
           <div class="field-group">
             <label class="field-label">Scene Engine Mode</label>
-            <select class="field-select" id="ed-kind">
-              <option value="ai_sequence" ${sc.kind === 'ai_sequence' ? 'selected' : ''}>AI Cinema Sequence</option>
-              <option value="kinetic_ui" ${sc.kind === 'kinetic_ui' ? 'selected' : ''}>Kinetic Brand / UI Card ($0)</option>
+            <select class="field-select" id="ed-kind" onchange="toggleDrawerKindSections(this.value)">
+              <option value="ai_sequence" ${sc.kind === 'ai_sequence' ? 'selected' : ''}>✦ AI Cinema Sequence</option>
+              <option value="motion_graphic" ${sc.kind === 'motion_graphic' ? 'selected' : ''}>🎨 Motion Graphic ($0 · UI / Charts / Code)</option>
+              <option value="user_clip" ${sc.kind === 'user_clip' ? 'selected' : ''}>📹 My Video / Founder Clip ($0)</option>
+              <option value="kinetic_ui" ${sc.kind === 'kinetic_ui' ? 'selected' : ''}>✨ Legacy Kinetic Title Card ($0)</option>
             </select>
+          </div>
+        </div>
+
+        <!-- Motion Graphic Controls -->
+        <div id="ed-mg-section" style="display:${sc.kind === 'motion_graphic' ? 'flex' : 'none'};flex-direction:column;gap:10px;background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;">
+          <strong style="font-size:13px;">🎨 Launch Motion Graphic Settings ($0)</strong>
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Template</label>
+              <select class="field-select" id="ed-mg-template">
+                ${(state.catalog?.motion_templates || [
+                  { id: 'kinetic_headline', label: 'Kinetic Editorial Headline' },
+                  { id: 'prompt_ui_demo', label: 'Live Prompt & UI Demo' },
+                  { id: 'benchmark_bars', label: 'Animated Benchmark Chart' },
+                  { id: 'bento_feature_grid', label: 'Bento Feature Grid' },
+                  { id: 'terminal_code', label: 'Terminal / SDK Code Reveal' },
+                  { id: 'split_comparison', label: 'Before vs. After Split' },
+                ]).map(t => `<option value="${esc(t.id)}" ${(sc.graphic_spec?.template_id || 'prompt_ui_demo') === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Theme Palette</label>
+              <select class="field-select" id="ed-mg-theme">
+                <option value="dark_glass" ${(sc.graphic_spec?.theme_mode || 'dark_glass') === 'dark_glass' ? 'selected' : ''}>Dark Glass (OpenAI / Gemini)</option>
+                <option value="warm_editorial" ${(sc.graphic_spec?.theme_mode || '') === 'warm_editorial' ? 'selected' : ''}>Warm Editorial (Anthropic)</option>
+                <option value="clean_light" ${(sc.graphic_spec?.theme_mode || '') === 'clean_light' ? 'selected' : ''}>Clean Light Studio</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Eyebrow Badge</label>
+              <input class="field-input" id="ed-mg-eyebrow" value="${esc(sc.graphic_spec?.eyebrow || '')}" placeholder="e.g. INTRODUCING · BENCHMARK" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Headline</label>
+              <input class="field-input" id="ed-mg-headline" value="${esc(sc.graphic_spec?.headline || sc.title)}" />
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Prompt / Command Text</label>
+            <input class="field-input" id="ed-mg-prompt" value="${esc(sc.graphic_spec?.prompt_text || '')}" placeholder="e.g. npx launchcut deploy --prod" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Response / Bullet Lines (one per line)</label>
+            <textarea class="field-textarea" id="ed-mg-lines" placeholder="✓ Live reasoning stream&#10;✓ Zero setup friction">${esc((sc.graphic_spec?.response_lines || []).join('\n'))}</textarea>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:var(--ink-muted);">${sc.graphic_spec?.screenshot_url ? '✓ Product screenshot attached' : 'Optional: frame a real product screenshot inside the UI'}</span>
+            <label class="mini-btn" style="cursor:pointer;">
+              ⬆ Upload UI Screenshot
+              <input type="file" accept="image/*" style="display:none;" onchange="uploadSceneScreenshotUI('${esc(sc.scene_id)}', this)" />
+            </label>
+          </div>
+        </div>
+
+        <!-- User Video Clip Controls -->
+        <div id="ed-uc-section" style="display:${sc.kind === 'user_clip' ? 'flex' : 'none'};flex-direction:column;gap:10px;background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <strong style="font-size:13px;">📹 Your Video / Screen Recording ($0)</strong>
+            <label class="mini-btn" style="cursor:pointer;">
+              ⬆ Upload Video (.mp4/.mov)
+              <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" />
+            </label>
+          </div>
+          ${sc.user_clip?.clip_url ? `<video controls playsinline style="width:100%;max-height:170px;border-radius:10px;background:#111;" src="${esc(sc.user_clip.clip_url)}"></video>` : `<div style="font-size:12.5px;color:var(--ink-muted);">No video uploaded for this Act yet.</div>`}
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Trim Start (sec)</label>
+              <input class="field-input" id="ed-uc-start" type="number" step="0.1" min="0" value="${Number(sc.user_clip?.trim_start_sec || 0)}" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Trim End (sec)</label>
+              <input class="field-input" id="ed-uc-end" type="number" step="0.1" min="0.5" value="${Number(sc.user_clip?.trim_end_sec ?? sc.user_clip?.source_duration_sec ?? sc.duration_sec)}" />
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Aspect Framing</label>
+              <select class="field-select" id="ed-uc-framing">
+                <option value="cover_crop" ${(sc.user_clip?.framing || 'cover_crop') === 'cover_crop' ? 'selected' : ''}>Smart Fill Frame (Talking Head)</option>
+                <option value="contain_blur" ${(sc.user_clip?.framing || '') === 'contain_blur' ? 'selected' : ''}>Blurred Backdrop (Vertical → 16:9)</option>
+                <option value="device_bezel" ${(sc.user_clip?.framing || '') === 'device_bezel' ? 'selected' : ''}>Floating Studio Window (Screen Demo)</option>
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;margin-top:20px;cursor:pointer;">
+              <input type="checkbox" id="ed-uc-audio" ${(sc.user_clip?.keep_original_audio ?? true) ? 'checked' : ''} />
+              Keep My Voice Audio
+            </label>
+          </div>
+        </div>
+
+        <!-- Graphic Overlay Controls (Lower-Third / Stat Pill) -->
+        <div style="display:flex;flex-direction:column;gap:8px;background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;">
+          <strong style="font-size:13px;">🏷 On-Screen Overlay (Optional Lower-Third / Stat Pill)</strong>
+          <div class="form-grid-2">
+            <select class="field-select" id="ed-ov-kind">
+              <option value="lower_third" ${(sc.overlays?.[0]?.kind || 'lower_third') === 'lower_third' ? 'selected' : ''}>Lower-Third Nameplate</option>
+              <option value="stat_pill" ${(sc.overlays?.[0]?.kind || '') === 'stat_pill' ? 'selected' : ''}>Floating Stat Pill</option>
+              <option value="feature_callout" ${(sc.overlays?.[0]?.kind || '') === 'feature_callout' ? 'selected' : ''}>Feature Callout Card</option>
+            </select>
+            <select class="field-select" id="ed-ov-pos">
+              <option value="bottom_left" ${(sc.overlays?.[0]?.position || 'bottom_left') === 'bottom_left' ? 'selected' : ''}>Bottom Left</option>
+              <option value="top_right" ${(sc.overlays?.[0]?.position || '') === 'top_right' ? 'selected' : ''}>Top Right</option>
+              <option value="bottom_center" ${(sc.overlays?.[0]?.position || '') === 'bottom_center' ? 'selected' : ''}>Bottom Center</option>
+            </select>
+          </div>
+          <div class="form-grid-2">
+            <input class="field-input" id="ed-ov-primary" value="${esc(sc.overlays?.[0]?.primary_text || '')}" placeholder="Primary text (e.g. Akhil · Founder)" />
+            <input class="field-input" id="ed-ov-secondary" value="${esc(sc.overlays?.[0]?.secondary_text || '')}" placeholder="Secondary text (optional)" />
           </div>
         </div>
 
@@ -2366,6 +2645,13 @@
       renderPinboard();
     }
 
+    function toggleDrawerKindSections(kind) {
+      const mg = document.getElementById('ed-mg-section');
+      const uc = document.getElementById('ed-uc-section');
+      if (mg) mg.style.display = kind === 'motion_graphic' ? 'flex' : 'none';
+      if (uc) uc.style.display = kind === 'user_clip' ? 'flex' : 'none';
+    }
+
     function appendDrawerBeat() {
       const list = document.getElementById('ed-beats-list');
       const div = document.createElement('div');
@@ -2413,11 +2699,52 @@
 
       const scenesCopy = state.project.scenes.map(s => ({ ...s }));
       const chainEl = document.getElementById('ed-chain');
+      const kindVal = document.getElementById('ed-kind').value;
+      const durVal = Number(document.getElementById('ed-dur').value || 10);
+
+      let graphicSpec = scenesCopy[idx].graphic_spec || null;
+      if (kindVal === 'motion_graphic') {
+        const rawLines = (document.getElementById('ed-mg-lines')?.value || '').split('\n').map(x => x.trim()).filter(Boolean);
+        graphicSpec = {
+          ...(graphicSpec || {}),
+          template_id: document.getElementById('ed-mg-template')?.value || 'prompt_ui_demo',
+          theme_mode: document.getElementById('ed-mg-theme')?.value || 'dark_glass',
+          eyebrow: document.getElementById('ed-mg-eyebrow')?.value.trim() || '',
+          headline: document.getElementById('ed-mg-headline')?.value.trim() || '',
+          prompt_text: document.getElementById('ed-mg-prompt')?.value.trim() || '',
+          response_lines: rawLines,
+        };
+      }
+
+      let userClip = scenesCopy[idx].user_clip || null;
+      if (kindVal === 'user_clip') {
+        userClip = {
+          ...(userClip || {}),
+          trim_start_sec: Number(document.getElementById('ed-uc-start')?.value || 0),
+          trim_end_sec: Number(document.getElementById('ed-uc-end')?.value || durVal),
+          framing: document.getElementById('ed-uc-framing')?.value || 'cover_crop',
+          keep_original_audio: Boolean(document.getElementById('ed-uc-audio')?.checked ?? true),
+        };
+      }
+
+      const ovPri = document.getElementById('ed-ov-primary')?.value.trim() || '';
+      const overlays = ovPri
+        ? [{
+            overlay_id: 'ov_1',
+            kind: document.getElementById('ed-ov-kind')?.value || 'lower_third',
+            primary_text: ovPri,
+            secondary_text: document.getElementById('ed-ov-secondary')?.value.trim() || '',
+            position: document.getElementById('ed-ov-pos')?.value || 'bottom_left',
+            start_sec: 0.4,
+            end_sec: Math.max(1.5, durVal - 0.5),
+          }]
+        : [];
+
       scenesCopy[idx] = {
         ...scenesCopy[idx],
         title: document.getElementById('ed-title').value.trim() || scenesCopy[idx].title,
-        duration_sec: Number(document.getElementById('ed-dur').value || 10),
-        kind: document.getElementById('ed-kind').value,
+        duration_sec: durVal,
+        kind: kindVal,
         continues_from_prev: chainEl ? chainEl.checked : false,
         subjects: splitCsv(document.getElementById('ed-subjects').value),
         materials: splitCsv(document.getElementById('ed-materials').value),
@@ -2426,10 +2753,13 @@
         vo_line: document.getElementById('ed-vo').value.trim(),
         end_frame: document.getElementById('ed-end').value.trim(),
         beats,
+        graphic_spec: graphicSpec,
+        user_clip: userClip,
+        overlays,
       };
 
       const btn = document.getElementById('btn-save-scene');
-      btn.disabled = true;
+      setButtonLoading(btn, true, 'Saving…');
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`, {
           method: 'PATCH',
@@ -2442,7 +2772,7 @@
       } catch (err) {
         showBanner(`Save failed: ${err.message}`, 'error');
       } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
       }
     }
 
@@ -2822,6 +3152,14 @@
       document.getElementById('brand-outro-fields').style.display = p.add_brand_outro ? 'flex' : 'none';
       document.getElementById('outro-brand-name').value = p.brand_name || '';
       document.getElementById('outro-brand-tagline').value = p.brand_tagline || '';
+
+      const capChk = document.getElementById('chk-captions');
+      if (capChk) {
+        capChk.checked = Boolean(p.enable_captions);
+        document.getElementById('captions-style-wrap').style.display = p.enable_captions ? 'block' : 'none';
+        const capSel = document.getElementById('caption-style-select');
+        if (capSel && p.caption_style) capSel.value = p.caption_style;
+      }
     }
 
     function selectSeam(seam) {
@@ -2840,6 +3178,13 @@
       if (!state.project) return;
       state.project.add_brand_outro = Boolean(checked);
       document.getElementById('brand-outro-fields').style.display = checked ? 'flex' : 'none';
+    }
+
+    function toggleCaptionsUI(checked) {
+      if (!state.project) return;
+      state.project.enable_captions = Boolean(checked);
+      const wrap = document.getElementById('captions-style-wrap');
+      if (wrap) wrap.style.display = checked ? 'block' : 'none';
     }
 
     async function uploadBrandLogo(input) {
@@ -2863,8 +3208,10 @@
       const btn = document.getElementById('btn-stitch-master');
       setButtonLoading(btn, true, 'Stitching…');
       startProgress({
-        message: 'Stitching Master Cut in low-RAM studio FFmpeg…',
-        steps: ['Collect Winning Takes', 'Blend Seams & Audio', 'Encode Master Cut'],
+        message: state.project.timeline_mode === 'aroll_with_cutaways'
+          ? 'Stitching continuous Founder A-Roll + Cutaways in FFmpeg…'
+          : 'Stitching Master Cut in low-RAM studio FFmpeg…',
+        steps: ['Collect Winning Takes', 'Composite Overlays & Audio', 'Encode Master Cut'],
         avgDurationSec: state.mockMode ? 3 : 8,
       });
       try {
@@ -2876,6 +3223,9 @@
             add_brand_outro: document.getElementById('chk-brand-outro').checked,
             brand_name: document.getElementById('outro-brand-name').value.trim() || null,
             brand_tagline: document.getElementById('outro-brand-tagline').value.trim() || null,
+            timeline_mode: state.project.timeline_mode || 'sequential_acts',
+            enable_captions: Boolean(document.getElementById('chk-captions')?.checked),
+            caption_style: document.getElementById('caption-style-select')?.value || 'minimal_bottom',
             mock: state.mockMode,
           }),
         });

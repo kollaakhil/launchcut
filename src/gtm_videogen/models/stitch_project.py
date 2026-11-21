@@ -31,9 +31,56 @@ from gtm_videogen.models.director_blueprint import (
 from gtm_videogen.models.model_registry import VideoModelSpec
 
 StitchAspect = Literal["16:9", "9:16", "1:1"]
-SceneKind = Literal["ai_sequence", "kinetic_ui"]
+SceneKind = Literal["ai_sequence", "kinetic_ui", "motion_graphic", "user_clip"]
 AudioMode = Literal["native_only", "native_plus_score", "vo_plus_ducked_score"]
 SeamTransition = Literal["invisible_chain", "micro_dissolve", "audio_riser"]
+MotionTemplateId = Literal[
+    "kinetic_headline",
+    "prompt_ui_demo",
+    "benchmark_bars",
+    "bento_feature_grid",
+    "terminal_code",
+    "split_comparison",
+]
+MotionThemeMode = Literal["dark_glass", "warm_editorial", "clean_light"]
+UserClipFraming = Literal["cover_crop", "contain_blur", "device_bezel"]
+OverlayKind = Literal["lower_third", "stat_pill", "feature_callout", "brand_watermark"]
+OverlayPosition = Literal["bottom_left", "top_right", "bottom_center"]
+TimelineMode = Literal["sequential_acts", "aroll_with_cutaways"]
+CaptionStyle = Literal["minimal_bottom", "karaoke_highlight", "editorial_serif"]
+
+MOTION_TEMPLATE_CATALOG: list[dict[str, str]] = [
+    {
+        "id": "kinetic_headline",
+        "label": "Kinetic Editorial Headline",
+        "tagline": "Anthropic-style warm masked typography with spring reveal",
+    },
+    {
+        "id": "prompt_ui_demo",
+        "label": "Live Prompt & UI Demo",
+        "tagline": "OpenAI/Gemini-style typing prompt bar, cursor click & response card",
+    },
+    {
+        "id": "benchmark_bars",
+        "label": "Animated Benchmark Chart",
+        "tagline": "Animated horizontal bar chart with rolling counters & hero highlight",
+    },
+    {
+        "id": "bento_feature_grid",
+        "label": "Bento Feature Grid",
+        "tagline": "3 glassmorphic capability cards staggering in with spotlight sweep",
+    },
+    {
+        "id": "terminal_code",
+        "label": "Terminal / SDK Code Reveal",
+        "tagline": "Dark macOS terminal typing a real command/SDK call + green deploy badge",
+    },
+    {
+        "id": "split_comparison",
+        "label": "Before vs. After Split",
+        "tagline": "Crisp split-screen comparison wipe from legacy workflow to your brand",
+    },
+]
 
 _TEXT_IN_SCENE_RE = re.compile(
     r"\b(neon sign|billboard|sign reading|text reading|words reading|logo text|banner saying|written words|readable text)\b",
@@ -51,6 +98,51 @@ class StitchBeat(BaseModel):
     action: str = ""
     camera: str = ""
     sound: str = ""
+
+
+class MotionGraphicSpec(BaseModel):
+    """Parameterized spec for crisp 24fps procedural motion graphics ($0/shot, Render-512MB safe)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    template_id: MotionTemplateId = "prompt_ui_demo"
+    theme_mode: MotionThemeMode = "dark_glass"
+    eyebrow: str = ""
+    headline: str = ""
+    subheadline: str = ""
+    prompt_text: str = ""
+    response_lines: list[str] = Field(default_factory=list)
+    metrics: list[dict[str, Any]] = Field(default_factory=list)
+    screenshot_path: str | None = None
+
+
+class UserClipSpec(BaseModel):
+    """Uploaded founder video or screen recording with trim, framing, and audio controls."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    raw_video_path: str = ""
+    filename: str = "clip.mp4"
+    source_duration_sec: float = 10.0
+    trim_start_sec: float = Field(default=0.0, ge=0.0)
+    trim_end_sec: float | None = None
+    framing: UserClipFraming = "cover_crop"
+    keep_original_audio: bool = True
+    transcript_words: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SceneOverlaySpec(BaseModel):
+    """Transparent RGBA graphic overlay composited over a scene via FFmpeg."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    overlay_id: str = "ov_1"
+    kind: OverlayKind = "lower_third"
+    primary_text: str = ""
+    secondary_text: str = ""
+    position: OverlayPosition = "bottom_left"
+    start_sec: float = Field(default=0.4, ge=0.0)
+    end_sec: float = Field(default=4.2, ge=0.5)
 
 
 class StitchTake(BaseModel):
@@ -82,14 +174,14 @@ class StitchElement(BaseModel):
 
 
 class StitchScene(BaseModel):
-    """One Scene/Act (5s / 8s / 10s / 15s) in the Visual Scene Flow Diagram."""
+    """One Scene/Act (3s -> 60s) in the Visual Scene Flow Diagram."""
 
     model_config = ConfigDict(extra="ignore")
 
     scene_id: str
     index: int = 0
     title: str = "Scene 1 · Opening Hook"
-    duration_sec: int = Field(default=10, ge=4, le=15)
+    duration_sec: int = Field(default=10, ge=3, le=60)
     kind: SceneKind = "ai_sequence"
     continues_from_prev: bool = False
 
@@ -101,6 +193,12 @@ class StitchScene(BaseModel):
     vo_line: str = ""
     end_frame: str = "Locked-off hero composition with balanced negative space"
     beats: list[StitchBeat] = Field(default_factory=list)
+
+    # Hybrid Launch Controls (Motion Graphics, User Clips, Overlays & A-Roll Cutaway Window)
+    graphic_spec: MotionGraphicSpec | None = None
+    user_clip: UserClipSpec | None = None
+    overlays: list[SceneOverlaySpec] = Field(default_factory=list)
+    aroll_window: tuple[float, float] | None = None
 
     # Editable / Uploadable Start & End Anchor Keyframes
     start_keyframe_path: str | None = None
@@ -169,6 +267,15 @@ class StitchProject(BaseModel):
 
     elements: list[StitchElement] = Field(default_factory=list)
     scenes: list[StitchScene] = Field(default_factory=list)
+
+    # Hybrid Timeline: Founder A-Roll + Cutaways & Captions
+    timeline_mode: TimelineMode = "sequential_acts"
+    aroll_clip_path: str | None = None
+    aroll_filename: str | None = None
+    aroll_duration_sec: float = 0.0
+    aroll_transcript: list[dict[str, Any]] = Field(default_factory=list)
+    enable_captions: bool = False
+    caption_style: CaptionStyle = "minimal_bottom"
 
     # Soundstage & Master Finishing Controls
     audio_mode: AudioMode = "native_plus_score"
@@ -531,13 +638,86 @@ STITCH_GALLERY_RECIPES: list[dict[str, Any]] = [
         "lighting_preset": "volumetric_gold",
         "motion_preset": "epic_slowmo",
     },
+    {
+        "id": "anthropic_editorial",
+        "category": "launch",
+        "badge": "AI Launch · Hybrid",
+        "title": "Anthropic Warm Keynote",
+        "lens_tag": "Editorial UI",
+        "idea": (
+            "Warm alabaster editorial typography introduces your product, transitioning smoothly "
+            "into a crisp live prompt reasoning demo and a calm sunlit studio metaphor."
+        ),
+        "image_url": "/api/stitch/gallery/launch_anthropic.jpg",
+        "end_image_url": "/api/stitch/gallery/launch_anthropic.jpg",
+        "world_preset": "anthropic_editorial",
+        "camera_preset": "macro_tilt_shift",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["motion_graphic:kinetic_headline", "motion_graphic:prompt_ui_demo", "ai_sequence"],
+    },
+    {
+        "id": "openai_product_drop",
+        "category": "launch",
+        "badge": "Product Drop · Hybrid",
+        "title": "OpenAI Minimal Drop",
+        "lens_tag": "Live UI + 35mm",
+        "idea": (
+            "High-contrast monochrome glassmorphic prompt box streams a live answer, cuts to an "
+            "authentic human moment, and locks onto a crisp bento grid of flagship capabilities."
+        ),
+        "image_url": "/api/stitch/gallery/launch_openai.jpg",
+        "end_image_url": "/api/stitch/gallery/launch_openai.jpg",
+        "world_preset": "openai_product_drop",
+        "camera_preset": "continuous_orbit",
+        "lighting_preset": "crisp_daylight",
+        "motion_preset": "epic_slowmo",
+        "hybrid_plan": ["motion_graphic:prompt_ui_demo", "ai_sequence", "motion_graphic:bento_feature_grid"],
+    },
+    {
+        "id": "gemini_multimodal",
+        "category": "launch",
+        "badge": "Multimodal · Benchmarks",
+        "title": "Gemini Multimodal Launch",
+        "lens_tag": "Prism + Charts",
+        "idea": (
+            "Deep cosmos navy prism glass opens into a rapid before-and-after multimodal split "
+            "comparison and animated benchmark bars proving flagship speed and intelligence."
+        ),
+        "image_url": "/api/stitch/gallery/launch_gemini.jpg",
+        "end_image_url": "/api/stitch/gallery/launch_gemini.jpg",
+        "world_preset": "gemini_multimodal",
+        "camera_preset": "fpv_glide",
+        "lighting_preset": "volumetric_gold",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["ai_sequence", "motion_graphic:split_comparison", "motion_graphic:benchmark_bars"],
+    },
+    {
+        "id": "founder_keynote_hybrid",
+        "category": "launch",
+        "badge": "Founder + Demo · Hybrid",
+        "title": "Founder + Product Demo",
+        "lens_tag": "A-Roll + UI",
+        "idea": (
+            "Upload your own founder talking-head or screen demo as Act 1, then weave in crisp "
+            "product UI graphics, terminal code reveals, and cinematic AI B-roll cutaways."
+        ),
+        "image_url": "/api/stitch/gallery/launch_founder.jpg",
+        "end_image_url": "/api/stitch/gallery/launch_founder.jpg",
+        "world_preset": "founder_keynote_hybrid",
+        "camera_preset": "pullback_reveal",
+        "lighting_preset": "golden_hour",
+        "motion_preset": "seamless_morph",
+        "hybrid_plan": ["user_clip", "motion_graphic:terminal_code", "ai_sequence"],
+    },
 ]
 
 
 def get_stitch_catalog() -> dict[str, Any]:
-    """Return curated visual gallery recipes and world/camera/lighting/motion presets."""
+    """Return curated visual gallery themes, motion templates, and world/camera/lighting/motion presets."""
     return {
         "gallery": STITCH_GALLERY_RECIPES,
+        "motion_templates": MOTION_TEMPLATE_CATALOG,
         "worlds": list(WORLD_PRESETS.values()),
         "cameras": list(CAMERA_PRESETS.values()),
         "lightings": list(LIGHTING_PRESETS.values()),

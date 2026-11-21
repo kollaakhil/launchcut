@@ -44,8 +44,11 @@ from gtm_videogen.core.http_client import ResilientHttpClient
 from gtm_videogen.core.job_registry import CancellationToken
 from gtm_videogen.core.media_store import MediaStore
 from gtm_videogen.media._subprocess import aspect_to_dimensions, probe_media, run_subprocess
+from gtm_videogen.media.captions import resolve_font_path
 from gtm_videogen.media.ffmpeg_stitcher import _move_output_atomically, _pinned_h264_flags
 from gtm_videogen.media.kinetic_motion import render_kinetic_card_mp4
+from gtm_videogen.media.motion_templates import render_motion_template_mp4, render_overlay_png
+from gtm_videogen.media.user_clip_processor import normalize_user_clip_take
 from gtm_videogen.models.director_blueprint import (
     CAMERA_PRESETS,
     LIGHTING_PRESETS,
@@ -70,15 +73,22 @@ from gtm_videogen.models.schemas import (
 )
 from gtm_videogen.models.stitch_project import (
     STITCH_GALLERY_RECIPES,
+    MotionGraphicSpec,
+    MotionTemplateId,
+    MotionThemeMode,
+    SceneKind,
+    SceneOverlaySpec,
     StitchAspect,
     StitchBeat,
     StitchProject,
     StitchScene,
     StitchTake,
+    UserClipSpec,
     validate_stitch_project,
 )
 from gtm_videogen.providers.audio import AudioProvider
 from gtm_videogen.providers.scraper import BrandScraper
+from gtm_videogen.providers.transcription import transcribe_video_words
 from gtm_videogen.providers.video import VideoProvider
 
 
@@ -456,6 +466,105 @@ def _find_gallery_recipe(recipe_id: str | None) -> dict[str, Any] | None:
     return None
 
 
+def _default_graphic_spec(
+    template_id: MotionTemplateId,
+    *,
+    brand: str,
+    idea: str,
+    scraped: dict[str, Any],
+    world_id: str,
+) -> MotionGraphicSpec:
+    """Build a brand-tailored MotionGraphicSpec for any of the 6 launch templates."""
+    theme_mode: MotionThemeMode = "warm_editorial" if world_id == "anthropic_editorial" else "dark_glass"
+    hero = brand or "LaunchCut"
+    tagline = str(scraped.get("tagline") or "").strip()
+    facts = [str(f).strip() for f in (scraped.get("facts") or []) if str(f).strip()]
+    clean_idea = idea.strip()
+
+    if template_id == "kinetic_headline":
+        return MotionGraphicSpec(
+            template_id="kinetic_headline",
+            theme_mode=theme_mode,
+            eyebrow=f"INTRODUCING {hero.upper()}",
+            headline=tagline[:72] or clean_idea[:72] or f"Meet {hero}",
+            subheadline=facts[0][:110] if facts else clean_idea[:110],
+        )
+    if template_id == "benchmark_bars":
+        return MotionGraphicSpec(
+            template_id="benchmark_bars",
+            theme_mode=theme_mode,
+            eyebrow="PERFORMANCE BENCHMARK",
+            headline=f"{hero} leads on speed & quality",
+            subheadline=facts[0][:90] if facts else clean_idea[:90],
+            metrics=[
+                {"label": hero[:20], "value": 96.4, "display": "96.4%", "highlight": True},
+                {"label": "Previous Gen", "value": 72.1, "display": "72.1%", "highlight": False},
+                {"label": "Legacy Flow", "value": 48.5, "display": "48.5%", "highlight": False},
+            ],
+        )
+    if template_id == "bento_feature_grid":
+        f1 = facts[0][:38] if len(facts) > 0 else "Instant brand adaptation"
+        f2 = facts[1][:38] if len(facts) > 1 else "Studio-grade visual lock"
+        f3 = facts[2][:38] if len(facts) > 2 else "Ready to ship in minutes"
+        return MotionGraphicSpec(
+            template_id="bento_feature_grid",
+            theme_mode=theme_mode,
+            eyebrow=f"WHY {hero.upper()}",
+            headline=f"Everything {hero} unlocks",
+            subheadline=tagline[:90] or clean_idea[:90],
+            metrics=[
+                {"display": "10×", "label": "Faster Launch", "sub": f1},
+                {"display": "4K", "label": "Crisp Precision", "sub": f2},
+                {"display": "1-Click", "label": "Ready to Ship", "sub": f3},
+            ],
+        )
+    if template_id == "terminal_code":
+        slug = re.sub(r"[^a-z0-9]+", "-", hero.lower()).strip("-") or "app"
+        return MotionGraphicSpec(
+            template_id="terminal_code",
+            theme_mode="dark_glass",
+            eyebrow="DEVELOPER EXPERIENCE",
+            headline=f"{hero} live in one command",
+            prompt_text=f"npx {slug} launch --theme studio",
+            response_lines=[
+                f"✓ Authenticated {hero} workspace",
+                f"✓ {facts[0][:62]}" if facts else f"✓ Compiled {clean_idea[:52]}",
+                "✓ Deployed globally — ready in 120ms",
+            ],
+        )
+    if template_id == "split_comparison":
+        return MotionGraphicSpec(
+            template_id="split_comparison",
+            theme_mode=theme_mode,
+            eyebrow="THE SHIFT",
+            headline=f"Before vs. With {hero}",
+            response_lines=[
+                "Fragmented manual workflows",
+                "Days of back-and-forth edits",
+                "Generic off-brand output",
+            ],
+            metrics=[
+                {"label": facts[0][:34] if facts else f"Unified {hero} pipeline"},
+                {"label": facts[1][:34] if len(facts) > 1 else "Crisp on-brand motion design"},
+                {"label": "Ship launch-ready in minutes"},
+            ],
+        )
+    # prompt_ui_demo
+    return MotionGraphicSpec(
+        template_id="prompt_ui_demo",
+        theme_mode=theme_mode,
+        eyebrow=f"{hero.upper()} LIVE DEMO",
+        headline=tagline[:68] or f"{hero} in action",
+        subheadline=clean_idea[:90],
+        prompt_text=clean_idea[:64] or f"Launch {hero} for our flagship release",
+        response_lines=[
+            tagline[:68] or f"{hero}: {clean_idea[:54]}",
+            f"✓ {facts[0][:64]}" if facts else "✓ Instant visual choreography generated",
+            f"✓ {facts[1][:64]}" if len(facts) > 1 else "✓ Studio-grade output ready to publish",
+        ],
+    )
+
+
 def _build_deterministic_scenes(
     *,
     idea: str,
@@ -566,13 +675,53 @@ def _build_deterministic_scenes(
             ),
         ]
 
+    recipe = _find_gallery_recipe(recipe_id)
+    hybrid_plan: list[str] = list(recipe.get("hybrid_plan") or []) if recipe else []
+    world_id = str(world_data.get("id") or "miniature_diorama")
+
     scenes: list[StitchScene] = []
     for idx, dur in enumerate(durations):
         spec = arc_specs[min(idx, len(arc_specs) - 1)]
         sc_title, subjs, mats, cam_s, end_f, vo_l = spec
         if idx >= len(arc_specs):
             sc_title = f"Scene {idx + 1} · Continuation"
-        continues = idx > 0
+
+        sc_kind: SceneKind = "ai_sequence"
+        graphic_spec: MotionGraphicSpec | None = None
+        user_clip: UserClipSpec | None = None
+        overlays: list[SceneOverlaySpec] = []
+
+        if idx < len(hybrid_plan):
+            token = hybrid_plan[idx]
+            if token.startswith("motion_graphic:"):
+                tpl_id = token.split(":", 1)[1]
+                sc_kind = "motion_graphic"
+                graphic_spec = _default_graphic_spec(
+                    tpl_id,  # type: ignore[arg-type]
+                    brand=brand,
+                    idea=clean_idea,
+                    scraped=scraped,
+                    world_id=world_id,
+                )
+                sc_title = f"Act {idx + 1} · {graphic_spec.template_id.replace('_', ' ').title()}"
+            elif token == "user_clip":
+                sc_kind = "user_clip"
+                user_clip = UserClipSpec(filename="", raw_video_path="", source_duration_sec=float(dur))
+                sc_title = f"Act {idx + 1} · Founder / Product Video"
+                if brand:
+                    overlays.append(
+                        SceneOverlaySpec(
+                            overlay_id=f"ov_{idx + 1}",
+                            kind="lower_third",
+                            primary_text=brand,
+                            secondary_text=str(scraped.get("tagline") or "Product Launch")[:48],
+                            position="bottom_left",
+                            start_sec=0.5,
+                            end_sec=min(float(dur) - 0.5, 4.5),
+                        )
+                    )
+
+        continues = idx > 0 and sc_kind == "ai_sequence" and scenes[idx - 1].kind == "ai_sequence"
         prev_end = scenes[idx - 1].end_frame if continues else ""
         beats = _make_beats_for_duration(
             dur,
@@ -590,7 +739,7 @@ def _build_deterministic_scenes(
                 index=idx,
                 title=sc_title,
                 duration_sec=dur,
-                kind="ai_sequence",
+                kind=sc_kind,
                 continues_from_prev=continues,
                 subjects=list(subjs),
                 materials=list(mats),
@@ -599,6 +748,9 @@ def _build_deterministic_scenes(
                 vo_line=vo_l,
                 end_frame=end_f,
                 beats=beats,
+                graphic_spec=graphic_spec,
+                user_clip=user_clip,
+                overlays=overlays,
             )
         )
     return title[:72], main_subject[:220], scenes
@@ -1009,8 +1161,69 @@ async def render_single_scene_take(
                 chained_start_uri = encode_image_data_uri(chain_jpg)
                 chained_from_prev = True
 
-        # 2. $0 Kinetic UI Scene OR $0 Offline Animatic Take
-        if sc.kind == "kinetic_ui" or use_mock:
+        # 2A. User / Founder Video Clip Take ($0 — trimmed, framed & loudnormed)
+        if sc.kind == "user_clip":
+            if not sc.user_clip or not sc.user_clip.raw_video_path or not Path(sc.user_clip.raw_video_path).is_file():
+                raise RuntimeError(
+                    f"Upload a video clip (.mp4/.mov) onto '{sc.title}' before shooting this Act."
+                )
+            await _report(f"Normalizing {sc.title} ({sc.user_clip.framing}, loudnorm)...")
+            _, norm_dur = await normalize_user_clip_take(
+                clip_spec=sc.user_clip,
+                output_path=out_clip,
+                width=width,
+                height=height,
+                fps=fps,
+                ffmpeg_bin=resolved.ffmpeg_bin,
+                ffprobe_bin=resolved.ffprobe_bin,
+                cancel=cancel,
+            )
+            sc.duration_sec = max(3, min(60, int(round(norm_dur))))
+            take = StitchTake(
+                take_id=take_num,
+                engine_id="user_clip",
+                engine_label=f"User Video ({sc.user_clip.framing})",
+                clip_path=str(out_clip),
+                duration_sec=float(norm_dur),
+                usd=0.0,
+                chained_from_prev=False,
+            )
+        # 2B. Launch Motion Graphics Template ($0 — crisp 24fps UI / Charts / Code / Editorial)
+        elif sc.kind == "motion_graphic" or (sc.kind == "kinetic_ui" and sc.graphic_spec is not None):
+            gspec = sc.graphic_spec or _default_graphic_spec(
+                "prompt_ui_demo",
+                brand=project.brand_name or project.title,
+                idea=project.idea,
+                scraped={},
+                world_id=project.world_preset,
+            )
+            label = f"Motion Graphic · {gspec.template_id.replace('_', ' ').title()} ($0)"
+            await _report(f"Rendering {sc.title} · Take {take_num} ({label})...")
+            await render_motion_template_mp4(
+                spec=gspec,
+                output_path=out_clip,
+                width=width,
+                height=height,
+                fps=fps,
+                duration_sec=float(sc.duration_sec),
+                brand_name=project.brand_name or project.title,
+                accent_rgb=accent_rgb,
+                ffmpeg_bin=resolved.ffmpeg_bin,
+                ffprobe_bin=resolved.ffprobe_bin,
+                fonts_dir=resolved.fonts_dir,
+                cancel=cancel,
+            )
+            take = StitchTake(
+                take_id=take_num,
+                engine_id=f"motion_graphic:{gspec.template_id}",
+                engine_label=label,
+                clip_path=str(out_clip),
+                duration_sec=float(sc.duration_sec),
+                usd=0.0,
+                chained_from_prev=False,
+            )
+        # 2C. Legacy $0 Kinetic UI Scene OR $0 Offline Animatic Take
+        elif sc.kind == "kinetic_ui" or use_mock:
             label = "Kinetic UI ($0)" if sc.kind == "kinetic_ui" else "Studio Animatic ($0)"
             await _report(f"Rendering {sc.title} · Take {take_num} ({label})...")
             hero_img: Path | None = None
@@ -1228,6 +1441,270 @@ def _synthesize_riser_bed_wav(
     return out_path
 
 
+async def plan_aroll_cutaways(
+    project: StitchProject,
+    *,
+    settings: Settings | None = None,
+    mock: bool = False,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Transcribe Founder A-Roll (if needed) and plan timed Motion Graphic & AI B-Roll cutaways."""
+    if not project.aroll_clip_path or not Path(project.aroll_clip_path).is_file():
+        raise RuntimeError("Upload a Founder A-Roll video first before planning cutaways.")
+    resolved = settings or get_settings()
+    if not project.aroll_transcript or project.aroll_duration_sec <= 0:
+        _, words, dur = await transcribe_video_words(
+            Path(project.aroll_clip_path),
+            fallback_text=project.idea or project.title,
+            settings=resolved,
+            mock=mock,
+            cancel=cancel,
+        )
+        project.aroll_transcript = words
+        project.aroll_duration_sec = dur
+
+    dur = max(4.0, float(project.aroll_duration_sec or 15.0))
+    brand = project.brand_name or project.title
+    # Plan 2 well-paced cutaway windows leaving founder on camera for opening & closing hooks
+    w1_start = round(max(1.2, dur * 0.22), 2)
+    w1_end = round(min(dur - 1.5, w1_start + min(5.0, max(2.5, dur * 0.28))), 2)
+    w2_start = round(max(w1_end + 1.2, dur * 0.60), 2)
+    w2_end = round(min(dur - 1.0, w2_start + min(5.0, max(2.2, dur * 0.24))), 2)
+
+    def _snippet(t0: float, t1: float) -> str:
+        ws = [
+            str(w.get("word") or "")
+            for w in project.aroll_transcript
+            if float(w.get("start", 0.0)) >= t0 - 0.2 and float(w.get("end", 0.0)) <= t1 + 0.3
+        ]
+        return " ".join(ws).strip()
+
+    s1_txt = _snippet(w1_start, w1_end) or project.idea[:80]
+    s2_txt = _snippet(w2_start, w2_end) or f"{brand} product vision"
+
+    cutaway_scenes: list[StitchScene] = []
+    if w1_end - w1_start >= 1.5:
+        g1 = _default_graphic_spec(
+            "prompt_ui_demo",
+            brand=brand,
+            idea=s1_txt,
+            scraped={"tagline": project.brand_tagline or "", "facts": [s1_txt]},
+            world_id=project.world_preset,
+        )
+        cutaway_scenes.append(
+            StitchScene(
+                scene_id=f"sc_cut1_{uuid4().hex[:6]}",
+                index=0,
+                title=f"Cutaway 1 · UI Proof ({w1_start:.1f}s–{w1_end:.1f}s)",
+                duration_sec=max(3, int(round(w1_end - w1_start))),
+                kind="motion_graphic",
+                continues_from_prev=False,
+                subjects=[brand, "live product interface"],
+                materials=["dark frosted glass", "crisp vector UI"],
+                camera_spec="Locked studio UI choreography",
+                colors=list(project.lighting.color_palette[:3] or ["#0C0E14", "#4E8CFF", "#F4F7FC"]),
+                vo_line=s1_txt[:140],
+                end_frame="Clean product UI proof locked in frame",
+                beats=_make_beats_for_duration(
+                    max(3, int(round(w1_end - w1_start))),
+                    scene_title="UI Proof Cutaway",
+                    idea=s1_txt,
+                    subjects=[brand],
+                    materials=["frosted glass", "vector UI"],
+                    camera_spec="Locked studio UI choreography",
+                    continues=False,
+                    prev_end_frame="",
+                ),
+                graphic_spec=g1,
+                aroll_window=(w1_start, w1_end),
+            )
+        )
+
+    if w2_end - w2_start >= 1.5:
+        g2 = _default_graphic_spec(
+            "benchmark_bars",
+            brand=brand,
+            idea=s2_txt,
+            scraped={"tagline": project.brand_tagline or "", "facts": [s2_txt]},
+            world_id=project.world_preset,
+        )
+        cutaway_scenes.append(
+            StitchScene(
+                scene_id=f"sc_cut2_{uuid4().hex[:6]}",
+                index=len(cutaway_scenes),
+                title=f"Cutaway 2 · Impact Proof ({w2_start:.1f}s–{w2_end:.1f}s)",
+                duration_sec=max(3, int(round(w2_end - w2_start))),
+                kind="motion_graphic",
+                continues_from_prev=False,
+                subjects=[brand, "animated performance benchmark"],
+                materials=["editorial glass", "luminous accent bars"],
+                camera_spec="Smooth studio data reveal",
+                colors=list(project.lighting.color_palette[:3] or ["#0C0E14", "#E54D3A", "#F4F7FC"]),
+                vo_line=s2_txt[:140],
+                end_frame="Benchmark proof locked with brand highlight",
+                beats=_make_beats_for_duration(
+                    max(3, int(round(w2_end - w2_start))),
+                    scene_title="Benchmark Cutaway",
+                    idea=s2_txt,
+                    subjects=[brand],
+                    materials=["editorial glass"],
+                    camera_spec="Smooth studio data reveal",
+                    continues=False,
+                    prev_end_frame="",
+                ),
+                graphic_spec=g2,
+                aroll_window=(w2_start, w2_end),
+            )
+        )
+
+    if cutaway_scenes:
+        project.scenes = cutaway_scenes
+    project.timeline_mode = "aroll_with_cutaways"
+    project.status_message = (
+        f"Planned {len(cutaway_scenes)} timed cutaway(s) over your {dur:.1f}s Founder A-Roll voice track."
+    )
+    return project
+
+
+async def _apply_scene_overlays(
+    *,
+    clip_path: Path,
+    overlays: list[SceneOverlaySpec],
+    output_path: Path,
+    width: int,
+    height: int,
+    fps: int,
+    accent_rgb: tuple[int, int, int],
+    ffmpeg_bin: str,
+    fonts_dir: Path | None,
+    threads: int,
+    tmp_dir: Path,
+    cancel: CancellationToken | None = None,
+) -> Path:
+    """Composite transparent RGBA overlay PNGs onto a single scene clip using FFmpeg."""
+    if not overlays:
+        return clip_path
+    inputs: list[str] = ["-i", str(clip_path)]
+    fc_parts: list[str] = []
+    cur = "0:v"
+    for idx, ov in enumerate(overlays[:4]):
+        png_p = render_overlay_png(
+            overlay=ov,
+            width=width,
+            height=height,
+            output_path=tmp_dir / f"ov_{idx}_{ov.overlay_id}.png",
+            accent_rgb=accent_rgb,
+            fonts_dir=fonts_dir,
+        )
+        inputs.extend(["-loop", "1", "-i", str(png_p)])
+        nxt = f"vov{idx}"
+        t0 = max(0.0, float(ov.start_sec))
+        t1 = max(t0 + 0.4, float(ov.end_sec))
+        fc_parts.append(
+            f"[{cur}][{idx + 1}:v]overlay=0:0:shortest=1:enable='between(t,{t0:.2f},{t1:.2f})'[{nxt}]"
+        )
+        cur = nxt
+
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-threads",
+        str(threads),
+        *inputs,
+        "-filter_complex",
+        ";".join(fc_parts),
+        "-map",
+        f"[{cur}]",
+        "-map",
+        "0:a?",
+        *_pinned_h264_flags(fps, threads=threads),
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+    await run_subprocess(cmd, timeout_sec=120.0, cancel=cancel, check=True)
+    return output_path
+
+
+def _ass_ts(sec: float) -> str:
+    sec = max(0.0, float(sec))
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = int(sec % 60)
+    cs = int(round((sec - math.floor(sec)) * 100))
+    if cs >= 100:
+        cs = 99
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _write_project_captions_ass(
+    *,
+    project: StitchProject,
+    clip_durations: list[float],
+    width: int,
+    height: int,
+    out_path: Path,
+) -> Path | None:
+    """Write a clean ASS v4.00+ subtitle file from A-roll word timestamps or scene VO lines."""
+    cues: list[tuple[float, float, str]] = []
+    if project.aroll_transcript:
+        # Group into crisp 4-5 word subtitle phrases
+        chunk: list[dict[str, Any]] = []
+        for w in project.aroll_transcript:
+            chunk.append(w)
+            if len(chunk) >= 5:
+                t0 = float(chunk[0].get("start", 0.0))
+                t1 = max(t0 + 0.35, float(chunk[-1].get("end", t0 + 1.2)))
+                txt = " ".join(str(x.get("word") or "") for x in chunk).strip()
+                if txt:
+                    cues.append((t0, t1, txt))
+                chunk = []
+        if chunk:
+            t0 = float(chunk[0].get("start", 0.0))
+            t1 = max(t0 + 0.35, float(chunk[-1].get("end", t0 + 1.2)))
+            txt = " ".join(str(x.get("word") or "") for x in chunk).strip()
+            if txt:
+                cues.append((t0, t1, txt))
+    else:
+        cursor = 0.0
+        for sc, dur in zip(project.scenes, clip_durations, strict=False):
+            line = (sc.vo_line or "").strip()
+            if line:
+                cues.append((cursor + 0.2, max(cursor + 0.8, cursor + dur - 0.25), line))
+            cursor += dur
+
+    if not cues:
+        return None
+
+    font_name = "Liberation Serif" if project.caption_style == "editorial_serif" else "Roboto"
+    font_size = max(22, int(height * 0.044))
+    margin_v = max(28, int(height * 0.06))
+    primary_col = "&H00F4F7FC"
+    back_col = "&H80101218"
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {width}\n"
+        f"PlayResY: {height}\n\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,{font_name},{font_size},{primary_col},&H0038A8E8,&H0012141A,{back_col},"
+        f"1,0,0,0,100,100,0,0,3,2,0,2,48,48,{margin_v},1\n\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+    lines = [header]
+    for t0, t1, txt in cues:
+        safe = txt.replace("\n", " ").replace("{", "").replace("}", "")
+        lines.append(f"Dialogue: 0,{_ass_ts(t0)},{_ass_ts(t1)},Default,,0,0,0,,{safe}\n")
+    out_path.write_text("".join(lines), encoding="utf-8")
+    return out_path
+
+
 async def stitch_master_cut(
     project: StitchProject,
     media_dir: Path,
@@ -1237,7 +1714,7 @@ async def stitch_master_cut(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """Assemble all winning Takes + Seam Transitions + Audio Mode + Optional Brand Outro (<5s)."""
+    """Assemble all winning Takes (or Founder A-Roll + Cutaways) + Overlays + Captions + Brand Outro."""
     resolved = settings or get_settings()
     media_dir.mkdir(parents=True, exist_ok=True)
     fps = 24
@@ -1252,77 +1729,292 @@ async def stitch_master_cut(
             if asyncio.iscoroutine(res):
                 await res
 
-    winning_clips: list[Path] = []
+    palette = project.lighting.color_palette or ["#191512", "#E54D3A", "#F6E7D4"]
+    accent_rgb = _hex_to_rgb(palette[1] if len(palette) > 1 else "#E54D3A", (229, 77, 58))
+
+    use_aroll_mode = (
+        project.timeline_mode == "aroll_with_cutaways"
+        and bool(project.aroll_clip_path)
+        and Path(str(project.aroll_clip_path)).is_file()
+    )
+
+    winning_pairs: list[tuple[StitchScene | None, Path]] = []
     for sc in project.scenes:
         win = sc.winning_take()
         if win and Path(win.clip_path).is_file():
-            winning_clips.append(Path(win.clip_path))
-    if not winning_clips:
+            winning_pairs.append((sc, Path(win.clip_path)))
+    if not winning_pairs and not use_aroll_mode:
         raise RuntimeError("Render at least one Scene take before stitching the Master Cut.")
 
     project.status = "stitching"
     project.error = None
-    await _report(f"Stitching {len(winning_clips)} Scene(s) into Master Cut...")
+    await _report(
+        "Stitching Founder A-Roll + Cutaways into Master Cut..."
+        if use_aroll_mode
+        else f"Stitching {len(winning_pairs)} Scene(s) into Master Cut..."
+    )
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="stitch_master_"))
+    aroll_audio_spine: Path | None = None
     try:
-        # Optional +2.5s Kinetic Brand Outro
-        if project.add_brand_outro and (project.brand_name or project.brand_logo_path):
-            outro_mp4 = tmp_dir / "brand_outro.mp4"
-            bible = _synthetic_bible_from_project(project)
-            palette = project.lighting.color_palette or ["#191512", "#E54D3A", "#F6E7D4"]
-            logo_p = (
-                Path(project.brand_logo_path)
-                if project.brand_logo_path and Path(project.brand_logo_path).is_file()
-                else None
-            )
-            await render_kinetic_card_mp4(
-                text=(project.brand_name or project.title)[:42],
-                subtitle=(project.brand_tagline or "Directed with Stitch")[:80],
-                footer=(project.source_url or "")[:64],
-                width=width,
-                height=height,
-                fps=fps,
-                duration_sec=2.5,
-                bible=bible,
-                output_path=outro_mp4,
-                bg_rgb=_hex_to_rgb(palette[0], (25, 21, 18)),
-                accent_rgb=_hex_to_rgb(palette[1] if len(palette) > 1 else "#E54D3A", (229, 77, 58)),
-                text_rgb=_hex_to_rgb(palette[2] if len(palette) > 2 else "#F6E7D4", (246, 231, 212)),
-                ffmpeg_bin=resolved.ffmpeg_bin,
-                ffprobe_bin=resolved.ffprobe_bin,
-                fonts_dir=resolved.fonts_dir,
-                card_kind="end_card",
-                shot_id="brand_outro",
-                logo_path=logo_p,
-                cancel=cancel,
-            )
-            winning_clips.append(outro_mp4)
-
         norm_paths: list[Path] = []
         clip_durations: list[float] = []
         any_native_audio = False
         preserve_native = project.audio_mode in ("native_only", "native_plus_score")
 
-        for idx, clip_p in enumerate(winning_clips):
-            probe = await probe_media(clip_p, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
-            has_a = bool(probe.has_audio and preserve_native)
-            if has_a:
-                any_native_audio = True
-            dur_s = float(probe.duration_sec or 8.0)
-            clip_durations.append(dur_s)
-            norm_p = tmp_dir / f"norm_{idx:02d}.mp4"
-            await _normalize_act_clip(
-                clip_p,
-                norm_p,
+        if use_aroll_mode:
+            aroll_src = Path(str(project.aroll_clip_path))
+            aroll_probe = await probe_media(aroll_src, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+            aroll_dur = max(2.0, float(aroll_probe.duration_sec or project.aroll_duration_sec or 10.0))
+
+            # Normalize full A-roll once to target dimensions/fps & extract continuous voice spine
+            aroll_norm = tmp_dir / "aroll_full_norm.mp4"
+            await normalize_user_clip_take(
+                clip_spec=UserClipSpec(
+                    raw_video_path=str(aroll_src),
+                    filename=project.aroll_filename or aroll_src.name,
+                    source_duration_sec=aroll_dur,
+                    trim_start_sec=0.0,
+                    trim_end_sec=aroll_dur,
+                    framing="cover_crop",
+                    keep_original_audio=True,
+                ),
+                output_path=aroll_norm,
                 width=width,
                 height=height,
                 fps=fps,
-                has_audio=has_a,
                 ffmpeg_bin=resolved.ffmpeg_bin,
+                ffprobe_bin=resolved.ffprobe_bin,
                 cancel=cancel,
             )
-            norm_paths.append(norm_p)
+            aroll_audio_spine = tmp_dir / "aroll_voice_spine.wav"
+            await run_subprocess(
+                [
+                    resolved.ffmpeg_bin,
+                    "-y",
+                    "-threads",
+                    str(eff_threads),
+                    "-i",
+                    str(aroll_norm),
+                    "-vn",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    str(aroll_audio_spine),
+                ],
+                timeout_sec=90.0,
+                cancel=cancel,
+                check=True,
+            )
+            any_native_audio = True
+
+            # Build ordered non-overlapping visual intervals: A-roll + cutaways
+            cutaways = sorted(
+                [(sc, cp) for sc, cp in winning_pairs if sc is not None and sc.aroll_window is not None],
+                key=lambda item: float(item[0].aroll_window[0]),  # type: ignore[index]
+            )
+            cursor = 0.0
+            seg_idx = 0
+            for sc_cut, cp_cut in cutaways:
+                assert sc_cut is not None and sc_cut.aroll_window is not None
+                t0 = max(cursor, min(aroll_dur, float(sc_cut.aroll_window[0])))
+                t1 = max(t0, min(aroll_dur, float(sc_cut.aroll_window[1])))
+                if t0 - cursor >= 0.25:
+                    sl = tmp_dir / f"aroll_seg_{seg_idx:02d}.mp4"
+                    await run_subprocess(
+                        [
+                            resolved.ffmpeg_bin,
+                            "-y",
+                            "-threads",
+                            str(eff_threads),
+                            "-ss",
+                            f"{cursor:.3f}",
+                            "-t",
+                            f"{(t0 - cursor):.3f}",
+                            "-i",
+                            str(aroll_norm),
+                            *_pinned_h264_flags(fps, threads=eff_threads),
+                            "-c:a",
+                            "aac",
+                            "-ar",
+                            "48000",
+                            "-ac",
+                            "2",
+                            "-b:a",
+                            "160k",
+                            str(sl),
+                        ],
+                        timeout_sec=90.0,
+                        cancel=cancel,
+                        check=True,
+                    )
+                    norm_paths.append(sl)
+                    clip_durations.append(t0 - cursor)
+                    seg_idx += 1
+
+                if t1 - t0 >= 0.25:
+                    cut_norm = tmp_dir / f"cut_seg_{seg_idx:02d}.mp4"
+                    await _normalize_act_clip(
+                        cp_cut,
+                        cut_norm,
+                        width=width,
+                        height=height,
+                        fps=fps,
+                        has_audio=False,
+                        ffmpeg_bin=resolved.ffmpeg_bin,
+                        cancel=cancel,
+                    )
+                    if sc_cut.overlays:
+                        cut_ov = tmp_dir / f"cut_seg_ov_{seg_idx:02d}.mp4"
+                        cut_norm = await _apply_scene_overlays(
+                            clip_path=cut_norm,
+                            overlays=sc_cut.overlays,
+                            output_path=cut_ov,
+                            width=width,
+                            height=height,
+                            fps=fps,
+                            accent_rgb=accent_rgb,
+                            ffmpeg_bin=resolved.ffmpeg_bin,
+                            fonts_dir=resolved.fonts_dir,
+                            threads=eff_threads,
+                            tmp_dir=tmp_dir,
+                            cancel=cancel,
+                        )
+                    # Fit cutaway visual to exact [t0, t1] window
+                    cut_fit = tmp_dir / f"cut_fit_{seg_idx:02d}.mp4"
+                    await run_subprocess(
+                        [
+                            resolved.ffmpeg_bin,
+                            "-y",
+                            "-threads",
+                            str(eff_threads),
+                            "-stream_loop",
+                            "-1",
+                            "-i",
+                            str(cut_norm),
+                            "-t",
+                            f"{(t1 - t0):.3f}",
+                            *_pinned_h264_flags(fps, threads=eff_threads),
+                            "-c:a",
+                            "aac",
+                            "-ar",
+                            "48000",
+                            "-ac",
+                            "2",
+                            "-b:a",
+                            "160k",
+                            str(cut_fit),
+                        ],
+                        timeout_sec=90.0,
+                        cancel=cancel,
+                        check=True,
+                    )
+                    norm_paths.append(cut_fit)
+                    clip_durations.append(t1 - t0)
+                    seg_idx += 1
+                    cursor = t1
+
+            if aroll_dur - cursor >= 0.25 or not norm_paths:
+                tail_dur = max(0.5, aroll_dur - cursor)
+                sl = tmp_dir / f"aroll_seg_{seg_idx:02d}.mp4"
+                await run_subprocess(
+                    [
+                        resolved.ffmpeg_bin,
+                        "-y",
+                        "-threads",
+                        str(eff_threads),
+                        "-ss",
+                        f"{cursor:.3f}",
+                        "-t",
+                        f"{tail_dur:.3f}",
+                        "-i",
+                        str(aroll_norm),
+                        *_pinned_h264_flags(fps, threads=eff_threads),
+                        "-c:a",
+                        "aac",
+                        "-ar",
+                        "48000",
+                        "-ac",
+                        "2",
+                        "-b:a",
+                        "160k",
+                        str(sl),
+                    ],
+                    timeout_sec=90.0,
+                    cancel=cancel,
+                    check=True,
+                )
+                norm_paths.append(sl)
+                clip_durations.append(tail_dur)
+        else:
+            # Sequential Acts mode
+            if project.add_brand_outro and (project.brand_name or project.brand_logo_path):
+                outro_mp4 = tmp_dir / "brand_outro.mp4"
+                bible = _synthetic_bible_from_project(project)
+                logo_p = (
+                    Path(project.brand_logo_path)
+                    if project.brand_logo_path and Path(project.brand_logo_path).is_file()
+                    else None
+                )
+                await render_kinetic_card_mp4(
+                    text=(project.brand_name or project.title)[:42],
+                    subtitle=(project.brand_tagline or "Directed with Stitch")[:80],
+                    footer=(project.source_url or "")[:64],
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    duration_sec=2.5,
+                    bible=bible,
+                    output_path=outro_mp4,
+                    bg_rgb=_hex_to_rgb(palette[0], (25, 21, 18)),
+                    accent_rgb=accent_rgb,
+                    text_rgb=_hex_to_rgb(palette[2] if len(palette) > 2 else "#F6E7D4", (246, 231, 212)),
+                    ffmpeg_bin=resolved.ffmpeg_bin,
+                    ffprobe_bin=resolved.ffprobe_bin,
+                    fonts_dir=resolved.fonts_dir,
+                    card_kind="end_card",
+                    shot_id="brand_outro",
+                    logo_path=logo_p,
+                    cancel=cancel,
+                )
+                winning_pairs.append((None, outro_mp4))
+
+            for idx, (sc_obj, clip_p) in enumerate(winning_pairs):
+                probe = await probe_media(clip_p, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+                has_a = bool(probe.has_audio and preserve_native)
+                if has_a:
+                    any_native_audio = True
+                dur_s = float(probe.duration_sec or 8.0)
+                clip_durations.append(dur_s)
+                norm_p = tmp_dir / f"norm_{idx:02d}.mp4"
+                await _normalize_act_clip(
+                    clip_p,
+                    norm_p,
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    has_audio=has_a,
+                    ffmpeg_bin=resolved.ffmpeg_bin,
+                    cancel=cancel,
+                )
+                if sc_obj is not None and sc_obj.overlays:
+                    ov_p = tmp_dir / f"norm_ov_{idx:02d}.mp4"
+                    norm_p = await _apply_scene_overlays(
+                        clip_path=norm_p,
+                        overlays=sc_obj.overlays,
+                        output_path=ov_p,
+                        width=width,
+                        height=height,
+                        fps=fps,
+                        accent_rgb=accent_rgb,
+                        ffmpeg_bin=resolved.ffmpeg_bin,
+                        fonts_dir=resolved.fonts_dir,
+                        threads=eff_threads,
+                        tmp_dir=tmp_dir,
+                        cancel=cancel,
+                    )
+                norm_paths.append(norm_p)
 
         assembled_mp4 = tmp_dir / "assembled.mp4"
         if len(norm_paths) == 1:
@@ -1472,7 +2164,73 @@ async def stitch_master_cut(
             else _synthesize_ambient_cinematic_wav(total_dur, tmp_dir / "bed.wav")
         )
 
-        if vo_path is not None:
+        if aroll_audio_spine is not None and aroll_audio_spine.is_file():
+            # Continuous Founder A-Roll voice spine never cuts across visual cutaways
+            if project.audio_mode == "native_only":
+                mix_cmd = [
+                    resolved.ffmpeg_bin,
+                    "-y",
+                    "-threads",
+                    str(eff_threads),
+                    "-i",
+                    str(assembled_mp4),
+                    "-i",
+                    str(aroll_audio_spine),
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0",
+                    "-c:v",
+                    "copy",
+                    "-af",
+                    "loudnorm=I=-15:TP=-1.5:LRA=11",
+                    "-c:a",
+                    "aac",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    "192k",
+                    "-shortest",
+                    "-movflags",
+                    "+faststart",
+                    str(final_tmp),
+                ]
+            else:
+                mix_cmd = [
+                    resolved.ffmpeg_bin,
+                    "-y",
+                    "-threads",
+                    str(eff_threads),
+                    "-i",
+                    str(assembled_mp4),
+                    "-i",
+                    str(aroll_audio_spine),
+                    "-i",
+                    str(bed_wav),
+                    "-filter_complex",
+                    "[1:a]volume=1.05[vo];[2:a]volume=0.20[bed];[vo][bed]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-14:TP=-1.5:LRA=11[aout]",
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "[aout]",
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "aac",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    "192k",
+                    "-shortest",
+                    "-movflags",
+                    "+faststart",
+                    str(final_tmp),
+                ]
+        elif vo_path is not None:
             mix_cmd = [
                 resolved.ffmpeg_bin,
                 "-y",
@@ -1596,12 +2354,52 @@ async def stitch_master_cut(
         if rc_mix != 0 or not final_tmp.is_file():
             shutil.copyfile(assembled_mp4, final_tmp)
 
+        # Optional ASS Captions burn-in (bundled open-license fonts, Render-512MB safe)
+        if project.enable_captions:
+            ass_path = _write_project_captions_ass(
+                project=project,
+                clip_durations=clip_durations,
+                width=width,
+                height=height,
+                out_path=tmp_dir / "captions.ass",
+            )
+            if ass_path is not None and ass_path.is_file():
+                cap_tmp = tmp_dir / "master_captioned.mp4"
+                fonts_dir_resolved = resolved.fonts_dir
+                if not fonts_dir_resolved.exists():
+                    fonts_dir_resolved = resolve_font_path("Roboto", bold=True).parent
+                esc_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+                esc_fonts = str(fonts_dir_resolved.resolve()).replace("\\", "/").replace(":", "\\:")
+                rc_cap, _, _ = await run_subprocess(
+                    [
+                        resolved.ffmpeg_bin,
+                        "-y",
+                        "-threads",
+                        str(eff_threads),
+                        "-i",
+                        str(final_tmp),
+                        "-vf",
+                        f"ass='{esc_ass}':fontsdir='{esc_fonts}'",
+                        *_pinned_h264_flags(fps, threads=eff_threads),
+                        "-c:a",
+                        "copy",
+                        "-movflags",
+                        "+faststart",
+                        str(cap_tmp),
+                    ],
+                    timeout_sec=180.0,
+                    cancel=cancel,
+                    check=False,
+                )
+                if rc_cap == 0 and cap_tmp.is_file():
+                    final_tmp = cap_tmp
+
         master_out = media_dir / f"master_{uuid4().hex[:6]}.mp4"
         _move_output_atomically(final_tmp, master_out)
         project.master_video_path = str(master_out)
         project.status = "done"
         project.status_message = (
-            f"Master Cut ready ({len(winning_clips)} clip(s), {project.seam_transition.replace('_', ' ')})."
+            f"Master Cut ready ({len(norm_paths)} segment(s), {project.seam_transition.replace('_', ' ')})."
         )
         return project
     finally:
@@ -1614,6 +2412,7 @@ __all__ = [
     "generate_all_keyframes",
     "generate_scene_keyframe",
     "pitch_three_concepts",
+    "plan_aroll_cutaways",
     "render_all_scenes",
     "render_single_scene_take",
     "scrape_optional_url",
