@@ -437,6 +437,59 @@ async def render_assets_overlapped(
         await asyncio.gather(*video_tasks, audio_task, return_exceptions=True)
         raise
 
+    # Upgrade 1+2: Lock kinetic motion_card word animations to real Whisper VO word timestamps
+    whisper_prov = getattr(providers, "whisper", None)
+    if whisper_prov is not None and hasattr(whisper_prov, "transcribe_words") and audio_assets:
+        vo_by_shot = {a.cue_id: Path(a.path) for a in audio_assets if a.kind == "vo" and a.path}
+        width, height = aspect_to_dimensions(
+            shot_sheet.aspect, preview=(render_mode == "preview")
+        )
+        for idx, shot in enumerate(ordered_shots):
+            if shot.engine != "motion_card":
+                continue
+            if existing_clips and repair_shot_ids and shot.id not in repair_shot_ids:
+                continue
+            vo_path = vo_by_shot.get(shot.id)
+            if not vo_path or not vo_path.is_file():
+                continue
+            try:
+                words = await whisper_prov.transcribe_words(vo_path, cancel=cancel)
+                if words:
+                    is_end = shot.index == len(shot_sheet.shots) - 1
+                    card_text = (
+                        shot.on_screen_text
+                        or shot_sheet.end_card_title
+                        or (shot.vo_line if is_end and shot.vo_line else None)
+                        or shot.beat
+                    )
+                    media_img = (
+                        valid_prod_imgs[shot.index % len(valid_prod_imgs)]
+                        if valid_prod_imgs and not is_end
+                        else None
+                    )
+                    clips[idx] = await graphics_renderer.render_card(
+                        text=card_text,
+                        width=width,
+                        height=height,
+                        fps=shot_sheet.fps,
+                        duration_sec=float(shot.duration_sec),
+                        bible=creative_bible,
+                        output_path=clips_dir / f"{shot.id}_card_synced.mp4",
+                        subtitle=shot_sheet.end_card_subtitle if is_end else None,
+                        footer=shot_sheet.end_card_footer if is_end else None,
+                        card_kind="end_card" if is_end else "title",
+                        shot_id=shot.id,
+                        theme=shot.theme or shot_sheet.theme,
+                        logo_path=brand_logo_path if is_end else None,
+                        media_image_path=media_img,
+                        word_timings=words,
+                        cancel=cancel,
+                    )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+
     return clips, audio_assets, warnings
 
 

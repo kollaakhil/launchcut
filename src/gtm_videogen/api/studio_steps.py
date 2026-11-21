@@ -471,12 +471,12 @@ async def audition_audio(
 
     aud_dir = services.data_dir / "cache" / "auditions"
     aud_dir.mkdir(parents=True, exist_ok=True)
-    provider = AudioProvider(
-        settings=services.settings,
-        media_store=MediaStore(aud_dir / "media"),
-        audio_cache=ContentCache(aud_dir / "cache"),
-    )
     try:
+        provider = AudioProvider(
+            settings=services.settings,
+            media_store=MediaStore(aud_dir / "media"),
+            audio_cache=ContentCache(aud_dir / "cache", "auditions"),
+        )
         if payload.kind == "voice":
             sample_text = (payload.text or "").strip()[:180] or (
                 "Built for teams that ship with quiet precision."

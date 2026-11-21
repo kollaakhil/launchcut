@@ -2216,6 +2216,10 @@
       $("inDirection").value = r.input.user_direction || "";
       $("inOffer").value = r.input.offer || "";
       $("inMustSay").value = (r.input.must_say || []).join(", ");
+      state.craftArchetype = r.craft_archetype || "";
+      $("archetypeRow")?.querySelectorAll(".archetype-pill").forEach((b) => {
+        b.classList.toggle("active", b.dataset.arch === state.craftArchetype);
+      });
       setMode(Boolean(r.input.mock));
 
       let targetStep = r.step || "brand";
@@ -2253,6 +2257,16 @@
       state.draftShots = [];
       state.ratingDrafts = {};
       state.selectedStackIds.clear();
+      state.craftArchetype = "";
+      state.pendingLogo = null;
+      state.pendingProducts = [];
+      state.pendingRefMoodboard = null;
+      $("archetypeRow")?.querySelectorAll(".archetype-pill").forEach((b) => b.classList.remove("active"));
+      if ($("logoPreview")) $("logoPreview").innerHTML = "";
+      if ($("productPreviews")) $("productPreviews").innerHTML = "";
+      if ($("refMoodboardPreview")) $("refMoodboardPreview").innerHTML = "";
+      if ($("inMasterEngine")) $("inMasterEngine").value = "";
+      if ($("auditionPlayer")) { $("auditionPlayer").pause(); $("auditionPlayer").style.display = "none"; }
       $("runsSelect").value = "";
       $("sseMiniLog").classList.remove("visible");
       setBanner("", "");

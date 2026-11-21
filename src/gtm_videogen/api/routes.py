@@ -380,7 +380,9 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
         "features": {
             "upgrades_v2": True,
             "kinetic_motion": True,
+            "word_synced_kinetic": True,
             "audio_audition": True,
+            "audition_v2": True,
             "veo3_flagship": True,
             "taste_cloning": True,
             "auto_polish": True,
