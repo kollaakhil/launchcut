@@ -322,12 +322,15 @@ async def generate_keyframes_endpoint(
         raise HTTPException(status_code=404, detail="Blueprint not found")
 
     media_dir = store.media_dir(blueprint_id)
-    updated = await generate_blueprint_keyframes(
-        bp,
-        media_dir,
-        settings=services.settings,
-        mock=req.mock,
-    )
+    try:
+        updated = await generate_blueprint_keyframes(
+            bp,
+            media_dir,
+            settings=services.settings,
+            mock=req.mock,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Keyframe generation failed: {exc}") from exc
     store.save(updated)
     return _serialize_blueprint(updated)
 

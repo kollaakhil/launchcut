@@ -623,7 +623,12 @@ async def _call_openrouter_json(
     api_key = settings.openrouter_api_key.strip()
     if not api_key:
         return None
-    model = (settings.flagship_text_model or settings.fast_text_model or "openai/gpt-4o-mini").strip()
+    model = (
+        settings.flagship_model
+        or settings.text_model
+        or settings.fast_model
+        or "openai/gpt-4o-mini"
+    ).strip()
     payload: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -648,7 +653,7 @@ async def _call_openrouter_json(
         max_retries=1,
     ) as client:
         data = await client.post_json(
-            f"{settings.openrouter_base_url.rstrip('/')}/chat/completions",
+            "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
             headers=headers,
             cancel=cancel,

@@ -126,7 +126,25 @@ class ResilientHttpClient:
                 await self._sleep_backoff(attempt, retry_after=retry_after, cancel=cancel)
                 continue
 
-            response.raise_for_status()
+            if response.is_error:
+                body_snippet = ""
+                try:
+                    err_json = response.json()
+                    if isinstance(err_json, dict):
+                        detail = err_json.get("detail") or err_json.get("message") or err_json.get("error")
+                        if detail:
+                            body_snippet = str(detail)[:300]
+                except Exception:
+                    pass
+                if not body_snippet:
+                    body_snippet = (response.text or "").strip()[:300]
+                if body_snippet:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {response.status_code} {response.reason_phrase} for {response.url}: {body_snippet}",
+                        request=response.request,
+                        response=response,
+                    )
+                response.raise_for_status()
             return response
 
         if last_exc is not None:
