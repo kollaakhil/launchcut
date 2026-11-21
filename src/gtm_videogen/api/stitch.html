@@ -779,38 +779,53 @@
       width: 315px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 12px 12px 15px;
-      box-shadow: var(--shadow-md);
+      border-radius: 16px;
+      padding: 12px 12px 14px;
+      box-shadow: var(--shadow-sm);
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+      gap: 9px;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s;
       cursor: pointer;
       position: relative;
     }
-    .polaroid-card.tilt-l { transform: rotate(-0.65deg); }
-    .polaroid-card.tilt-r { transform: rotate(0.55deg); }
+    .polaroid-card.tilt-l, .polaroid-card.tilt-r { transform: none; }
     .polaroid-card:hover {
-      transform: rotate(0deg) translateY(-4px);
-      box-shadow: var(--shadow-lg);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
       border-color: var(--coral);
     }
     .polaroid-card.selected {
-      transform: rotate(0deg);
       border: 2px solid var(--coral);
     }
-    .polaroid-pin {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--coral);
-      box-shadow: 0 2px 5px rgba(229, 77, 58, 0.4);
-      position: absolute;
-      top: -6px;
-      left: 50%;
-      transform: translateX(-50%);
+    .polaroid-pin { display: none; }
+    details.pro-disclosure {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 14px;
     }
+    details.pro-disclosure > summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      user-select: none;
+    }
+    details.pro-disclosure > summary::-webkit-details-marker { display: none; }
+    details.pro-disclosure > summary::after {
+      content: "▾";
+      font-size: 12px;
+      opacity: 0.65;
+      transition: transform 0.15s ease;
+    }
+    details.pro-disclosure[open] > summary::after { transform: rotate(180deg); }
+    details.pro-disclosure[open] > summary { color: var(--ink); margin-bottom: 12px; }
     .polaroid-frame {
       aspect-ratio: 16 / 9;
       border-radius: 11px;
@@ -1309,22 +1324,25 @@
         <button class="spark-cta" id="btn-direct-now" onclick="directFromSpark()">✦ Direct</button>
       </div>
 
-      <div class="spark-subbar">
+      <div class="spark-subbar" style="align-items:flex-start;">
         <div class="preset-row">
           <button class="pill-btn" id="btn-pitch-3" onclick="pitchThree()">✨ Pitch 3 Concepts</button>
           <span class="active-theme-pill" id="active-theme-pill">
             <span id="active-theme-name"></span>
             <button type="button" onclick="clearGalleryTheme()" title="Clear selected theme" aria-label="Clear theme">✕</button>
           </span>
-          <select class="mini-select" id="preset-world" title="Visual World"></select>
-          <select class="mini-select" id="preset-camera" title="Camera Style"></select>
-          <select class="mini-select" id="preset-lighting" title="Lighting"></select>
-          <select class="mini-select" id="preset-motion" title="Motion Feel"></select>
         </div>
-        <div class="preset-row">
-          <select class="mini-select" id="spark-video-model" title="Active Video Model" onchange="onSparkModelChange(this.value)"></select>
-          <select class="mini-select" id="spark-llm-model" title="Script Writer LLM"></select>
-        </div>
+        <details class="pro-disclosure" style="padding:7px 12px;">
+          <summary style="font-size:12.5px;">⚙ Advanced Style &amp; Models</summary>
+          <div class="preset-row" style="margin-top:8px;">
+            <select class="mini-select" id="preset-world" title="Visual World"></select>
+            <select class="mini-select" id="preset-camera" title="Camera Style"></select>
+            <select class="mini-select" id="preset-lighting" title="Lighting"></select>
+            <select class="mini-select" id="preset-motion" title="Motion Feel"></select>
+            <select class="mini-select" id="spark-video-model" title="Active Video Model" onchange="onSparkModelChange(this.value)"></select>
+            <select class="mini-select" id="spark-llm-model" title="Script Writer LLM"></select>
+          </div>
+        </details>
       </div>
 
       <!-- 3 Concept Pitches Drawer -->
@@ -1349,7 +1367,7 @@
           <button class="cat-chip" data-cat="craft" onclick="filterGallery('craft', this)">Paper &amp; Craft</button>
           <button class="cat-chip" data-cat="asmr" onclick="filterGallery('asmr', this)">ASMR Macro</button>
         </div>
-        <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Click any theme to style your brand/idea — or try an example film</span>
+        <span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;">Pick a theme to style your brand/idea</span>
       </div>
 
       <div class="gallery-grid" id="gallery-grid"></div>
@@ -1363,34 +1381,35 @@
           <div class="meta-pills" id="board-meta-pills"></div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <button class="pill-btn" id="btn-autofix" onclick="runScriptAutofix()" style="display:none;">✨ Auto-Fix Warnings</button>
-          <button class="pill-btn" onclick="addScenePrompt('motion_graphic')">+ Motion Graphic ($0)</button>
-          <button class="pill-btn" onclick="addScenePrompt('user_clip')">+ My Video Clip</button>
-          <button class="pill-btn" onclick="addScenePrompt('ai_sequence')">+ AI Scene</button>
-          <button class="pill-btn primary" onclick="switchStage('shoot')">Shoot &amp; Takes →</button>
+          <button class="pill-btn" id="btn-autofix" onclick="runScriptAutofix()" style="display:none;">✨ Auto-Fix</button>
+          <select class="mini-select" id="add-act-select" onchange="if(this.value){addScenePrompt(this.value);this.value='';}">
+            <option value="">＋ Add Act…</option>
+            <option value="motion_graphic">🎨 Motion Graphic ($0 · UI / Chart / Code)</option>
+            <option value="user_clip">📹 My Video / Screen Clip ($0)</option>
+            <option value="ai_sequence">✦ AI Cinema Scene</option>
+          </select>
+          <button class="pill-btn primary" onclick="switchStage('shoot')">Render Videos →</button>
         </div>
       </div>
 
-      <!-- Founder A-Roll & Auto-Cutaways Studio Bar -->
-      <div class="tray-card" id="aroll-studio-bar" style="margin-bottom:16px;padding:12px 16px;">
+      <!-- Optional Founder A-Roll & Auto-Cutaways (Collapsed by Default) -->
+      <details class="pro-disclosure" id="aroll-studio-bar" style="margin-bottom:16px;">
+        <summary>📹 Add Founder Video (Continuous A-Roll + Cutaways — Optional)</summary>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div>
-            <strong style="font-size:13.5px;">📹 Founder Video / Continuous A-Roll Cutaways</strong>
-            <span id="aroll-status-label" style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Upload a talking-head video to weave graphics &amp; AI B-roll seamlessly over your voice.</span>
-          </div>
+          <span id="aroll-status-label" style="font-size:12.5px;color:var(--ink-muted);">Upload a talking-head video to weave graphics &amp; AI B-roll seamlessly over your voice.</span>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <label class="pill-btn" style="cursor:pointer;">
-              ⬆ Upload Founder Video (.mp4/.mov)
+              ⬆ Upload Video (.mp4/.mov)
               <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadProjectArollUI(this)" />
             </label>
             <button class="pill-btn sage" id="btn-auto-cutaways" onclick="autoPlanCutawaysUI()" style="display:none;">✨ Auto-Transcribe &amp; Plan Cutaways</button>
           </div>
         </div>
-      </div>
+      </details>
 
       <div id="gate-warnings-bar" style="display:none;margin-bottom:16px;"></div>
 
-      <!-- Tactile Polaroid Visual Scene Flow Diagram -->
+      <!-- Visual Storyboard Flow -->
       <div class="pinboard-flow" id="pinboard-flow"></div>
     </section>
 
@@ -1399,27 +1418,24 @@
       <div class="board-header">
         <div>
           <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;" id="shoot-title">Shoot &amp; Takes</div>
-          <div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">Lock visual identity with @Elements, tweak individual Start/End stills, and shoot Acts non-linearly with Take History.</div>
+          <div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">Render each Act or shoot the full sequence, then head to Screening Room to export.</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <select class="mini-select" id="shoot-model-select" onchange="changeProjectModel(this.value)"></select>
-          <button class="pill-btn" id="btn-gen-all-kf" onclick="generateAllKeyframesUI()">🎨 Generate All Stills</button>
-          <button class="pill-btn primary" id="btn-render-all" onclick="renderAllScenesUI()">▶ Shoot All Acts (Chained)</button>
-          <button class="pill-btn dark" onclick="switchStage('screening')">Screening Room →</button>
+          <button class="pill-btn" id="btn-gen-all-kf" onclick="generateAllKeyframesUI()">🎨 Preview Stills</button>
+          <button class="pill-btn primary" id="btn-render-all" onclick="renderAllScenesUI()">▶ Shoot All Acts</button>
+          <button class="pill-btn dark" onclick="switchStage('screening')">Export →</button>
         </div>
       </div>
 
-      <!-- Reference Elements Tray (@Element1..3) -->
-      <div class="tray-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <div>
-            <strong style="font-size:14.5px;">Reference Elements Tray</strong>
-            <span style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Upload Product, Character, or Style photos — locked across 0s → 60s on Kling 3.0 &amp; Flux Kontext</span>
-          </div>
-          <span class="tag-pill" id="elements-support-badge">Supports @Elements</span>
-        </div>
+      <!-- Optional Reference Elements Tray (@Element1..3 — Collapsed by Default) -->
+      <details class="pro-disclosure" style="margin-bottom:18px;">
+        <summary>
+          <span>🎨 Reference Photos (@Elements — Optional Product / Face / Style Lock)</span>
+          <span class="tag-pill" id="elements-support-badge" style="margin-left:auto;">Supports @Elements</span>
+        </summary>
         <div class="elements-row" id="elements-row"></div>
-      </div>
+      </details>
 
       <!-- Per-Act Shoot Cards -->
       <div id="shoot-acts-list"></div>
@@ -1446,48 +1462,12 @@
           </div>
 
           <div style="margin-top:16px;">
-            <div class="field-label" style="margin-bottom:8px;">Winning Takes Timeline</div>
+            <div class="field-label" style="margin-bottom:8px;">Acts Timeline</div>
             <div id="screening-timeline" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
           </div>
         </div>
 
-        <div class="theater-card" style="display:flex;flex-direction:column;gap:16px;">
-          <div>
-            <div class="field-label" style="margin-bottom:8px;">Seam Transitions</div>
-            <div class="option-cards" id="seam-options">
-              <button class="opt-card active" data-seam="invisible_chain" onclick="selectSeam('invisible_chain')">
-                <strong>Invisible Pixel Chain</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Hard pixel-exact frame handoff between chained Acts.</div>
-              </button>
-              <button class="opt-card" data-seam="micro_dissolve" onclick="selectSeam('micro_dissolve')">
-                <strong>Micro-Dissolve (0.35s)</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Silky short visual + audio crossfade at scene cuts.</div>
-              </button>
-              <button class="opt-card" data-seam="audio_riser" onclick="selectSeam('audio_riser')">
-                <strong>Audio Riser Swell</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Subtle harmonic swell bridging each scene boundary.</div>
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div class="field-label" style="margin-bottom:8px;">Unified Soundstage</div>
-            <div class="option-cards" id="audio-options">
-              <button class="opt-card" data-audio="native_only" onclick="selectAudioMode('native_only')">
-                <strong>Native Model Audio Only</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Pure Kling 3.0 / Veo 3 foley mastered to -14 LUFS.</div>
-              </button>
-              <button class="opt-card active" data-audio="native_plus_score" onclick="selectAudioMode('native_plus_score')">
-                <strong>Native Foley + Warm Cinema Score</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Blends native audio with a subtle ambient studio bed.</div>
-              </button>
-              <button class="opt-card" data-audio="vo_plus_ducked_score" onclick="selectAudioMode('vo_plus_ducked_score')">
-                <strong>ElevenLabs VO + Ducked Score</strong>
-                <div style="font-size:12px;color:var(--ink-soft);">Speaks your Scene VO lines over a smoothly ducked score.</div>
-              </button>
-            </div>
-          </div>
-
+        <div class="theater-card" style="display:flex;flex-direction:column;gap:14px;">
           <div style="background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;">
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
               <input type="checkbox" id="chk-brand-outro" onchange="toggleBrandOutro(this.checked)" />
@@ -1516,6 +1496,47 @@
               </select>
             </div>
           </div>
+
+          <details class="pro-disclosure">
+            <summary>🎚 Audio &amp; Transition Options</summary>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div>
+                <div class="field-label" style="margin-bottom:6px;">Seam Transitions</div>
+                <div class="option-cards" id="seam-options">
+                  <button class="opt-card active" data-seam="invisible_chain" onclick="selectSeam('invisible_chain')">
+                    <strong>Invisible Pixel Chain</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Hard pixel-exact frame handoff.</div>
+                  </button>
+                  <button class="opt-card" data-seam="micro_dissolve" onclick="selectSeam('micro_dissolve')">
+                    <strong>Micro-Dissolve (0.35s)</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Short visual + audio crossfade.</div>
+                  </button>
+                  <button class="opt-card" data-seam="audio_riser" onclick="selectSeam('audio_riser')">
+                    <strong>Audio Riser Swell</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Subtle harmonic swell on cuts.</div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div class="field-label" style="margin-bottom:6px;">Soundstage</div>
+                <div class="option-cards" id="audio-options">
+                  <button class="opt-card" data-audio="native_only" onclick="selectAudioMode('native_only')">
+                    <strong>Native Audio Only</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Pure clip audio mastered to -14 LUFS.</div>
+                  </button>
+                  <button class="opt-card active" data-audio="native_plus_score" onclick="selectAudioMode('native_plus_score')">
+                    <strong>Native Audio + Warm Score</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Blends clip audio with subtle studio bed.</div>
+                  </button>
+                  <button class="opt-card" data-audio="vo_plus_ducked_score" onclick="selectAudioMode('vo_plus_ducked_score')">
+                    <strong>ElevenLabs VO + Ducked Score</strong>
+                    <div style="font-size:12px;color:var(--ink-soft);">Speaks Scene VO lines over ducked score.</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </details>
 
           <button class="spark-cta" id="btn-stitch-master" style="width:100%;" onclick="stitchMasterCutUI()">⚡ Stitch Master Cut (&lt;5s)</button>
         </div>
@@ -2567,71 +2588,76 @@
           </div>
         </div>
 
-        <!-- Graphic Overlay Controls (Lower-Third / Stat Pill) -->
-        <div style="display:flex;flex-direction:column;gap:8px;background:var(--bg-paper);border:1px solid var(--border);border-radius:14px;padding:12px;">
-          <strong style="font-size:13px;">🏷 On-Screen Overlay (Optional Lower-Third / Stat Pill)</strong>
-          <div class="form-grid-2">
-            <select class="field-select" id="ed-ov-kind">
-              <option value="lower_third" ${(sc.overlays?.[0]?.kind || 'lower_third') === 'lower_third' ? 'selected' : ''}>Lower-Third Nameplate</option>
-              <option value="stat_pill" ${(sc.overlays?.[0]?.kind || '') === 'stat_pill' ? 'selected' : ''}>Floating Stat Pill</option>
-              <option value="feature_callout" ${(sc.overlays?.[0]?.kind || '') === 'feature_callout' ? 'selected' : ''}>Feature Callout Card</option>
-            </select>
-            <select class="field-select" id="ed-ov-pos">
-              <option value="bottom_left" ${(sc.overlays?.[0]?.position || 'bottom_left') === 'bottom_left' ? 'selected' : ''}>Bottom Left</option>
-              <option value="top_right" ${(sc.overlays?.[0]?.position || '') === 'top_right' ? 'selected' : ''}>Top Right</option>
-              <option value="bottom_center" ${(sc.overlays?.[0]?.position || '') === 'bottom_center' ? 'selected' : ''}>Bottom Center</option>
-            </select>
+        <!-- Graphic Overlay Controls (Lower-Third / Stat Pill — Collapsed Unless Filled) -->
+        <details class="pro-disclosure" ${sc.overlays?.[0]?.primary_text ? 'open' : ''}>
+          <summary>🏷 On-Screen Overlay (Optional Lower-Third / Stat Pill)</summary>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="form-grid-2">
+              <select class="field-select" id="ed-ov-kind">
+                <option value="lower_third" ${(sc.overlays?.[0]?.kind || 'lower_third') === 'lower_third' ? 'selected' : ''}>Lower-Third Nameplate</option>
+                <option value="stat_pill" ${(sc.overlays?.[0]?.kind || '') === 'stat_pill' ? 'selected' : ''}>Floating Stat Pill</option>
+                <option value="feature_callout" ${(sc.overlays?.[0]?.kind || '') === 'feature_callout' ? 'selected' : ''}>Feature Callout Card</option>
+              </select>
+              <select class="field-select" id="ed-ov-pos">
+                <option value="bottom_left" ${(sc.overlays?.[0]?.position || 'bottom_left') === 'bottom_left' ? 'selected' : ''}>Bottom Left</option>
+                <option value="top_right" ${(sc.overlays?.[0]?.position || '') === 'top_right' ? 'selected' : ''}>Top Right</option>
+                <option value="bottom_center" ${(sc.overlays?.[0]?.position || '') === 'bottom_center' ? 'selected' : ''}>Bottom Center</option>
+              </select>
+            </div>
+            <div class="form-grid-2">
+              <input class="field-input" id="ed-ov-primary" value="${esc(sc.overlays?.[0]?.primary_text || '')}" placeholder="Primary text (e.g. Akhil · Founder)" />
+              <input class="field-input" id="ed-ov-secondary" value="${esc(sc.overlays?.[0]?.secondary_text || '')}" placeholder="Secondary text (optional)" />
+            </div>
           </div>
-          <div class="form-grid-2">
-            <input class="field-input" id="ed-ov-primary" value="${esc(sc.overlays?.[0]?.primary_text || '')}" placeholder="Primary text (e.g. Akhil · Founder)" />
-            <input class="field-input" id="ed-ov-secondary" value="${esc(sc.overlays?.[0]?.secondary_text || '')}" placeholder="Secondary text (optional)" />
-          </div>
-        </div>
+        </details>
 
-        ${idx > 0 ? `
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-            <input type="checkbox" id="ed-chain" ${sc.continues_from_prev ? 'checked' : ''} />
-            Pixel-Chain from Scene ${idx}'s exact final frame
-          </label>
-        ` : ''}
+        <!-- AI Cinema Controls (Hidden when editing Motion Graphic or User Video) -->
+        <div id="ed-ai-section" style="display:${sc.kind === 'ai_sequence' || sc.kind === 'kinetic_ui' ? 'flex' : 'none'};flex-direction:column;gap:14px;">
+          ${idx > 0 ? `
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="ed-chain" ${sc.continues_from_prev ? 'checked' : ''} />
+              Pixel-Chain from Scene ${idx}'s exact final frame
+            </label>
+          ` : ''}
 
-        <div class="field-group">
-          <label class="field-label">Characters &amp; Hero Subjects (comma-separated)</label>
-          <input class="field-input" id="ed-subjects" value="${esc((sc.subjects || []).join(', '))}" />
-        </div>
-
-        <div class="field-group">
-          <label class="field-label">Physical Materials &amp; Textures (comma-separated)</label>
-          <input class="field-input" id="ed-materials" value="${esc((sc.materials || []).join(', '))}" />
-        </div>
-
-        <div class="field-group">
-          <label class="field-label">Camera Position &amp; Movement</label>
-          <input class="field-input" id="ed-camera" value="${esc(sc.camera_spec)}" />
-        </div>
-
-        <div class="form-grid-2">
           <div class="field-group">
-            <label class="field-label">Palette Hexes (3 comma-sep)</label>
-            <input class="field-input" id="ed-colors" value="${esc((sc.colors || []).join(', '))}" />
+            <label class="field-label">Characters &amp; Hero Subjects (comma-separated)</label>
+            <input class="field-input" id="ed-subjects" value="${esc((sc.subjects || []).join(', '))}" />
           </div>
+
           <div class="field-group">
-            <label class="field-label">Voiceover Line (Optional)</label>
-            <input class="field-input" id="ed-vo" value="${esc(sc.vo_line || '')}" placeholder="Optional spoken line…" />
+            <label class="field-label">Physical Materials &amp; Textures (comma-separated)</label>
+            <input class="field-input" id="ed-materials" value="${esc((sc.materials || []).join(', '))}" />
           </div>
-        </div>
 
-        <div class="field-group">
-          <label class="field-label">Locked End Frame (Feeds Next Scene's Continuity)</label>
-          <textarea class="field-textarea" id="ed-end">${esc(sc.end_frame)}</textarea>
-        </div>
-
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span class="field-label">Beat-by-Beat Choreography</span>
-            <button class="mini-btn" onclick="appendDrawerBeat()">+ Add Beat</button>
+          <div class="field-group">
+            <label class="field-label">Camera Position &amp; Movement</label>
+            <input class="field-input" id="ed-camera" value="${esc(sc.camera_spec)}" />
           </div>
-          <div id="ed-beats-list" style="display:flex;flex-direction:column;gap:10px;">${beatsHtml}</div>
+
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Palette Hexes (3 comma-sep)</label>
+              <input class="field-input" id="ed-colors" value="${esc((sc.colors || []).join(', '))}" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Voiceover Line (Optional)</label>
+              <input class="field-input" id="ed-vo" value="${esc(sc.vo_line || '')}" placeholder="Optional spoken line…" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Locked End Frame (Feeds Next Scene's Continuity)</label>
+            <textarea class="field-textarea" id="ed-end">${esc(sc.end_frame)}</textarea>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span class="field-label">Beat-by-Beat Choreography</span>
+              <button class="mini-btn" onclick="appendDrawerBeat()">+ Add Beat</button>
+            </div>
+            <div id="ed-beats-list" style="display:flex;flex-direction:column;gap:10px;">${beatsHtml}</div>
+          </div>
         </div>
 
         <div id="drawer-json-wrap" style="display:${showJson ? 'block' : 'none'};">
@@ -2648,8 +2674,10 @@
     function toggleDrawerKindSections(kind) {
       const mg = document.getElementById('ed-mg-section');
       const uc = document.getElementById('ed-uc-section');
+      const ai = document.getElementById('ed-ai-section');
       if (mg) mg.style.display = kind === 'motion_graphic' ? 'flex' : 'none';
       if (uc) uc.style.display = kind === 'user_clip' ? 'flex' : 'none';
+      if (ai) ai.style.display = (kind === 'ai_sequence' || kind === 'kinetic_ui') ? 'flex' : 'none';
     }
 
     function appendDrawerBeat() {
@@ -2827,68 +2855,71 @@
           </button>
         `).join('');
 
+        const isAi = sc.kind === 'ai_sequence';
+        const hasStills = Boolean(sc.start_keyframe_media_url || sc.end_keyframe_media_url);
+        const stillsHtml = isAi ? `
+            <details class="pro-disclosure" style="margin-top:12px;" ${hasStills ? 'open' : ''}>
+              <summary>🖼 Start &amp; End Anchor Stills (Optional)</summary>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+                <div class="kf-panel">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="field-label">Start Frame</span>
+                    <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'start', this)" /></label>
+                  </div>
+                  <div class="kf-img-box">
+                    ${sc.start_keyframe_media_url ? `<img src="${esc(sc.start_keyframe_media_url)}?v=${Date.now()}" alt="Start keyframe" />` : 'Not generated yet'}
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-start-${esc(sc.scene_id)}" placeholder="1-line tweak…" />
+                    <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'start')">↻ Regen</button>
+                  </div>
+                </div>
+                <div class="kf-panel">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="field-label">End Frame ${activeM.supports_end_frame ? '✓ Bridged' : ''}</span>
+                    <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'end', this)" /></label>
+                  </div>
+                  <div class="kf-img-box">
+                    ${sc.end_keyframe_media_url ? `<img src="${esc(sc.end_keyframe_media_url)}?v=${Date.now()}" alt="End keyframe" />` : 'Not generated yet'}
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-end-${esc(sc.scene_id)}" placeholder="1-line tweak…" />
+                    <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'end')">↻ Regen</button>
+                  </div>
+                </div>
+              </div>
+            </details>
+        ` : '';
+
         return `
           <div class="shoot-act-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
               <div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <strong style="font-size:16.5px;">Act ${idx + 1} · ${esc(sc.title)}</strong>
+                  <strong style="font-size:16px;">Act ${idx + 1} · ${esc(sc.title)}</strong>
                   <span class="tag-pill">${sc.duration_sec}s</span>
-                  ${idx > 0 && sc.continues_from_prev ? '<span class="tag-pill coral">↳ Auto-Chains from Act ' + idx + ' Final Pixel</span>' : ''}
+                  ${sc.kind === 'motion_graphic' ? '<span class="tag-pill">🎨 Motion Graphic ($0)</span>' : ''}
+                  ${sc.kind === 'user_clip' ? '<span class="tag-pill">📹 Your Video ($0)</span>' : ''}
                   ${sc.render_status === 'rendering' ? '<span class="tag-pill warn">⏳ Rendering…</span>' : ''}
                   ${sc.render_status === 'done' ? '<span class="tag-pill ok">✓ Ready</span>' : ''}
                   ${sc.render_status === 'failed' ? '<span class="tag-pill coral">✕ Failed</span>' : ''}
                 </div>
-                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${esc(sc.render_message || sc.camera_spec)}</div>
+                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${esc(sc.render_message || (isAi ? sc.camera_spec : (sc.graphic_spec?.headline || 'Ready to render')))}</div>
               </div>
               <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
-                ${isRendering ? '⏳ Shooting…' : (sc.takes.length ? '↻ Shoot New Take' : '▶ Shoot Act')}
+                ${isRendering ? '⏳ Rendering…' : (sc.takes.length ? '↻ Re-Render' : '▶ Render Act')}
               </button>
             </div>
 
-            <div class="shoot-act-grid">
-              <!-- Start Frame -->
-              <div class="kf-panel">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                  <span class="field-label">Start Anchor Frame</span>
-                  <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'start', this)" /></label>
-                </div>
-                <div class="kf-img-box">
-                  ${sc.start_keyframe_media_url ? `<img src="${esc(sc.start_keyframe_media_url)}?v=${Date.now()}" alt="Start keyframe" />` : 'Not generated yet'}
-                </div>
-                <div style="display:flex;gap:6px;">
-                  <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-start-${esc(sc.scene_id)}" placeholder="1-line tweak (e.g. warmer light)…" />
-                  <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'start')">↻ Regen</button>
-                </div>
-              </div>
-
-              <!-- End Frame -->
-              <div class="kf-panel">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                  <span class="field-label">End Anchor Frame ${activeM.supports_end_frame ? '✓ Bridged' : ''}</span>
-                  <label class="mini-btn" style="cursor:pointer;">⬆ Upload<input type="file" accept="image/*" style="display:none;" onchange="uploadKeyframeFile('${esc(sc.scene_id)}', 'end', this)" /></label>
-                </div>
-                <div class="kf-img-box">
-                  ${sc.end_keyframe_media_url ? `<img src="${esc(sc.end_keyframe_media_url)}?v=${Date.now()}" alt="End keyframe" />` : 'Not generated yet'}
-                </div>
-                <div style="display:flex;gap:6px;">
-                  <input class="field-input" style="padding:6px 9px;font-size:12px;" id="tw-end-${esc(sc.scene_id)}" placeholder="1-line tweak for end frame…" />
-                  <button class="mini-btn" onclick="regenKeyframeUI('${esc(sc.scene_id)}', 'end')">↻ Regen</button>
-                </div>
-              </div>
-
-              <!-- Video Take Preview + Take History -->
-              <div>
-                <div class="take-player-box ${isRendering ? 'is-rendering' : ''}">
-                  ${winClip
-                    ? `<video controls playsinline preload="metadata" src="${esc(winClip)}"></video>`
-                    : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Shoot Act</strong> to render Take 1'}</div>`}
-                </div>
-                <div class="takes-strip">
-                  ${takesHtml || '<span style="font-size:12px;color:var(--ink-muted);">No takes rendered yet for this Act.</span>'}
-                </div>
-              </div>
+            <div class="take-player-box ${isRendering ? 'is-rendering' : ''}" style="max-width:640px;">
+              ${winClip
+                ? `<video controls playsinline preload="metadata" src="${esc(winClip)}"></video>`
+                : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Render Act</strong> to generate this clip'}</div>`}
             </div>
+            <div class="takes-strip" style="margin-top:8px;">
+              ${takesHtml || '<span style="font-size:12px;color:var(--ink-muted);">No takes rendered yet.</span>'}
+            </div>
+            ${stillsHtml}
           </div>
         `;
       }).join('');
