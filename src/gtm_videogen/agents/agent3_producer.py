@@ -151,6 +151,8 @@ async def _render_single_shot(
     warnings: list[str],
     cancel: CancellationToken | None,
     bypass_cache: bool = False,
+    logo_path: Path | None = None,
+    media_image_path: Path | None = None,
 ) -> RenderedClip:
     """Render one shot per its engine (ai_video, image_to_video, motion_card, manim)."""
     if cancel is not None:
@@ -176,11 +178,13 @@ async def _render_single_shot(
             duration_sec=float(shot.duration_sec),
             bible=bible,
             output_path=out_path,
-            subtitle=sheet.end_card_subtitle,
-            footer=sheet.end_card_footer,
+            subtitle=sheet.end_card_subtitle if is_end else None,
+            footer=sheet.end_card_footer if is_end else None,
             card_kind="end_card" if is_end else "title",
             shot_id=shot.id,
             theme=shot.theme or sheet.theme,
+            logo_path=logo_path if is_end else None,
+            media_image_path=media_image_path if not is_end else None,
             cancel=cancel,
         )
 
@@ -218,6 +222,8 @@ async def _render_single_shot(
             output_path=clips_dir / f"{shot.id}_fallback_card.mp4",
             shot_id=shot.id,
             theme=shot.theme or sheet.theme,
+            logo_path=logo_path if shot.index == len(sheet.shots) - 1 else None,
+            media_image_path=media_image_path if shot.index != len(sheet.shots) - 1 else None,
             cancel=cancel,
         )
 
@@ -249,6 +255,8 @@ async def render_assets_overlapped(
     cancel: CancellationToken | None = None,
     existing_clips: dict[str, RenderedClip] | None = None,
     repair_shot_ids: set[str] | None = None,
+    brand_logo_path: Path | None = None,
+    product_image_paths: list[Path] | None = None,
 ) -> tuple[list[RenderedClip], list[RenderedAudio], list[str]]:
     """Overlap video rendering with audio generation (P3, P4, BUG-05, BUG-16)."""
     if cancel is not None:
@@ -259,6 +267,7 @@ async def render_assets_overlapped(
     manim_renderer = ManimRenderer()
     clips_dir = work_dir / "clips"
     ordered_shots = sorted(shot_sheet.shots, key=lambda s: s.index)
+    valid_prod_imgs = [p for p in (product_image_paths or []) if p.is_file()]
 
     first_video_ok = asyncio.Event()
     clip_sem = asyncio.Semaphore(4)
@@ -288,6 +297,9 @@ async def render_assets_overlapped(
                 return reused
 
             bypass = bool(repair_shot_ids and shot.id in repair_shot_ids)
+            media_img = (
+                valid_prod_imgs[shot.index % len(valid_prod_imgs)] if valid_prod_imgs else None
+            )
             clip = await _render_single_shot(
                 shot=shot,
                 sheet=shot_sheet,
@@ -300,6 +312,8 @@ async def render_assets_overlapped(
                 warnings=warnings,
                 cancel=cancel,
                 bypass_cache=bypass,
+                logo_path=brand_logo_path,
+                media_image_path=media_img,
             )
             first_video_ok.set()
             await emit_event(
@@ -424,6 +438,10 @@ def _build_agent3_tools(
     director_qa: QAReport | None,
     event_cb: EventCallback | None,
     cancel: CancellationToken | None,
+    existing_clips: dict[str, RenderedClip] | None = None,
+    repair_shot_ids: set[str] | None = None,
+    brand_logo_path: Path | None = None,
+    product_image_paths: list[Path] | None = None,
 ) -> tuple[list[BaseTool], list[BaseTool]]:
     """Create Agent 3 Producer worker tools and its deterministic QA/budget grader tool."""
     stitcher = FFmpegStitcher()
@@ -439,6 +457,13 @@ def _build_agent3_tools(
     def preflight_cost_tool() -> str:
         """Estimate full run USD cost (incl. audio + min_seconds) vs cap_usd (BUG-15)."""
         est = estimate_run_cost(shot_sheet=shot_sheet, sound_plan=sound_plan)
+        if existing_clips and repair_shot_ids:
+            # Only charge preflight for shots that will actually be re-rendered
+            subset = shot_sheet.model_copy(
+                update={"shots": [s for s in shot_sheet.shots if s.id in repair_shot_ids]}
+            )
+            if subset.shots:
+                est = estimate_run_cost(shot_sheet=subset, sound_plan=sound_plan)
         state_bag["estimated_usd"] = est["total_usd"]
         budget_ok = True if run_input.mock else (est["total_usd"] <= cost_meter.cap_usd + 1e-9)
         payload = {
@@ -472,6 +497,10 @@ def _build_agent3_tools(
             render_mode=run_input.render_mode,
             event_cb=event_cb,
             cancel=cancel,
+            existing_clips=existing_clips,
+            repair_shot_ids=repair_shot_ids,
+            brand_logo_path=brand_logo_path,
+            product_image_paths=product_image_paths,
         )
         state_bag["clips"] = clips
         state_bag["audio_assets"] = audio_assets
@@ -913,6 +942,10 @@ async def run_agent3_producer(
     grader_model: BaseChatModel | str | None = None,
     max_iterations: int = 3,
     raise_on_failure: bool = True,
+    existing_clips: dict[str, RenderedClip] | None = None,
+    repair_shot_ids: set[str] | None = None,
+    brand_logo_path: Path | None = None,
+    product_image_paths: list[Path] | None = None,
 ) -> Agent3Result:
     """Run Agent 3 (Render, Stitch & Final QA Producer DeepAgent) with RubricMiddleware gating."""
     if cancel is not None:
@@ -944,6 +977,10 @@ async def run_agent3_producer(
         director_qa=director_qa,
         event_cb=event_cb,
         cancel=cancel,
+        existing_clips=existing_clips,
+        repair_shot_ids=repair_shot_ids,
+        brand_logo_path=brand_logo_path,
+        product_image_paths=product_image_paths,
     )
 
     is_offline_mode = run_input.mock or is_offline_provider_bundle(providers)

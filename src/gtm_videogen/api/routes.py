@@ -197,6 +197,7 @@ class RunEventBroker:
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=heartbeat_sec)
                 except TimeoutError:
+                    yield {"type": "__heartbeat__"}
                     continue
                 yield ev
                 if ev.get("type") in TERMINAL_EVENT_TYPES:
@@ -601,7 +602,12 @@ async def stream_run_events(
             yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
             return
 
-        async for ev in services.event_broker.subscribe(run_id, request=request):
+        async for ev in services.event_broker.subscribe(
+            run_id, request=request, heartbeat_sec=10.0
+        ):
+            if ev.get("type") == "__heartbeat__":
+                yield ": keepalive\n\n"
+                continue
             yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
 
     return StreamingResponse(

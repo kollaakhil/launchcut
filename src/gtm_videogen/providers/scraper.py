@@ -227,31 +227,55 @@ def _extract_brand_name(soup: BeautifulSoup, brand_url: str, explicit_name: str 
     return host.replace("www.", "").split(".")[0].capitalize()
 
 
+_BOILERPLATE_RE = re.compile(
+    r"^(log\s*in|sign\s*in|sign\s*up|log\s*in\s+or\s+sign\s*up|get\s+started|menu|"
+    r"skip\s+to\s+(main\s+)?content|accept(\s+all)?\s+cookies?|cookie\s+policy|"
+    r"privacy\s+policy|terms\s+of\s+(service|use)|all\s+rights\s+reserved)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_boilerplate_text(text: str) -> bool:
+    t = text.strip()
+    if not t or _BOILERPLATE_RE.search(t):
+        return True
+    low = t.lower()
+    return any(
+        phrase in low
+        for phrase in (
+            "we use cookies",
+            "manage cookie",
+            "log in or sign up",
+            "already have an account",
+        )
+    )
+
+
 def _extract_page_facts(soup: BeautifulSoup) -> list[str]:
     facts: list[str] = []
 
     meta_desc = soup.find("meta", attrs={"name": re.compile(r"^description$", re.IGNORECASE)})
     if meta_desc and isinstance(meta_desc.get("content"), str):
         desc = _clean_text(meta_desc["content"])
-        if len(desc) >= 12:
+        if len(desc) >= 12 and not _is_boilerplate_text(desc):
             facts.append(desc[:300])
 
     og_desc = soup.find("meta", attrs={"property": "og:description"})
     if og_desc and isinstance(og_desc.get("content"), str):
         desc = _clean_text(og_desc["content"])
-        if len(desc) >= 12:
+        if len(desc) >= 12 and not _is_boilerplate_text(desc):
             facts.append(desc[:300])
 
     for tag_name in ("h1", "h2"):
         for heading in soup.find_all(tag_name):
             text = _clean_text(heading.get_text(" ", strip=True))
-            if 8 <= len(text) <= 200:
+            if 8 <= len(text) <= 200 and not _is_boilerplate_text(text):
                 facts.append(text)
 
     char_budget = 0
     for para in soup.find_all(["p", "li"]):
         text = _clean_text(para.get_text(" ", strip=True))
-        if 20 <= len(text) <= 280:
+        if 20 <= len(text) <= 280 and not _is_boilerplate_text(text):
             facts.append(text)
             char_budget += len(text)
             if char_budget >= _MAX_TEXT_CHARS or len(facts) >= 24:

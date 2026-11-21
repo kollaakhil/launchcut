@@ -143,6 +143,8 @@ class GraphicsCardRenderer:
         footer: str | None = None,
         card_kind: CardKind = "title",
         theme: GraphicsTheme | None = None,
+        logo_path: Path | None = None,
+        media_image_path: Path | None = None,
     ) -> Image.Image:
         bg_rgb, text_rgb, accent_rgb = _pick_card_colors(bible, theme)
         typo = bible.typography_and_layout
@@ -168,7 +170,6 @@ class GraphicsCardRenderer:
         footer_font = _load_pil_font(reg_path, footer_size)
 
         # Editorial radial studio lighting backdrop tinted subtly with brand accent
-        img = Image.new("RGB", (width, height), color=bg_rgb)
         grad_w, grad_h = 160, 90
         grad_small = Image.new("RGB", (grad_w, grad_h), color=bg_rgb)
         gpx = grad_small.load()
@@ -196,6 +197,49 @@ class GraphicsCardRenderer:
             width=max(1, int(min(width, height) * 0.002)),
         )
 
+        # Optional real uploaded product/UI screenshot showcase (floating dark studio bezel)
+        if media_image_path is not None and Path(media_image_path).is_file():
+            try:
+                media_img = Image.open(media_image_path).convert("RGBA")
+                max_mw = int(width * 0.56)
+                max_mh = int(height * 0.54)
+                media_img.thumbnail((max_mw, max_mh), Image.Resampling.LANCZOS)
+                mw, mh = media_img.size
+                mx = (width - mw) // 2
+                my = int(height * 0.11)
+                bezel = max(6, int(base_dim * 0.012))
+                draw.rectangle(
+                    [mx - bezel, my - bezel, mx + mw + bezel, my + mh + bezel],
+                    fill=tuple(max(0, int(c * 0.55)) for c in bg_rgb),
+                    outline=border_rgb,
+                    width=max(1, int(base_dim * 0.0025)),
+                )
+                img.paste(media_img, (mx, my), media_img)
+                # Render clean editorial caption underneath the framed product/UI shot
+                cap_font = _load_pil_font(bold_path, max(24, int(base_dim * 0.056)))
+                cap_lines = _wrap_lines(draw, text, cap_font, int(width * 0.80))
+                cy_txt = my + mh + bezel + int(height * 0.045)
+                for line in cap_lines[:2]:
+                    bbox = draw.textbbox((0, 0), line, font=cap_font)
+                    lw = bbox[2] - bbox[0]
+                    draw.text(((width - lw) // 2, cy_txt), line, fill=text_rgb, font=cap_font)
+                    cy_txt += int(cap_font.size * 1.25)
+                return img
+            except Exception:
+                pass
+
+        # Optional real uploaded brand logo (composited cleanly above headline on end cards)
+        logo_img: Image.Image | None = None
+        if logo_path is not None and Path(logo_path).is_file():
+            try:
+                loaded_logo = Image.open(logo_path).convert("RGBA")
+                loaded_logo.thumbnail(
+                    (int(width * 0.34), int(base_dim * 0.16)), Image.Resampling.LANCZOS
+                )
+                logo_img = loaded_logo
+            except Exception:
+                logo_img = None
+
         margin_x = max(32, int(width * 0.09))
         max_text_w = max(100, width - 2 * margin_x)
         layout = (typo.end_card_layout or "centered_minimal").lower()
@@ -207,22 +251,21 @@ class GraphicsCardRenderer:
         sub_line_h = int(sub_size * 1.35)
         accent_h = max(4, int(base_dim * 0.008))
 
-        block_h = len(title_lines) * title_line_h
+        logo_h = (logo_img.height + int(base_dim * 0.05)) if logo_img is not None else 0
+        block_h = logo_h + len(title_lines) * title_line_h
         if sub_lines:
             block_h += int(base_dim * 0.04) + len(sub_lines) * sub_line_h
 
         if card_kind == "lower_third":
             band_h = block_h + int(height * 0.10)
             band_top = max(int(height * 0.55), height - band_h - int(height * 0.07))
-            # Accent rule at top of lower-third band
             draw.rectangle(
                 [margin_x, band_top, margin_x + int(width * 0.18), band_top + accent_h],
                 fill=accent_rgb,
             )
             cursor_y = band_top + accent_h + int(height * 0.03)
             align_left = True
-        elif "split" in layout or "left" in layout:
-            # Editorial left-aligned with vertical accent rule
+        elif ("split" in layout or "left" in layout) and logo_img is None:
             rule_w = max(6, int(base_dim * 0.012))
             cursor_y = max(40, (height - block_h) // 2)
             draw.rectangle(
@@ -236,11 +279,23 @@ class GraphicsCardRenderer:
             align_left = True
         else:
             cursor_y = max(40, (height - block_h) // 2)
-            # Centered horizontal accent rule above headline
-            rule_w = int(width * 0.14)
-            rule_x = (width - rule_w) // 2
-            rule_y = max(20, cursor_y - int(base_dim * 0.045))
-            draw.rectangle([rule_x, rule_y, rule_x + rule_w, rule_y + accent_h], fill=accent_rgb)
+            if logo_img is not None:
+                lx = (width - logo_img.width) // 2
+                img.paste(logo_img, (lx, cursor_y), logo_img)
+                cursor_y += logo_img.height + int(base_dim * 0.035)
+                rule_w = int(width * 0.12)
+                rule_x = (width - rule_w) // 2
+                draw.rectangle(
+                    [rule_x, cursor_y, rule_x + rule_w, cursor_y + accent_h], fill=accent_rgb
+                )
+                cursor_y += accent_h + int(base_dim * 0.035)
+            else:
+                rule_w = int(width * 0.14)
+                rule_x = (width - rule_w) // 2
+                rule_y = max(20, cursor_y - int(base_dim * 0.045))
+                draw.rectangle(
+                    [rule_x, rule_y, rule_x + rule_w, rule_y + accent_h], fill=accent_rgb
+                )
             align_left = False
 
         for line in title_lines:
@@ -284,6 +339,8 @@ class GraphicsCardRenderer:
         card_kind: CardKind = "title",
         shot_id: str = "card",
         theme: GraphicsTheme | None = None,
+        logo_path: Path | None = None,
+        media_image_path: Path | None = None,
         cancel: CancellationToken | None = None,
     ) -> RenderedClip:
         """Render a motion-graphics card to an H.264 MP4 with exact width/height/fps/duration."""
@@ -315,6 +372,8 @@ class GraphicsCardRenderer:
                 footer=footer,
                 card_kind=card_kind,
                 theme=theme,
+                logo_path=logo_path,
+                media_image_path=media_image_path,
             )
             img.save(png_path, format="PNG")
 

@@ -38,13 +38,13 @@ async def test_hitl_5_step_studio_workflow_offline(tmp_path: Path) -> None:
     async with httpx.AsyncClient(
         transport=transport, base_url="http://testserver", headers=headers
     ) as client:
-        # Presets catalog
+        # Presets catalog (streamlined to 3 high-clarity stacks)
         presets_resp = await client.get("/api/studio/presets")
         assert presets_resp.status_code == 200
         presets = presets_resp.json()["presets"]
-        assert len(presets) >= 4
+        assert len(presets) == 3
 
-        # Step 1: Create run & trigger research ONLY
+        # Step 1: Create run & upload real brand logo + product screenshot
         create_resp = await client.post(
             "/api/runs",
             json={
@@ -61,6 +61,33 @@ async def test_hitl_5_step_studio_workflow_offline(tmp_path: Path) -> None:
         )
         assert create_resp.status_code == 201
         run_id = create_resp.json()["run_id"]
+
+        # Upload real PNG logo & product asset
+        import base64
+        import io
+
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("RGBA", (64, 64), (240, 180, 75, 255)).save(buf, format="PNG")
+        tiny_png_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+        up_logo = await client.post(
+            f"/api/runs/{run_id}/assets",
+            json={"kind": "logo", "filename": "kestrel-logo.png", "data_url": tiny_png_url},
+        )
+        assert up_logo.status_code == 200
+        assert up_logo.json()["run"]["brand_logo_path"]
+
+        up_prod = await client.post(
+            f"/api/runs/{run_id}/assets",
+            json={"kind": "product", "filename": "bag-hero.png", "data_url": tiny_png_url},
+        )
+        assert up_prod.status_code == 200
+        asset_url = up_prod.json()["asset"]["url"]
+        fetched_asset = await client.get(asset_url)
+        assert fetched_asset.status_code == 200
+        assert fetched_asset.headers["content-type"].startswith("image/png")
 
         # Editable USD budget cap
         cap_resp = await client.patch(f"/api/runs/{run_id}/cap", json={"cap_usd": 8.5})

@@ -762,8 +762,76 @@
       color: var(--ink);
     }
 
+    /* Brand Asset Uploader & Shot Filmstrip */
+    .asset-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      background: var(--bg-subtle);
+      border: 1px solid var(--rule);
+      margin-bottom: 14px;
+    }
+    .asset-thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .asset-thumb {
+      width: 48px;
+      height: 36px;
+      object-fit: contain;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 2px;
+    }
+    .filmstrip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      gap: 6px;
+    }
+    .film-shot {
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .film-shot.weak { border-color: rgba(232, 93, 74, 0.55); }
+    .film-shot img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+      background: #0d0e11;
+    }
+    .film-shot-meta {
+      padding: 5px 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+    }
+    .film-fix-btn {
+      appearance: none;
+      border: 1px solid var(--rule-strong);
+      background: var(--surface);
+      color: var(--ink-secondary);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .film-fix-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+
     @media (max-width: 900px) {
-      .grid-2, .grid-3, .grid-4, .metrics-row { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .grid-4, .metrics-row, .asset-bar { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -772,7 +840,7 @@
   <header class="topbar">
     <div class="brand-group">
       <h1>Launch<span>Cut</span></h1>
-      <span class="flow-crumb">Brand → Concept → Shot Sheet → Storyboard → Previews &amp; QA → Final</span>
+      <span class="flow-crumb">Brand → Concept → Sheet → Stills → Previews &amp; QA → Final</span>
     </div>
     <div class="topbar-controls">
       <span class="chip" id="chipApis"><span class="dot"></span>Checking…</span>
@@ -793,7 +861,7 @@
   <!-- 6-Step Interactive Navigation -->
   <nav class="stepper-bar" aria-label="Production workflow steps">
     <button type="button" class="step-btn active" data-step="brand" id="nav-brand">
-      <span class="step-num">1</span> Brand &amp; Goal
+      <span class="step-num">1</span> Brand &amp; Assets
     </button>
     <span class="step-arrow">→</span>
     <button type="button" class="step-btn" data-step="concept" id="nav-concept" disabled>
@@ -818,7 +886,7 @@
   </nav>
 
   <main class="shell">
-    <!-- Status & Live SSE Feedback -->
+    <!-- Calm Status Banner + Collapsible Activity Log -->
     <div class="status-banner" id="statusBanner" role="status">
       <div class="banner-left">
         <div class="spinner" id="bannerSpinner" style="display:none;"></div>
@@ -826,39 +894,42 @@
       </div>
       <button type="button" class="btn btn-danger btn-sm" id="btnCancelJob" style="display:none;">Cancel</button>
     </div>
-    <div class="sse-mini-log" id="sseMiniLog"></div>
+    <details id="sseDetails" style="display:none; margin-bottom:14px;">
+      <summary style="cursor:pointer; font-size:11.5px; color:var(--ink-muted); margin-bottom:6px;">Live pipeline activity log</summary>
+      <div class="sse-mini-log visible" id="sseMiniLog"></div>
+    </details>
 
-    <!-- STEP 1: BRAND & GOAL -->
+    <!-- STEP 1: BRAND, ASSETS & GOAL -->
     <section class="step-view active" id="view-brand">
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">1. Brand &amp; Campaign Brief</h2>
-            <p class="panel-sub">Start by giving brand info, goals, and verified facts. AI researches your site and pitches 4 concepts before any script or video money is spent.</p>
+            <h2 class="panel-title">1. Brand, Assets &amp; Goal</h2>
+            <p class="panel-sub">Give your brand URL, goal, and optional real logo / product screenshots. AI researches your brand and pitches 4 concepts before spending video credits.</p>
           </div>
           <div class="btn-group">
             <div class="mode-pill-switch">
               <button type="button" class="mode-pill active" id="modeLive">Live APIs</button>
-              <button type="button" class="mode-pill" id="modeMock">Offline Mock ($0)</button>
+              <button type="button" class="mode-pill" id="modeMock">Mock ($0)</button>
             </div>
           </div>
         </div>
 
         <div class="btn-group" style="margin-bottom:16px;">
           <button type="button" class="btn btn-sm" id="presetNike">Preset: Nike (Live)</button>
-          <button type="button" class="btn btn-sm" id="presetFellow">Preset: Fellow Stagg EKG (Live)</button>
-          <button type="button" class="btn btn-sm" id="presetKestrel">Preset: Kestrel Roasters (Mock $0)</button>
+          <button type="button" class="btn btn-sm" id="presetFellow">Preset: Fellow (Live)</button>
+          <button type="button" class="btn btn-sm" id="presetKestrel">Preset: Kestrel (Mock $0)</button>
         </div>
 
-        <form id="brandForm" class="space-y-4">
+        <form id="brandForm">
           <div class="grid-2" style="margin-bottom:14px;">
             <div class="field">
               <label for="inBrand">Brand Name</label>
-              <input id="inBrand" type="text" required placeholder="e.g. Nike" value="Nike" />
+              <input id="inBrand" type="text" required placeholder="e.g. Linear" value="Nike" />
             </div>
             <div class="field">
               <label for="inUrl">Brand Website URL</label>
-              <input id="inUrl" type="url" required placeholder="https://www.nike.com" value="https://www.nike.com" />
+              <input id="inUrl" type="url" required placeholder="https://linear.app" value="https://www.nike.com" />
             </div>
           </div>
 
@@ -876,9 +947,9 @@
               <label for="inAspect">Aspect Ratio</label>
               <select id="inAspect">
                 <option value="16:9">16:9 Landscape</option>
-                <option value="9:16">9:16 Vertical (Reels/TikTok)</option>
+                <option value="9:16">9:16 Vertical</option>
                 <option value="1:1">1:1 Square</option>
-                <option value="4:5">4:5 Social Feed</option>
+                <option value="4:5">4:5 Social</option>
               </select>
             </div>
             <div class="field">
@@ -895,37 +966,54 @@
             </div>
           </div>
 
-          <div class="grid-2" style="margin-bottom:14px;">
+          <!-- Real Brand Asset Uploader -->
+          <div class="asset-bar">
             <div class="field">
-              <label for="inFacts">Verified Product Facts (one per line — strongly improves copy)</label>
-              <textarea id="inFacts" rows="3" placeholder="ZoomX foam returns responsive energy on every stride&#10;Engineered mesh upper for lightweight breathability"></textarea>
+              <label for="inLogoFile">Real Brand Logo (PNG/JPG/WebP — used on closing lockup)</label>
+              <input id="inLogoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              <div class="asset-thumbs" id="logoPreview"></div>
             </div>
             <div class="field">
-              <label for="inDirection">Creative Direction / Must-Say / Offer (optional)</label>
-              <textarea id="inDirection" rows="3" placeholder="Dawn neighborhood energy, tactile 35mm feel, end on clean brand mark"></textarea>
+              <label for="inProductFiles">Real Product Photos / App UI Screenshots (up to 4)</label>
+              <input id="inProductFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+              <div class="asset-thumbs" id="productPreviews"></div>
             </div>
           </div>
 
-          <div class="grid-3">
-            <div class="field">
-              <label for="inOffer">Promotional Offer (optional)</label>
-              <input id="inOffer" type="text" placeholder="e.g. Free 30-day wear test" />
-            </div>
-            <div class="field">
-              <label for="inMustSay">Must-Say Phrases (comma-separated)</label>
-              <input id="inMustSay" type="text" placeholder="e.g. Just Do It" />
-            </div>
-            <div class="field">
-              <label for="inFps">Frame Rate</label>
-              <select id="inFps">
-                <option value="24">24 fps (Cinema)</option>
-                <option value="30">30 fps (Smooth Social)</option>
-              </select>
-            </div>
+          <div class="field" style="margin-bottom:14px;">
+            <label for="inFacts">Verified Product Facts (one per line — grounds voiceover copy)</label>
+            <textarea id="inFacts" rows="2" placeholder="ZoomX foam returns responsive energy on every stride&#10;Engineered mesh upper for lightweight breathability"></textarea>
           </div>
+
+          <details style="margin-bottom:14px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--bg-subtle); padding:10px 14px;">
+            <summary style="cursor:pointer; font-size:12px; color:var(--ink-secondary); font-weight:500;">Advanced Brief Controls (Creative Direction, Offer, Must-Say, FPS)</summary>
+            <div class="grid-2" style="margin-top:12px; margin-bottom:10px;">
+              <div class="field">
+                <label for="inDirection">Creative Direction (optional)</label>
+                <textarea id="inDirection" rows="2" placeholder="Editorial precision, quiet studio lighting, clean brand mark"></textarea>
+              </div>
+              <div class="field">
+                <label for="inOffer">Promotional Offer (optional)</label>
+                <input id="inOffer" type="text" placeholder="e.g. Free 30-day wear test" />
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label for="inMustSay">Must-Say Phrases (comma-separated)</label>
+                <input id="inMustSay" type="text" placeholder="e.g. Built for speed" />
+              </div>
+              <div class="field">
+                <label for="inFps">Frame Rate</label>
+                <select id="inFps">
+                  <option value="24">24 fps (Cinema)</option>
+                  <option value="30">30 fps (Smooth Social)</option>
+                </select>
+              </div>
+            </div>
+          </details>
 
           <div class="btn-bar">
-            <span style="font-size:12px; color:var(--ink-muted);">Step 1 runs Agent 1 only (brand scrape + 4 concepts + Creative Bible). Video rendering starts only after you approve Step 3.</span>
+            <span style="font-size:12px; color:var(--ink-muted);">Step 1 pitches 4 concepts first — video rendering starts only after you approve your shot sheet &amp; stills.</span>
             <button type="submit" class="btn btn-primary" id="btnRunResearch">Research Brand &amp; Pitch 4 Concepts →</button>
           </div>
         </form>
@@ -1182,8 +1270,11 @@
       customStacks: [],
       draftShots: [],
       ratingDrafts: {},
+      pendingLogo: null,
+      pendingProducts: [],
       kfBust: Date.now(),
       sse: null,
+      pollTimer: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1219,8 +1310,9 @@
     }
 
     function logSse(ev) {
+      const details = $("sseDetails");
+      if (details) details.style.display = "block";
       const box = $("sseMiniLog");
-      box.classList.add("visible");
       const t = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour12: false }) : "";
       const detail = ev.data ? JSON.stringify(ev.data).slice(0, 140) : "";
       const row = document.createElement("div");
@@ -1232,11 +1324,32 @@
 
     function closeSse() {
       if (state.sse) { state.sse.close(); state.sse = null; }
+      if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
     }
 
     function subscribeSse(runId, onTerminal) {
       closeSse();
       $("sseMiniLog").innerHTML = "";
+      let finished = false;
+      const finishRun = async () => {
+        if (finished) return;
+        finished = true;
+        closeSse();
+        await loadRuns();
+        const fresh = await api(`/api/runs/${encodeURIComponent(runId)}`);
+        state.run = fresh;
+        state.kfBust = Date.now();
+        if (fresh.status === "failed" || fresh.error) {
+          setBanner("error", fresh.error || "Step failed");
+        } else if (fresh.status === "cancelled") {
+          setBanner("error", "Step cancelled by user.");
+        } else {
+          setBanner("ok", `Step completed — ready on "${fresh.step}".`);
+        }
+        if (onTerminal) await onTerminal(fresh);
+        renderAll();
+      };
+
       const src = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`);
       state.sse = src;
       const types = ["stage_started", "rubric_evaluation", "shot_progress", "cost_update", "warning", "stage_completed", "run_completed", "run_cancelled", "run_failed"];
@@ -1253,23 +1366,24 @@
             renderCostMeter();
           }
           if (t === "run_completed" || t === "run_cancelled" || t === "run_failed") {
-            closeSse();
-            await loadRuns();
-            const fresh = await api(`/api/runs/${encodeURIComponent(runId)}`);
-            state.run = fresh;
-            state.kfBust = Date.now();
-            if (fresh.status === "failed" || fresh.error) {
-              setBanner("error", fresh.error || "Step failed");
-            } else if (fresh.status === "cancelled") {
-              setBanner("error", "Step cancelled by user.");
-            } else {
-              setBanner("ok", `Step completed — ready on "${fresh.step}".`);
-            }
-            if (onTerminal) await onTerminal(fresh);
-            renderAll();
+            await finishRun();
           }
         });
       });
+
+      // Fallback poll every 4s in case a reverse proxy (Render/Cloudflare) buffers or drops SSE
+      state.pollTimer = setInterval(async () => {
+        if (finished) return;
+        try {
+          const snap = await api(`/api/runs/${encodeURIComponent(runId)}`);
+          if (snap.status !== "working") {
+            await finishRun();
+          } else if (snap.cost_ledger?.actual_usd !== undefined && state.run) {
+            state.run.cost_ledger.actual_usd = snap.cost_ledger.actual_usd;
+            renderCostMeter();
+          }
+        } catch {}
+      }, 4000);
     }
 
     function maxReachedStepIndex(run) {
@@ -1670,6 +1784,28 @@
             `<button type="button" class="tag-pill ${draft.tags.has(tag) ? "on" : ""}" data-tag-vid="${esc(v.version_id)}" data-tag-val="${esc(tag)}">${esc(tag)}</button>`
           ).join("");
 
+          const shotScoresById = {};
+          ((v.quality_scorecard && v.quality_scorecard.shot_scores) || []).forEach((ss) => { shotScoresById[ss.shot_id] = ss; });
+          const verShots = (v.shot_sheet && v.shot_sheet.shots) || (state.run?.shot_sheet?.shots) || [];
+          const filmstripHtml = verShots.length ? `
+            <div class="filmstrip">
+              ${verShots.map((sh) => {
+                const sc = shotScoresById[sh.id];
+                const weak = sc && (sc.verdict === "reiterate" || Number(sc.score || 0) < 8.0);
+                const kfSrc = sh.keyframe_path ? `/api/runs/${encodeURIComponent(state.run.run_id)}/shots/${encodeURIComponent(sh.id)}/keyframe?t=${state.kfBust}` : "";
+                return `
+                  <div class="film-shot ${weak ? "weak" : ""}" title="${esc(sc ? (sc.critique || "") : sh.beat)}">
+                    ${kfSrc ? `<img src="${kfSrc}" alt="${esc(sh.id)}" loading="lazy" />` : ""}
+                    <div class="film-shot-meta">
+                      <span>${esc(sh.id)}${sc ? ` · ${Number(sc.score).toFixed(1)}` : ""}</span>
+                      <button type="button" class="film-fix-btn" data-fix-vid="${esc(v.version_id)}" data-fix-shot="${esc(sh.id)}" ${v.status !== "done" ? "disabled" : ""}>↻ Fix</button>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          ` : "";
+
           return `
             <article class="version-card ${isWin ? "winner" : ""}">
               ${v.render_manifest?.stitched_path
@@ -1685,6 +1821,7 @@
                 </div>
 
                 ${renderScorecardHtml(v.quality_scorecard)}
+                ${filmstripHtml}
 
                 <div class="human-rate-box">
                   <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -1711,6 +1848,31 @@
             </article>
           `;
         }).join("");
+
+        // Wire single-shot filmstrip fix buttons (reuses untouched shots for $0!)
+        $("versionsGrid").querySelectorAll("[data-fix-shot]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const vid = btn.dataset.fixVid;
+            const sid = btn.dataset.fixShot;
+            const d = state.ratingDrafts[vid] || { notes: "", tags: new Set() };
+            const combinedNotes = [d.notes, ...Array.from(d.tags)].filter(Boolean).join("; ");
+            setBanner("working", `Re-rendering ONLY shot ${sid} (reusing untouched clips)…`, true);
+            try {
+              await api(`/api/runs/${encodeURIComponent(state.run.run_id)}/reiterate`, {
+                method: "POST",
+                body: JSON.stringify({
+                  version_id: vid,
+                  shot_ids: [sid],
+                  notes: combinedNotes,
+                  regenerate_keyframes: true,
+                }),
+              });
+              subscribeSse(state.run.run_id, () => setView("previews"));
+            } catch (err) {
+              setBanner("error", err.message);
+            }
+          });
+        });
 
         // Wire Stars
         $("versionsGrid").querySelectorAll("[data-star-vid]").forEach((btn) => {
@@ -2023,7 +2185,40 @@
       $("inDuration").value = "15"; $("lblDuration").textContent = "15s";
     });
 
-    // Step 1 Submit -> Create Run + Step 1 Research
+    // Brand Asset File Readers (Logo + Product/UI Screenshots)
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    $("inLogoFile").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) { state.pendingLogo = null; $("logoPreview").innerHTML = ""; return; }
+      try {
+        const data_url = await readFileAsDataUrl(file);
+        state.pendingLogo = { kind: "logo", filename: file.name, data_url };
+        $("logoPreview").innerHTML = `<img class="asset-thumb" src="${data_url}" alt="Brand logo" title="${esc(file.name)}" />`;
+      } catch (err) { setBanner("error", err.message); }
+    });
+
+    $("inProductFiles").addEventListener("change", async (e) => {
+      const files = Array.from(e.target.files || []).slice(0, 4);
+      state.pendingProducts = [];
+      $("productPreviews").innerHTML = "";
+      for (const file of files) {
+        try {
+          const data_url = await readFileAsDataUrl(file);
+          state.pendingProducts.push({ kind: "product", filename: file.name, data_url });
+          $("productPreviews").innerHTML += `<img class="asset-thumb" src="${data_url}" alt="${esc(file.name)}" title="${esc(file.name)}" />`;
+        } catch (err) { setBanner("error", err.message); }
+      }
+    });
+
+    // Step 1 Submit -> Create Run + Upload Assets + Step 1 Research
     $("brandForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       setBanner("working", "Creating run & researching brand (Agent 1)…", true);
@@ -2049,6 +2244,24 @@
 
         const created = await api("/api/runs", { method: "POST", body: JSON.stringify(payload) });
         state.run = created;
+
+        // Upload real brand logo & product/UI screenshots if provided
+        const uploads = [
+          ...(state.pendingLogo ? [state.pendingLogo] : []),
+          ...state.pendingProducts,
+        ];
+        if (uploads.length) {
+          setBanner("working", `Uploading ${uploads.length} brand asset(s)…`, true);
+          for (const asset of uploads) {
+            const up = await api(`/api/runs/${encodeURIComponent(created.run_id)}/assets`, {
+              method: "POST",
+              body: JSON.stringify(asset),
+            });
+            if (up.run) state.run = up.run;
+          }
+        }
+
+        setBanner("working", "Researching brand & pitching 4 concepts (Agent 1)…", true);
         await api(`/api/runs/${encodeURIComponent(created.run_id)}/step/research`, { method: "POST" });
         await loadRuns();
         subscribeSse(created.run_id, (fresh) => {

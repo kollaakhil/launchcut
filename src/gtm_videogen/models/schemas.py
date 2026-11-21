@@ -541,6 +541,8 @@ class RunState(BaseModel):
     step: Literal["brand", "concept", "sheet", "storyboard", "previews", "final"] = "brand"
     selected_concept_id: str | None = None
     winning_version_id: str | None = None
+    brand_logo_path: str | None = None
+    uploaded_assets: list[MediaRef] = Field(default_factory=list)
     input: RunInput
     research: ResearchBundle | None = None
     concepts: list[ConceptPitch] = Field(default_factory=list)

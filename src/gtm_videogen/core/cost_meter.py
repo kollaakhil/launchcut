@@ -82,6 +82,10 @@ class CostMeter:
         return round(self._spent_usd, 6)
 
     @property
+    def actual_usd(self) -> float:
+        return self.spent_usd
+
+    @property
     def reserved_usd(self) -> float:
         return round(sum(r.estimated_usd for r in self._reservations.values()), 6)
 

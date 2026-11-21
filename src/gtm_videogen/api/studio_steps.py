@@ -15,10 +15,12 @@ Supports the 5-step interactive workflow:
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
 import mimetypes
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -50,6 +52,7 @@ from gtm_videogen.models.schemas import (
     CreativeBible,
     CreativeFingerprint,
     HumanScore,
+    MediaRef,
     RunState,
     Script,
     ShotSheet,
@@ -63,28 +66,14 @@ from gtm_videogen.rules.script_gate import evaluate_script_gate
 
 studio_router = APIRouter(prefix="/api")
 
-# Curated multi-option preview stacks (inspired by GTM_VideoGen sheet-studio)
+# Streamlined, high-clarity preview stacks
 PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
     {
-        "id": "kling_flash",
-        "label": "Kling v4 Flash (Keyframe-Anchored)",
-        "description": (
-            "Animates your approved Step 4 keyframes via Kling v4 Flash I2V ($0.094/s) "
-            "+ ElevenLabs v3 voiceover for crisp visual continuity."
-        ),
-        "video_model": "kling/v4/flash/text-to-video",
-        "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
-        "hybrid_motion_cards": False,
-        "use_keyframes": True,
-        "mock": False,
-        "est_per_ai_shot_usd": 0.35,
-    },
-    {
         "id": "hybrid_motion",
-        "label": "Hybrid Hero + Kinetic Motion Screens",
+        "label": "Launch Film Hybrid (Recommended)",
         "description": (
-            "Anthropic/OpenAI style mix: Kling v4 Flash hero shots + $0 radial-studio "
-            "kinetic typography screens and closing brand lockup."
+            "Anthropic/OpenAI style: continuity-locked Kling v4 Flash hero shots "
+            "+ $0 editorial typography, product/UI bezel, and brand logo screens."
         ),
         "video_model": "kling/v4/flash/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
@@ -94,24 +83,25 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
         "est_per_ai_shot_usd": 0.35,
     },
     {
-        "id": "kling_cinema",
-        "label": "Kling v4 Cinema",
+        "id": "kling_flash",
+        "label": "Full Cinema AI (Keyframe-Anchored)",
         "description": (
-            "Full Kling v4 text/image-to-video model for maximum texture and cinematic motion."
+            "Animates every approved Step 4 keyframe via Kling v4 Flash I2V ($0.094/s) "
+            "+ ElevenLabs v3 voiceover."
         ),
-        "video_model": "kling/v4/text-to-video",
+        "video_model": "kling/v4/flash/text-to-video",
         "voice_model": "fal-ai/elevenlabs/tts/eleven-v3",
         "hybrid_motion_cards": False,
         "use_keyframes": True,
         "mock": False,
-        "est_per_ai_shot_usd": 0.55,
+        "est_per_ai_shot_usd": 0.35,
     },
     {
         "id": "mock_pacing",
         "label": "Instant Pacing Animatic ($0)",
         "description": (
-            "Zero-cost FFmpeg synthetic preview to verify timing, pacing, "
-            "voice cadence, and captions before spending."
+            "Zero-cost FFmpeg timing preview to verify pacing, voice cadence, "
+            "and shot rhythm before spending."
         ),
         "video_model": "mock-lavfi-mp4",
         "voice_model": "mock-lavfi-wav",
@@ -121,6 +111,22 @@ PREVIEW_STACK_PRESETS: list[dict[str, Any]] = [
         "est_per_ai_shot_usd": 0.0,
     },
 ]
+
+
+def _resolve_brand_assets(run_state: RunState) -> tuple[Path | None, list[Path]]:
+    """Return (brand_logo_path, product_image_paths) for existing uploaded files on disk."""
+    logo: Path | None = None
+    if run_state.brand_logo_path:
+        lp = Path(run_state.brand_logo_path)
+        if lp.is_file():
+            logo = lp
+    products: list[Path] = []
+    for ref in run_state.uploaded_assets:
+        if ref.path:
+            pp = Path(ref.path)
+            if pp.is_file():
+                products.append(pp)
+    return logo, products
 
 
 class ConceptPatchRequest(BaseModel):
@@ -213,6 +219,17 @@ class ReiterateRequest(BaseModel):
     version_id: str | None = None
     notes: str = ""
     regenerate_keyframes: bool = True
+
+
+class AssetUploadRequest(BaseModel):
+    """Upload a real brand logo or product/UI image as a base64 data URL (max ~8MB)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["logo", "product"] = "product"
+    filename: str = Field(min_length=1, max_length=120)
+    data_url: str = Field(min_length=20)
+    alt: str = ""
 
 
 def _estimate_stack_usd(sheet: ShotSheet | None, stack: dict[str, Any]) -> float:
@@ -798,6 +815,7 @@ async def step_render_previews(
                         ),
                     )
 
+                    brand_logo, product_imgs = _resolve_brand_assets(run_state)
                     try:
                         a3 = await run_agent3_producer(
                             run_id=f"{run_id}_{ver_id}",
@@ -813,6 +831,8 @@ async def step_render_previews(
                             cancel=cancel_token,
                             max_iterations=1,
                             raise_on_failure=False,
+                            brand_logo_path=brand_logo,
+                            product_image_paths=product_imgs,
                         )
                         _merge_cost_ledger(run_state, a3.cost_ledger.entries)
                         scorecard = None
@@ -851,7 +871,7 @@ async def step_render_previews(
                             tier="preview",
                             status="failed",
                             stack=stack.model_dump(mode="json"),
-                            usd=round(meter.actual_usd, 4),
+                            usd=round(meter.spent_usd, 4),
                             shot_sheet=ver_sheet,
                             error=str(ver_exc),
                         )
@@ -1086,6 +1106,7 @@ async def step_render_final(
                     voice_model_override=stack.get("voice_model"),
                 )
 
+                brand_logo, product_imgs = _resolve_brand_assets(run_state)
                 a3 = await run_agent3_producer(
                     run_id=run_id,
                     run_input=final_input,
@@ -1100,6 +1121,8 @@ async def step_render_final(
                     cancel=cancel_token,
                     max_iterations=2,
                     raise_on_failure=False,
+                    brand_logo_path=brand_logo,
+                    product_image_paths=product_imgs,
                 )
                 if not services.is_current_generation(run_id, gen):
                     return None
@@ -1230,11 +1253,14 @@ async def step_generate_storyboards(
                     else run_state.cost_ledger.cap_usd,
                 )
                 generator = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+                brand_logo, product_imgs = _resolve_brand_assets(run_state)
                 results = await generator.generate_all_keyframes(
                     run_state.shot_sheet,
                     run_state.creative_bible,
                     kf_dir,
                     mock=run_state.input.mock,
+                    logo_path=brand_logo,
+                    product_images=product_imgs,
                     cancel=cancel_token,
                 )
                 if not services.is_current_generation(run_id, gen):
@@ -1326,12 +1352,27 @@ async def regenerate_shot_keyframe(
                 else run_state.cost_ledger.cap_usd,
             )
             gen = StoryboardGenerator(settings=services.settings, cost_meter=meter)
+            brand_logo, product_imgs = _resolve_brand_assets(run_state)
+            first_ai = next(
+                (s for s in run_state.shot_sheet.shots if s.engine != "motion_card"), None
+            )
+            anchor_url = (
+                first_ai.keyframe_url
+                if first_ai is not None and first_ai.id != shot.id and first_ai.keyframe_url
+                else None
+            )
+            media_img = (
+                product_imgs[shot.index % len(product_imgs)] if product_imgs else None
+            )
             p, url, _ = await gen.generate_shot_keyframe(
                 shot,
                 run_state.shot_sheet,
                 run_state.creative_bible,
                 kf_dir,
                 mock=run_state.input.mock,
+                anchor_image_url=anchor_url,
+                logo_path=brand_logo,
+                media_image_path=media_img,
             )
             shot.keyframe_path = str(p)
             shot.keyframe_url = url
@@ -1520,18 +1561,38 @@ async def reiterate_weak_shots(
                     ledger_path=iter_dir / "spend_ledger.jsonl",
                 )
 
-                # Optionally regenerate keyframes for reiterated shots first
+                brand_logo, product_imgs = _resolve_brand_assets(run_state)
+                first_ai = next(
+                    (s for s in base_sheet.shots if s.engine != "motion_card"), None
+                )
+
+                # Optionally regenerate keyframes for reiterated shots first (anchored to Shot 1)
                 if payload.regenerate_keyframes:
                     kf_gen = StoryboardGenerator(settings=services.settings, cost_meter=meter)
                     kf_dir = services.data_dir / "work" / run_id / "keyframes"
                     for sh in base_sheet.shots:
                         if sh.id in chosen_ids:
+                            anchor_url = (
+                                first_ai.keyframe_url
+                                if first_ai is not None
+                                and first_ai.id != sh.id
+                                and first_ai.keyframe_url
+                                else None
+                            )
+                            media_img = (
+                                product_imgs[sh.index % len(product_imgs)]
+                                if product_imgs
+                                else None
+                            )
                             p, url, _ = await kf_gen.generate_shot_keyframe(
                                 sh,
                                 base_sheet,
                                 run_state.creative_bible,
                                 kf_dir,
                                 mock=iter_input.mock,
+                                anchor_image_url=anchor_url,
+                                logo_path=brand_logo,
+                                media_image_path=media_img,
                                 cancel=cancel_token,
                             )
                             sh.keyframe_path = str(p)
@@ -1539,6 +1600,15 @@ async def reiterate_weak_shots(
                             if url and not iter_input.mock and sh.engine == "ai_video":
                                 sh.engine = "image_to_video"
                                 sh.reference_image = url
+
+                # Reuse untouched rendered MP4 clips from target version ($0 & 0s for kept shots!)
+                existing_clips = (
+                    {c.shot_id: c for c in target_ver.render_manifest.clips}
+                    if target_ver
+                    and target_ver.render_manifest
+                    and target_ver.render_manifest.clips
+                    else None
+                )
 
                 providers = _build_step_providers(
                     services,
@@ -1563,6 +1633,10 @@ async def reiterate_weak_shots(
                     cancel=cancel_token,
                     max_iterations=1,
                     raise_on_failure=False,
+                    existing_clips=existing_clips,
+                    repair_shot_ids=set(chosen_ids),
+                    brand_logo_path=brand_logo,
+                    product_image_paths=product_imgs,
                 )
                 if not services.is_current_generation(run_id, gen):
                     return None
@@ -1647,3 +1721,94 @@ async def reiterate_weak_shots(
         job = await services.job_registry.submit(run_id, _job, stage="reiterate")
         services.run_store.save(run_state)
     return {"run_id": run_id, "shot_ids": chosen_ids, "job": job.model_dump(mode="json")}
+
+
+_ALLOWED_IMG_MIMES: dict[str, str] = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+}
+_DATA_URL_RE = re.compile(r"^data:(image/[a-zA-Z0-9.+-]+);base64,(.+)$", re.DOTALL)
+_MAX_ASSET_BYTES = 8 * 1024 * 1024
+
+
+@studio_router.post("/runs/{run_id}/assets")
+async def upload_brand_asset(
+    run_id: str,
+    payload: AssetUploadRequest,
+    actor: ActorDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Upload a real brand logo or product/UI image (base64 data URL) for a run."""
+    run_state = load_owned_run(run_id, services.run_store, actor)
+    match = _DATA_URL_RE.match(payload.data_url.strip())
+    if not match:
+        raise HTTPException(
+            status_code=400, detail="Asset must be a valid base64 image data URL (PNG/JPG/WebP)."
+        )
+    mime = match.group(1).lower()
+    ext = _ALLOWED_IMG_MIMES.get(mime)
+    if ext is None:
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported image type {mime!r}; use PNG, JPEG, or WebP."
+        )
+    try:
+        raw = base64.b64decode(match.group(2), validate=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid base64 image payload.") from exc
+    if not raw or len(raw) > _MAX_ASSET_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be between 1 byte and 8 MB.")
+
+    safe_stem = re.sub(r"[^a-zA-Z0-9_-]+", "_", Path(payload.filename).stem)[:40] or payload.kind
+    out_name = f"{payload.kind}_{safe_stem}_{uuid4().hex[:6]}{ext}"
+
+    async with services.run_lock(run_id):
+        run_state = services.run_store.load(run_id) or run_state
+        assets_dir = services.data_dir / "work" / run_id / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        out_path = (assets_dir / out_name).resolve()
+        out_path.write_bytes(raw)
+
+        ref = MediaRef(
+            id=out_name,
+            url=f"/api/runs/{run_id}/assets/{out_name}",
+            path=str(out_path),
+            mime_type=mime,
+            alt=payload.alt or payload.filename,
+            source=f"uploaded_{payload.kind}",
+        )
+        if payload.kind == "logo":
+            run_state.brand_logo_path = str(out_path)
+        else:
+            run_state.uploaded_assets.append(ref)
+            if run_state.research is not None:
+                run_state.research.product_photos.insert(0, ref)
+
+        services.run_store.save(run_state)
+    return {
+        "run_id": run_id,
+        "asset": ref.model_dump(mode="json"),
+        "run": run_state.model_dump(mode="json"),
+    }
+
+
+@studio_router.get("/runs/{run_id}/assets/{filename}")
+async def serve_brand_asset(
+    run_id: str,
+    filename: str,
+    services: ServicesDep,
+) -> Response:
+    """Serve an uploaded brand logo or product/UI image safely."""
+    if not run_id or len(run_id) > MAX_RUN_ID_LENGTH or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid run_id or filename")
+    assets_dir = (services.data_dir / "work" / run_id / "assets").resolve()
+    target = (assets_dir / filename).resolve()
+    try:
+        target.relative_to(assets_dir)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Asset path traversal blocked") from exc
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    return Response(content=target.read_bytes(), media_type=media_type)
