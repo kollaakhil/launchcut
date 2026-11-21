@@ -2339,12 +2339,32 @@
         if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
         setProject(data);
         renderPinboard();
+        if (state.activeStage === 'shoot') renderShootStage();
         if (state.editingSceneId === sceneId) openSceneDrawer(sceneId, false);
         finishProgress(data.status_message || 'Video clip uploaded!', 'success');
       } catch (err) {
         finishProgress(`Clip upload failed: ${err.message}`, 'error');
       } finally {
         input.value = '';
+      }
+    }
+
+    async function switchSceneToAiUI(sceneId) {
+      if (!state.project) return;
+      const scenesCopy = state.project.scenes.map(s =>
+        s.scene_id === sceneId ? { ...s, kind: 'ai_sequence' } : { ...s }
+      );
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ scenes: scenesCopy }),
+        });
+        setProject(proj);
+        if (state.activeStage === 'shoot') renderShootStage();
+        renderPinboard();
+        showBanner('Switched Act to AI Cinema — ready to render!', 'success');
+      } catch (err) {
+        showBanner(err.message, 'error');
       }
     }
 
@@ -2891,6 +2911,35 @@
             </details>
         ` : '';
 
+        const isUserClip = sc.kind === 'user_clip';
+        const hasUploadedClip = Boolean(sc.user_clip && sc.user_clip.clip_url);
+        const headerActions = isUserClip && !hasUploadedClip
+          ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+               <label class="pill-btn primary" style="cursor:pointer;">
+                 ⬆ Upload Video (.mp4/.mov)
+                 <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" />
+               </label>
+               <button class="pill-btn" onclick="switchSceneToAiUI('${esc(sc.scene_id)}')">✦ Generate with AI Instead</button>
+             </div>`
+          : `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+               ${isUserClip ? `<label class="pill-btn" style="cursor:pointer;">⬆ Replace Video<input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" /></label>` : ''}
+               <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
+                 ${isRendering ? '⏳ Rendering…' : (sc.takes.length ? '↻ Re-Render' : '▶ Render Act')}
+               </button>
+             </div>`;
+        const emptyBoxHtml = isUserClip && !hasUploadedClip
+          ? `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;text-align:center;">
+               <div style="font-size:13.5px;font-weight:700;">This Act expects your uploaded video clip</div>
+               <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                 <label class="pill-btn primary" style="cursor:pointer;">
+                   ⬆ Upload Video (.mp4/.mov)
+                   <input type="file" accept="video/mp4,video/quicktime,video/webm" style="display:none;" onchange="uploadSceneClipUI('${esc(sc.scene_id)}', this)" />
+                 </label>
+                 <button class="pill-btn" onclick="switchSceneToAiUI('${esc(sc.scene_id)}')">✦ Use AI Video Instead</button>
+               </div>
+             </div>`
+          : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Render Act</strong> to generate this clip'}</div>`;
+
         return `
           <div class="shoot-act-card">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
@@ -2899,22 +2948,22 @@
                   <strong style="font-size:16px;">Act ${idx + 1} · ${esc(sc.title)}</strong>
                   <span class="tag-pill">${sc.duration_sec}s</span>
                   ${sc.kind === 'motion_graphic' ? '<span class="tag-pill">🎨 Motion Graphic ($0)</span>' : ''}
-                  ${sc.kind === 'user_clip' ? '<span class="tag-pill">📹 Your Video ($0)</span>' : ''}
+                  ${sc.kind === 'user_clip' ? `<span class="tag-pill">${hasUploadedClip ? '📹 Video Uploaded ($0)' : '📹 Needs Video Upload'}</span>` : ''}
                   ${sc.render_status === 'rendering' ? '<span class="tag-pill warn">⏳ Rendering…</span>' : ''}
                   ${sc.render_status === 'done' ? '<span class="tag-pill ok">✓ Ready</span>' : ''}
                   ${sc.render_status === 'failed' ? '<span class="tag-pill coral">✕ Failed</span>' : ''}
                 </div>
-                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${esc(sc.render_message || (isAi ? sc.camera_spec : (sc.graphic_spec?.headline || 'Ready to render')))}</div>
+                <div style="font-size:12.5px;color:var(--ink-soft);margin-top:3px;">${esc(sc.render_message || (isAi ? sc.camera_spec : (sc.graphic_spec?.headline || (hasUploadedClip ? sc.user_clip.filename : 'Upload a video clip or switch to AI'))))}</div>
               </div>
-              <button class="pill-btn primary" ${isRendering ? 'disabled' : ''} onclick="renderSingleSceneUI('${esc(sc.scene_id)}')">
-                ${isRendering ? '⏳ Rendering…' : (sc.takes.length ? '↻ Re-Render' : '▶ Render Act')}
-              </button>
+              ${headerActions}
             </div>
 
             <div class="take-player-box ${isRendering ? 'is-rendering' : ''}" style="max-width:640px;">
               ${winClip
                 ? `<video controls playsinline preload="metadata" src="${esc(winClip)}"></video>`
-                : `<div>${isRendering ? '⏳ Rendering take…' : 'Click <strong>Render Act</strong> to generate this clip'}</div>`}
+                : (isUserClip && hasUploadedClip
+                    ? `<video controls playsinline preload="metadata" src="${esc(sc.user_clip.clip_url)}"></video>`
+                    : emptyBoxHtml)}
             </div>
             <div class="takes-strip" style="margin-top:8px;">
               ${takesHtml || '<span style="font-size:12px;color:var(--ink-muted);">No takes rendered yet.</span>'}
