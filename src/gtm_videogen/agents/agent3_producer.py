@@ -739,6 +739,8 @@ def _build_agent3_tools(
             cancel=cancel,
             existing_clips=existing_map,
             repair_shot_ids=target_ids,
+            brand_logo_path=brand_logo_path,
+            product_image_paths=product_image_paths,
         )
         state_bag["clips"] = clips
         state_bag["audio_assets"] = audio_assets

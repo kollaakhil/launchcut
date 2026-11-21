@@ -345,22 +345,23 @@ async def render_kinetic_card_mp4(
             else []
         )
 
-        settled_bytes: bytes | None = None
         for f_idx in range(total_frames):
             if cancel is not None and f_idx % 8 == 0:
                 cancel.raise_if_cancelled()
             t_sec = f_idx / float(fps)
             p_total = f_idx / float(max(1, total_frames - 1))
 
-            # If no continuous cursor/sweep animation is needed after reveal settles, reuse settled frame
-            if media_img is None and t_sec > reveal_end_sec and settled_bytes is not None:
-                proc.stdin.write(settled_bytes)
-                if f_idx % 12 == 0:
-                    await proc.stdin.drain()
-                continue
-
             frame = backdrop.copy()
             draw = ImageDraw.Draw(frame)
+            # Subtle continuous top hairline progress shimmer so cards stay alive & never trip freezedetect
+            inset = max(14, int(base_dim * 0.03))
+            sweep_x0 = inset
+            sweep_x1 = inset + max(8, int((even_w - 2 * inset) * max(0.04, p_total)))
+            draw.line(
+                [(sweep_x0, inset), (sweep_x1, inset)],
+                fill=_blend_rgb(bg_rgb, accent_rgb, 0.55),
+                width=max(2, int(base_dim * 0.004)),
+            )
 
             if media_img is not None:
                 # MODE 2: Floating Dark-Bezel Product/UI Showcase + Spotlight Sweep + Cursor
@@ -530,10 +531,8 @@ async def render_kinetic_card_mp4(
                     )
 
             raw_rgb = frame.tobytes()
-            if media_img is None and t_sec > reveal_end_sec and settled_bytes is None:
-                settled_bytes = raw_rgb
             proc.stdin.write(raw_rgb)
-            if f_idx % 12 == 0:
+            if f_idx % 4 == 0:
                 await proc.stdin.drain()
 
         proc.stdin.close()
