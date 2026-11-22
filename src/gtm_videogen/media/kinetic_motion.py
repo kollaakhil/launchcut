@@ -334,10 +334,6 @@ async def render_kinetic_card_mp4(
         assert proc.stdin is not None
 
         # Render animation frames and stream to FFmpeg stdin
-        # Cache final static-settled frame once kinetic reveals complete to save CPU!
-        reveal_end_sec = min(
-            duration_sec, max(0.85, (word_starts[-1] if word_starts else 0.2) + 0.45)
-        )
         cap_font = ImageFont.truetype(bold_path, max(24, int(base_dim * 0.056)))
         cap_lines = (
             _wrap_words_to_lines(probe_draw, text, cap_font, int(even_w * 0.80))
@@ -530,6 +526,20 @@ async def render_kinetic_card_mp4(
                         (fx, fy), f_str, fill=_blend_rgb(bg_rgb, text_rgb, 0.78), font=footer_font
                     )
 
+            # Smooth 2.8% sub-pixel lens push-in across duration so cards feel cinematic & never freeze
+            zoom_k = 1.0 + 0.028 * p_total
+            vw_k = even_w / zoom_k
+            vh_k = even_h / zoom_k
+            ox_k = (even_w - vw_k) * 0.5 + math.sin(t_sec * 0.9) * (even_w * 0.003)
+            oy_k = (even_h - vh_k) * 0.5 + math.cos(t_sec * 0.7) * (even_h * 0.0025)
+            ox_k = max(0.0, min(even_w - vw_k, ox_k))
+            oy_k = max(0.0, min(even_h - vh_k, oy_k))
+            frame = frame.transform(
+                (even_w, even_h),
+                Image.Transform.EXTENT,
+                (ox_k, oy_k, ox_k + vw_k, oy_k + vh_k),
+                resample=Image.Resampling.BILINEAR,
+            )
             raw_rgb = frame.tobytes()
             proc.stdin.write(raw_rgb)
             if f_idx % 4 == 0:

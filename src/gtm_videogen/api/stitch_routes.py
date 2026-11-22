@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gtm_videogen.agents.stitch_engine import (
     StitchProjectStore,
+    autofix_from_qa_report,
+    autopilot_produce_project,
     compile_stitch_project,
     export_campaign_pack,
     generate_all_keyframes,
@@ -29,6 +31,7 @@ from gtm_videogen.agents.stitch_engine import (
 )
 from gtm_videogen.api.routes import ServicesDep, _iter_file_range, _parse_byte_range
 from gtm_videogen.media._subprocess import probe_media
+from gtm_videogen.media.stitch_qa import evaluate_stitch_master_qa
 from gtm_videogen.models.model_registry import (
     BUILTIN_LLM_MODELS,
     ModelRegistryStore,
@@ -533,7 +536,7 @@ async def patch_project(
     if payload.scenes is not None and len(payload.scenes) > 0:
         existing_by_id = {s.scene_id: s for s in project.scenes}
         updated_scenes: list[StitchScene] = []
-        for idx, raw_sc in enumerate(payload.scenes[:6]):
+        for idx, raw_sc in enumerate(payload.scenes[:10]):
             sc_id = str(raw_sc.get("scene_id") or f"sc_{idx + 1}_{uuid4().hex[:6]}")
             base = existing_by_id.get(sc_id)
             if base is not None:
@@ -541,6 +544,7 @@ async def patch_project(
                 merged = base.model_dump()
                 for k in (
                     "title",
+                    "narrative_role",
                     "duration_sec",
                     "kind",
                     "continues_from_prev",
@@ -615,8 +619,8 @@ async def add_scene(
     project = store.load(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Stitch project not found")
-    if len(project.scenes) >= 6:
-        raise HTTPException(status_code=400, detail="Maximum 6 scenes per Stitch project.")
+    if len(project.scenes) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 scenes per Stitch project.")
 
     idx = len(project.scenes)
     prev = project.scenes[-1] if project.scenes else None
@@ -1282,6 +1286,149 @@ async def export_campaign_pack_endpoint(
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     store.save(project)
+    return _serialize_project(project, reg)
+
+
+class QARequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deep_vision: bool = True
+    mock: bool = False
+
+
+class AutopilotRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idea: str = Field(..., min_length=2, max_length=1500)
+    target_duration_sec: int = Field(default=60, ge=5, le=60)
+    aspect_ratio: StitchAspect = "16:9"
+    video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
+    llm_model_id: str = ""
+    world_preset: str = "miniature_diorama"
+    camera_preset: str = "macro_tilt_shift"
+    lighting_preset: str = "volumetric_gold"
+    motion_preset: str = "asmr_tactile"
+    source_url: str | None = None
+    recipe_id: str | None = None
+    brand_name: str | None = None
+    brand_tagline: str | None = None
+    mock: bool = False
+    sync: bool = False
+
+
+@stitch_router.post("/projects/{project_id}/qa")
+async def evaluate_qa_endpoint(
+    project_id: str, payload: QARequest, services: ServicesDep
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    project.qa_report = await evaluate_stitch_master_qa(
+        project,
+        deep_vision=payload.deep_vision,
+        mock=payload.mock,
+        settings=services.settings,
+    )
+    sc = project.qa_report.get("banger_score", 0)
+    gr = project.qa_report.get("grade", "")
+    project.status_message = f"Video QA complete · Banger Score {sc}/100 ({gr})."
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/qa-autofix")
+async def qa_autofix_endpoint(
+    project_id: str, payload: ArollActionRequest, services: ServicesDep
+) -> dict[str, Any]:
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    try:
+        await autofix_from_qa_report(
+            project,
+            store.media_dir(project_id),
+            registry_store=reg,
+            settings=services.settings,
+            mock=payload.mock,
+            on_progress=lambda p: store.save(p),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/autopilot")
+async def autopilot_endpoint(
+    payload: AutopilotRequest, services: ServicesDep
+) -> dict[str, Any]:
+    """1-Click Express Autopilot: Compile -> Script Gate -> Render All -> Stitch -> QA & Self-Heal."""
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = await compile_stitch_project(
+        idea=payload.idea,
+        target_duration_sec=payload.target_duration_sec,
+        aspect_ratio=payload.aspect_ratio,
+        video_model_id=payload.video_model_id,
+        llm_model_id=payload.llm_model_id,
+        world_preset=payload.world_preset,
+        camera_preset=payload.camera_preset,
+        lighting_preset=payload.lighting_preset,
+        motion_preset=payload.motion_preset,
+        source_url=payload.source_url,
+        recipe_id=payload.recipe_id,
+        brand_name=payload.brand_name,
+        brand_tagline=payload.brand_tagline,
+        registry_store=reg,
+        settings=services.settings,
+        mock=payload.mock,
+    )
+    project.status = "shooting"
+    project.status_message = f"Autopilot started · Producing {len(project.scenes)}-act film..."
+    store.save(project)
+
+    if payload.sync:
+        await autopilot_produce_project(
+            project,
+            store.media_dir(project.project_id),
+            registry_store=reg,
+            settings=services.settings,
+            mock=payload.mock,
+            on_progress=lambda p: store.save(p),
+        )
+        store.save(project)
+        return _serialize_project(project, reg)
+
+    pid = project.project_id
+
+    async def _bg_autopilot() -> None:
+        try:
+            fresh = store.load(pid) or project
+            await autopilot_produce_project(
+                fresh,
+                store.media_dir(pid),
+                registry_store=reg,
+                settings=services.settings,
+                mock=payload.mock,
+                on_progress=lambda p: store.save(p),
+            )
+            store.save(fresh)
+        except Exception as exc:
+            err_proj = store.load(pid) or project
+            err_proj.status = "failed"
+            err_proj.error = str(exc)
+            err_proj.status_message = f"Autopilot failed: {exc}"
+            for s in err_proj.scenes:
+                if s.render_status == "rendering":
+                    s.render_status = "failed"
+            store.save(err_proj)
+
+    task_key = f"{pid}:autopilot"
+    _ACTIVE_STITCH_TASKS[task_key] = asyncio.create_task(_bg_autopilot())
     return _serialize_project(project, reg)
 
 

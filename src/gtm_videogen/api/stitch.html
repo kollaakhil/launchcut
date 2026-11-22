@@ -1176,6 +1176,84 @@
       background: var(--coral-soft);
     }
 
+    /* 1-Click Autopilot CTA & Video QA Scorecard */
+    .spark-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .spark-cta.ink {
+      background: var(--ink);
+      box-shadow: 0 6px 18px rgba(31, 29, 26, 0.22);
+    }
+    .spark-cta.ink:hover:not(:disabled) {
+      background: #33302B;
+    }
+    .qa-card {
+      background: var(--bg-paper);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .qa-card.passed { border-color: rgba(47, 122, 88, 0.45); }
+    .qa-card.warn { border-color: rgba(217, 119, 6, 0.5); }
+    .qa-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .qa-badge-big {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .qa-score-pill {
+      font-size: 18px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      background: var(--sage);
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    .qa-score-pill.warn { background: #C96A1B; }
+    .qa-pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 8px 12px;
+    }
+    .qa-pillar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .qa-pillar-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--ink-soft);
+    }
+    .qa-pillar-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(31, 29, 26, 0.09);
+      overflow: hidden;
+    }
+    .qa-pillar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--sage);
+      transition: width 0.35s ease;
+    }
+    .qa-pillar-fill.warn { background: #D97706; }
+
     /* Dynamic Model Registry Modal */
     .modal-backdrop {
       position: fixed;
@@ -1306,11 +1384,11 @@
         <div class="spark-field">
           <label class="spark-label" for="spark-duration">Length</label>
           <select class="spark-select" id="spark-duration">
-            <option value="10">10s (1 Scene)</option>
-            <option value="15" selected>15s (1–2 Scenes)</option>
-            <option value="30">30s (3 Chained)</option>
-            <option value="45">45s (3–4 Chained)</option>
-            <option value="60">60s (4 Chained)</option>
+            <option value="10">10s (Quick Hook)</option>
+            <option value="15" selected>15s (Short Spot)</option>
+            <option value="30">30s (3–4 Act Story)</option>
+            <option value="45">45s (5-Act Launch)</option>
+            <option value="60">60s (1-Min Banger Film)</option>
           </select>
         </div>
         <div class="spark-field no-border">
@@ -1321,7 +1399,10 @@
             <option value="1:1">1:1 Square</option>
           </select>
         </div>
-        <button class="spark-cta" id="btn-direct-now" onclick="directFromSpark()">✦ Direct</button>
+        <div class="spark-actions">
+          <button class="spark-cta" id="btn-autopilot" onclick="autoProduceFromSpark()" title="1-click express: writes story, renders motion graphics &amp; cinema, stitches &amp; runs Video QA">⚡ Auto-Produce</button>
+          <button class="spark-cta ink" id="btn-direct-now" onclick="directFromSpark()" title="Open editable storyboard first">✦ Direct</button>
+        </div>
       </div>
 
       <div class="spark-subbar" style="align-items:flex-start;">
@@ -1468,6 +1549,8 @@
             <div class="field-label" style="margin-bottom:8px;">Acts Timeline</div>
             <div id="screening-timeline" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
           </div>
+
+          <div id="qa-scorecard-box" style="margin-top:16px;"></div>
         </div>
 
         <div class="theater-card" style="display:flex;flex-direction:column;gap:14px;">
@@ -2102,6 +2185,52 @@
         lighting_preset: p.lighting_preset,
         motion_preset: p.motion_preset,
       });
+    }
+
+    async function autoProduceFromSpark() {
+      const idea = document.getElementById('spark-idea').value.trim();
+      const url = document.getElementById('spark-url').value.trim();
+      if (!idea && !url) {
+        showBanner('Type a film idea or paste a product URL — or click "Try Example →" on any theme below.', 'error');
+        document.getElementById('spark-idea').focus();
+        return;
+      }
+      const btn = document.getElementById('btn-autopilot');
+      setButtonLoading(btn, true, 'Producing…');
+      const durSec = Number(document.getElementById('spark-duration').value || 60);
+      startProgress({
+        message: `Auto-producing your ${durSec}s film (Story → Motion Graphics & Cinema → Master Cut → QA Score)…`,
+        steps: ['Write Story Arc', 'Shoot All Acts', 'Master Soundstage', 'QA Score & Polish'],
+        avgDurationSec: state.mockMode ? 10 : Math.max(45, durSec * 2),
+      });
+      try {
+        const proj = await api('/api/stitch/autopilot', {
+          method: 'POST',
+          body: JSON.stringify({
+            idea: idea || `Cinematic product launch film for ${url}`,
+            source_url: url || null,
+            target_duration_sec: durSec,
+            aspect_ratio: document.getElementById('spark-aspect').value || '16:9',
+            video_model_id: document.getElementById('spark-video-model').value || 'fal-ai/kling-video/v3/pro/text-to-video',
+            llm_model_id: document.getElementById('spark-llm-model').value || '',
+            world_preset: document.getElementById('preset-world').value,
+            camera_preset: document.getElementById('preset-camera').value,
+            lighting_preset: document.getElementById('preset-lighting').value,
+            motion_preset: document.getElementById('preset-motion').value,
+            recipe_id: state.selectedRecipeId,
+            mock: state.mockMode,
+          }),
+        });
+        state.autopilotActive = true;
+        setProject(proj);
+        await refreshSavedProjects();
+        switchStage('shoot');
+        startPollingProject();
+      } catch (err) {
+        finishProgress(`Autopilot failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
     }
 
     async function directFromSpark() {
@@ -3175,6 +3304,12 @@
           if (!anyBusy) {
             clearInterval(state.pollTimer);
             state.pollTimer = null;
+            if (state.autopilotActive && proj.master_video_url) {
+              state.autopilotActive = false;
+              switchStage('screening');
+            } else {
+              state.autopilotActive = false;
+            }
             if (proj.error || proj.status === 'failed' || scenes.some(s => s.render_status === 'failed')) {
               finishProgress(proj.error || proj.status_message || 'Render finished with an error.', 'error');
             } else {
@@ -3197,7 +3332,129 @@
       }, 2200);
     }
 
-    /* ---------------- Stage 4: Screening Room & Master Stitch ---------------- */
+    /* ---------------- Stage 4: Screening Room, Video QA & Master Stitch ---------------- */
+    function renderQAScorecard(p) {
+      const box = document.getElementById('qa-scorecard-box');
+      if (!box) return;
+      const qa = p.qa_report;
+      if (!p.master_video_url || !qa || !qa.banger_score) {
+        box.innerHTML = '';
+        return;
+      }
+      const passed = Boolean(qa.passed);
+      const pillars = qa.pillars || {};
+      const tel = qa.telemetry || {};
+      const pillarList = [
+        ['Hook Impact', pillars.hook_impact],
+        ['Story & Pacing', pillars.story_pacing],
+        ['Visual Craft', pillars.visual_craft],
+        ['Motion Graphics', pillars.graphics_clarity],
+        ['Seam Continuity', pillars.seam_continuity],
+        ['Audio Mastering', pillars.audio_mastering],
+      ];
+      const needsPolish = !passed || (qa.warnings && qa.warnings.length > 0);
+      const scenePills = (qa.scene_scores || []).map(sc => {
+        const cls = sc.status === 'fail' ? 'warn' : (sc.status === 'warn' ? 'coral' : 'ok');
+        return `<span class="tag-pill ${cls}">Act ${(sc.index ?? 0) + 1}: ${Number(sc.score || 0).toFixed(1)}/10</span>`;
+      }).join('');
+      const issuesHtml = [...(qa.blocking_issues || []), ...(qa.warnings || [])]
+        .map(msg => `<li style="margin-bottom:3px;">${esc(msg)}</li>`)
+        .join('');
+
+      box.innerHTML = `
+        <div class="qa-card ${passed ? 'passed' : 'warn'}">
+          <div class="qa-head">
+            <div class="qa-badge-big">
+              <span class="qa-score-pill ${passed ? '' : 'warn'}">${Number(qa.banger_score)} / 100 · ${esc(qa.grade || 'A')}</span>
+              <div>
+                <div style="font-size:13.5px;font-weight:800;">${passed ? '✓ Broadcast & Launch Verified' : '⚠ Polish Recommended'}</div>
+                <div style="font-size:12px;color:var(--ink-soft);">${esc(qa.summary || '')}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${needsPolish ? `<button class="pill-btn primary" id="btn-qa-autofix" onclick="runQAAutofixUI()">✨ Auto-Polish Weak Acts</button>` : ''}
+              <button class="pill-btn" id="btn-qa-deep" onclick="runDeepQAUI()">🔍 Deep Gemini QA</button>
+            </div>
+          </div>
+
+          <div class="qa-pillars-grid">
+            ${pillarList.map(([lbl, val]) => {
+              const v = Number(val ?? 8.5);
+              const pct = Math.max(8, Math.min(100, Math.round(v * 10)));
+              return `
+                <div class="qa-pillar-item">
+                  <div class="qa-pillar-top"><span>${esc(lbl)}</span><span>${v.toFixed(1)}</span></div>
+                  <div class="qa-pillar-track"><div class="qa-pillar-fill ${v < 7.5 ? 'warn' : ''}" style="width:${pct}%"></div></div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <details class="pro-disclosure" style="padding:8px 12px;background:var(--bg-card);">
+            <summary style="font-size:12px;">📊 QA Telemetry &amp; Per-Act Scores (${esc(qa.evaluator || 'ffmpeg-ocr')})</summary>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;font-size:12px;color:var(--ink-soft);">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <span class="tag-pill">${Number(tel.duration_sec || 0).toFixed(1)}s (${tel.width || 1280}×${tel.height || 720} @ ${tel.fps || 24}fps)</span>
+                <span class="tag-pill">Loudness: ${tel.loudness_lufs != null ? `${tel.loudness_lufs} LUFS` : 'n/a'}</span>
+                <span class="tag-pill">Black Frames: ${(tel.black_segments || []).length}</span>
+                <span class="tag-pill">Frozen Holds: ${(tel.freeze_segments || []).length}</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">${scenePills}</div>
+              ${issuesHtml ? `<ul style="margin:4px 0 0 18px;padding:0;color:#B45309;">${issuesHtml}</ul>` : ''}
+            </div>
+          </details>
+        </div>
+      `;
+    }
+
+    async function runDeepQAUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-qa-deep');
+      setButtonLoading(btn, true, 'Evaluating…');
+      startProgress({
+        message: 'Running Deep Multimodal Video + Audio QA (FFmpeg + OCR + Gemini CLI)…',
+        steps: ['FFmpeg & Loudness Scan', 'Motion & OCR Check', 'Gemini Multimodal Critique'],
+        avgDurationSec: state.mockMode ? 3 : 12,
+      });
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/qa`, {
+          method: 'POST',
+          body: JSON.stringify({ deep_vision: true, mock: state.mockMode }),
+        });
+        setProject(proj);
+        renderScreeningRoom();
+        finishProgress(proj.status_message || 'Video QA complete!', 'success');
+      } catch (err) {
+        finishProgress(`QA check failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
+    async function runQAAutofixUI() {
+      if (!state.project) return;
+      const btn = document.getElementById('btn-qa-autofix');
+      setButtonLoading(btn, true, 'Polishing…');
+      startProgress({
+        message: 'Auto-polishing flagged acts, re-mastering soundstage & re-stitching…',
+        steps: ['Sharpen Weak Acts', 'Re-Shoot Flagged Takes', 'Re-Stitch & Re-Score'],
+        avgDurationSec: state.mockMode ? 6 : 25,
+      });
+      try {
+        const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/qa-autofix`, {
+          method: 'POST',
+          body: JSON.stringify({ mock: state.mockMode }),
+        });
+        setProject(proj);
+        renderScreeningRoom();
+        finishProgress(proj.status_message || 'Auto-Polish complete!', 'success');
+      } catch (err) {
+        finishProgress(`Auto-Polish failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
     function renderScreeningRoom() {
       const p = state.project;
       if (!p) return;
@@ -3232,6 +3489,7 @@
           </div>
         `;
       }).join('');
+      renderQAScorecard(p);
 
       document.querySelectorAll('#seam-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.seam === p.seam_transition));
       document.querySelectorAll('#audio-options .opt-card').forEach(b => b.classList.toggle('active', b.dataset.audio === p.audio_mode));

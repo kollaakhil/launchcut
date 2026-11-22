@@ -49,6 +49,7 @@ from gtm_videogen.media.captions import resolve_font_path
 from gtm_videogen.media.ffmpeg_stitcher import _move_output_atomically, _pinned_h264_flags
 from gtm_videogen.media.kinetic_motion import render_kinetic_card_mp4
 from gtm_videogen.media.motion_templates import render_motion_template_mp4, render_overlay_png
+from gtm_videogen.media.stitch_qa import evaluate_stitch_master_qa
 from gtm_videogen.media.user_clip_processor import normalize_user_clip_take
 from gtm_videogen.models.director_blueprint import (
     CAMERA_PRESETS,
@@ -86,9 +87,17 @@ from gtm_videogen.models.stitch_project import (
     StitchScene,
     StitchTake,
     UserClipSpec,
+    apply_deterministic_script_autofix,
     validate_stitch_project,
 )
 from gtm_videogen.providers.audio import AudioProvider
+from gtm_videogen.providers.gemini_cli import (
+    gemini_generate_image,
+    gemini_generate_json,
+    gemini_generate_tts,
+    gemini_generate_video,
+    is_gemini_cli_ready,
+)
 from gtm_videogen.providers.scraper import BrandScraper
 from gtm_videogen.providers.transcription import transcribe_video_words
 from gtm_videogen.providers.url_capture import capture_url_viewport_png, download_public_image
@@ -165,59 +174,81 @@ async def _call_openrouter_json(
     temperature: float = 0.65,
     cancel: CancellationToken | None = None,
 ) -> dict[str, Any] | None:
-    """Call OpenRouter chat completions and parse a JSON object cleanly."""
-    api_key = settings.openrouter_api_key.strip()
-    if not api_key:
-        return None
-    base_url = "https://openrouter.ai/api/v1"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://launchcut.onrender.com",
-        "X-Title": "Stitch Director Studio",
-    }
-    candidates: list[str] = []
-    for m in (llm_model_id.strip(), settings.flagship_model, settings.text_model):
-        if m and m not in candidates:
-            candidates.append(m)
+    """Call OpenRouter or native Gemini CLI (`gemini-api generate`) and parse a JSON object."""
+    clean_model = llm_model_id.strip()
+    prefer_gemini_cli = clean_model.startswith("gemini-cli/")
 
-    async with ResilientHttpClient(
-        connect_timeout=settings.http_connect_timeout_sec,
-        read_timeout=65.0,
-        write_timeout=20.0,
-        pool_timeout=10.0,
-        max_retries=1,
-    ) as client:
-        for model_name in candidates:
-            payload = {
-                "model": model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "response_format": {"type": "json_object"},
-            }
-            try:
-                data = await client.post_json(
-                    f"{base_url}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                    cancel=cancel,
-                )
-                choices = data.get("choices") if isinstance(data, dict) else None
-                if not isinstance(choices, list) or not choices:
+    if prefer_gemini_cli and is_gemini_cli_ready(settings):
+        gem_doc = await gemini_generate_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=clean_model,
+            settings=settings,
+            cancel=cancel,
+        )
+        if gem_doc is not None:
+            return gem_doc
+
+    api_key = settings.openrouter_api_key.strip()
+    if api_key and not prefer_gemini_cli:
+        base_url = "https://openrouter.ai/api/v1"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://launchcut.onrender.com",
+            "X-Title": "Stitch Director Studio",
+        }
+        candidates: list[str] = []
+        for m in (clean_model, settings.flagship_model, settings.text_model):
+            if m and not m.startswith("gemini-cli/") and m not in candidates:
+                candidates.append(m)
+
+        async with ResilientHttpClient(
+            connect_timeout=settings.http_connect_timeout_sec,
+            read_timeout=65.0,
+            write_timeout=20.0,
+            pool_timeout=10.0,
+            max_retries=1,
+        ) as client:
+            for model_name in candidates:
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "response_format": {"type": "json_object"},
+                }
+                try:
+                    data = await client.post_json(
+                        f"{base_url}/chat/completions",
+                        json=payload,
+                        headers=headers,
+                        cancel=cancel,
+                    )
+                    choices = data.get("choices") if isinstance(data, dict) else None
+                    if not isinstance(choices, list) or not choices:
+                        continue
+                    content = str(choices[0].get("message", {}).get("content", "") or "")
+                    cleaned = _strip_json_fences(content)
+                    if not cleaned:
+                        continue
+                    parsed = json.loads(cleaned)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
                     continue
-                content = str(choices[0].get("message", {}).get("content", "") or "")
-                cleaned = _strip_json_fences(content)
-                if not cleaned:
-                    continue
-                parsed = json.loads(cleaned)
-                if isinstance(parsed, dict):
-                    return parsed
-            except Exception:
-                continue
+
+    if is_gemini_cli_ready(settings):
+        return await gemini_generate_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=clean_model,
+            settings=settings,
+            cancel=cancel,
+        )
     return None
 
 
@@ -330,7 +361,7 @@ async def pitch_three_concepts(
     scraped = await scrape_optional_url(source_url, mock=mock, cancel=cancel)
     clean_idea = idea.strip() or scraped.get("summary") or "A cinematic visual story"
 
-    if not mock and resolved.openrouter_api_key.strip():
+    if not mock and (resolved.openrouter_api_key.strip() or is_gemini_cli_ready(resolved)):
         sys_prompt = (
             "You are a world-class commercial film director. Given a creator's rough idea "
             "(and optional scraped product context), pitch EXACTLY 3 distinct, visual, "
@@ -395,19 +426,187 @@ async def pitch_three_concepts(
     return {"pitches": _deterministic_pitches(clean_idea, scraped), "scraped": scraped}
 
 
-def _plan_scene_durations(target_sec: int, model_spec: VideoModelSpec) -> list[int]:
-    """Split target film duration (10s -> 60s) into 1-4 clean Scene durations supported by the model."""
-    allowed = sorted(model_spec.durations_sec or [5, 8, 10, 15])
+_FALLBACK_HYBRID_ROTATION: list[str] = [
+    "motion_graphic:split_comparison",
+    "motion_graphic:device_showcase_25d",
+    "motion_graphic:node_flow_diagram",
+    "motion_graphic:bento_feature_grid",
+    "motion_graphic:terminal_code",
+    "motion_graphic:prompt_ui_demo",
+    "motion_graphic:benchmark_bars",
+    "motion_graphic:customer_quote_proof",
+    "motion_graphic:kinetic_headline",
+]
+
+_NARRATIVE_ROLES_7ACT: list[str] = [
+    "hook",
+    "problem",
+    "turning_point",
+    "product_reveal",
+    "deep_dive",
+    "proof",
+    "climax_cta",
+]
+
+
+def _pick_unused_motion_token(used: set[str], preferred: list[str]) -> str:
+    for cand in [*preferred, *_FALLBACK_HYBRID_ROTATION]:
+        if cand not in used:
+            used.add(cand)
+            return cand
+    return "motion_graphic:bento_feature_grid"
+
+
+def _expand_hybrid_plan_for_target(seed_plan: list[str], target_sec: int) -> list[str]:
+    """Expand a 3-act theme seed into a non-repeating multi-act hybrid rhythm for 10s -> 60s."""
+    if not seed_plan:
+        return []
+    target = max(5, min(60, int(target_sec)))
+    if target <= 11:
+        return [seed_plan[0]]
+    if target <= 18:
+        return list(seed_plan[:2])
+    if target <= 34:
+        if len(seed_plan) >= 3 and target >= 28 and "ai_sequence" not in seed_plan:
+            return [seed_plan[0], "ai_sequence", seed_plan[1], seed_plan[2]]
+        return list(seed_plan[:3])
+
+    used_tpls: set[str] = {tok for tok in seed_plan if tok.startswith("motion_graphic:")}
+    hook_tok = seed_plan[0]
+    mid_tok = seed_plan[1] if len(seed_plan) > 1 else _pick_unused_motion_token(used_tpls, ["motion_graphic:device_showcase_25d"])
+    end_tok = seed_plan[-1] if len(seed_plan) > 2 else _pick_unused_motion_token(used_tpls, ["motion_graphic:benchmark_bars"])
+
+    if target <= 48:
+        # 5-Act 45s Launch Arc: Hook -> Problem/Shift -> AI Cinema World -> Product Tour -> Proof
+        shift_tok = _pick_unused_motion_token(
+            used_tpls,
+            ["motion_graphic:split_comparison", "motion_graphic:kinetic_headline"],
+        )
+        return [hook_tok, shift_tok, "ai_sequence", mid_tok, end_tok]
+
+    # 7-Act 60s Banger Arc: Hook -> Friction -> AI Turning Point -> Product Reveal -> Deep Architecture -> AI Climax -> Proof & CTA
+    shift_tok = _pick_unused_motion_token(
+        used_tpls,
+        ["motion_graphic:split_comparison", "motion_graphic:kinetic_headline"],
+    )
+    deep_tok = _pick_unused_motion_token(
+        used_tpls,
+        [
+            "motion_graphic:node_flow_diagram",
+            "motion_graphic:bento_feature_grid",
+            "motion_graphic:terminal_code",
+            "motion_graphic:prompt_ui_demo",
+        ],
+    )
+    return [
+        hook_tok,
+        shift_tok,
+        "ai_sequence",
+        mid_tok,
+        deep_tok,
+        "ai_sequence",
+        end_tok,
+    ]
+
+
+def _plan_scene_durations(
+    target_sec: int,
+    model_spec: VideoModelSpec,
+    hybrid_plan: list[str] | None = None,
+) -> list[int]:
+    """Plan 1-8 Scene durations (10s -> 60s) hitting `target_sec` accurately for both Hybrid & Cinema films."""
+    allowed = sorted(set(model_spec.durations_sec or [5, 8, 10, 15]))
     max_single = max(allowed)
     target = max(5, min(60, int(target_sec)))
 
-    if target <= max_single:
+    if hybrid_plan:
+        n = len(hybrid_plan)
+        if n == 1:
+            tok0 = hybrid_plan[0]
+            return [model_spec.snap_duration(target) if tok0 == "ai_sequence" else target]
+
+        base_each = max(4.0, target / float(n))
+        durs: list[int] = []
+        flex_indices: list[int] = []
+        for i, tok in enumerate(hybrid_plan):
+            if tok == "ai_sequence":
+                durs.append(model_spec.snap_duration(min(12.0, max(5.0, base_each + 1.0))))
+            else:
+                # Hook acts are punchier (5-7s); deep-dive/proof acts breathe cleanly (7-10s)
+                ideal = max(5, min(10, int(round(base_each - (1.0 if i == 0 else 0.0)))))
+                durs.append(ideal)
+                flex_indices.append(i)
+
+        # Distribute remaining delta across flexible motion_graphic / user_clip acts first
+        guard = 0
+        while sum(durs) != target and flex_indices and guard < 40:
+            guard += 1
+            diff = target - sum(durs)
+            changed = False
+            order = list(reversed(flex_indices)) if diff > 0 else list(flex_indices)
+            for idx in order:
+                if diff > 0 and durs[idx] < 12:
+                    durs[idx] += 1
+                    diff -= 1
+                    changed = True
+                    if diff == 0:
+                        break
+                elif diff < 0 and durs[idx] > 4:
+                    durs[idx] -= 1
+                    diff += 1
+                    changed = True
+                    if diff == 0:
+                        break
+            if not changed:
+                break
+        return durs
+
+    # Pure AI Cinema / Diorama / Hardware planning (1 -> 8 acts)
+    if target <= max_single and target <= 15:
         return [model_spec.snap_duration(target)]
 
-    # Pick 2, 3, or 4 scenes so total stays close to target
-    count = max(2, min(4, math.ceil(target / float(min(15, max_single)))))
-    per = model_spec.snap_duration(target / float(count))
-    return [per] * count
+    # Prefer dynamic 8s-10s pacing on 30s-60s films rather than sluggish 15s static shots
+    preferred_pace = 10.0 if 10 in allowed else (8.0 if 8 in allowed else float(min(12, max_single)))
+    desired_count = max(2, min(8, int(round(target / preferred_pace))))
+
+    best_combo: list[int] | None = None
+    best_score: tuple[int, int, float] | None = None
+
+    for count in range(max(2, desired_count - 1), min(8, desired_count + 2) + 1):
+        # Build combination starting from closest duration per slot and nudging through `allowed`
+        per = model_spec.snap_duration(target / float(count))
+        combo = [per] * count
+        for _ in range(count * len(allowed)):
+            diff = target - sum(combo)
+            if diff == 0:
+                break
+            best_idx = -1
+            best_new_d = -1
+            best_rem = abs(diff)
+            for idx, cur_d in enumerate(combo):
+                for cand_d in allowed:
+                    if cand_d == cur_d:
+                        continue
+                    new_diff = abs(target - (sum(combo) - cur_d + cand_d))
+                    if new_diff < best_rem:
+                        best_rem = new_diff
+                        best_idx = idx
+                        best_new_d = cand_d
+            if best_idx >= 0:
+                combo[best_idx] = best_new_d
+            else:
+                break
+        combo.sort(reverse=False)
+        # Put slightly longer climax/establishing shots in the middle/end for natural pacing
+        err = abs(target - sum(combo))
+        cnt_dist = abs(count - desired_count)
+        fif_pen = sum(1 for d in combo if d >= 15) * 0.5 if target >= 45 else 0.0
+        score = (err, cnt_dist, fif_pen)
+        if best_score is None or score < best_score:
+            best_score = score
+            best_combo = combo
+
+    return best_combo or [model_spec.snap_duration(target / 4.0)] * 4
 
 
 def _make_beats_for_duration(
@@ -627,8 +826,9 @@ def _build_deterministic_scenes(
     camera_data: dict[str, Any],
     lighting_data: dict[str, Any],
     scraped: dict[str, Any],
+    expanded_hybrid_plan: list[str] | None = None,
 ) -> tuple[str, str, list[StitchScene]]:
-    """Build rich, structured, editable StitchScenes offline or as fallback."""
+    """Build rich, structured, editable StitchScenes across 1-8 Acts (10s -> 60s)."""
     clean_idea = idea.strip() or "A tactile miniature world awakening on an aged oak table"
     brand = str(scraped.get("brand_name") or "").strip()
     palette = list(lighting_data["lighting"].get("color_palette") or ["#191512", "#E8A838", "#F6E7D4"])
@@ -651,7 +851,8 @@ def _build_deterministic_scenes(
         main_subject = "a tiny living miniature city awakened by glowing liquid gold inside a glass jar"
         arc_specs = [
             (
-                "Scene 1 · Awakening Drop",
+                "hook",
+                "Act 1 · Awakening Drop",
                 ["giant realistic human hand", "glass pipette with liquid gold", "frozen gray miniature city"],
                 ["glowing molten gold", "weathered stone streets", "crystal pipette glass"],
                 "90mm macro tilt-shift · extreme close-up slowly pushing in",
@@ -659,26 +860,56 @@ def _build_deterministic_scenes(
                 "One drop of gold wakes a silent world.",
             ),
             (
-                "Scene 2 · Folding Horizon",
+                "problem",
+                "Act 2 · Shadows Dissolve",
+                ["stone bridges catching molten amber", "awakening streetlamps", "miniature clocktower"],
+                ["carved limestone", "liquid amber reflections", "fine morning mist"],
+                "65mm macro dolly · low-angle lateral glide down miniature street",
+                "Frost retreats as warm golden light threads through every archway",
+                "Where silence stood, warmth begins to travel.",
+            ),
+            (
+                "turning_point",
+                "Act 3 · Folding Horizon",
                 ["living miniature town", "glowing amber rooftops", "tiny illuminated trains"],
                 ["aged oak desk", "warm amber lantern light", "handcrafted miniature timber"],
                 "90mm macro tilt-shift · smooth continuous orbital arc",
                 "The unfolding miniature valley settles into a radiant glowing tabletop village",
-                "Every street folds upward into living warmth.",
+                "Every street folds upward into living motion.",
             ),
             (
-                "Scene 3 · Sealed in Glass",
+                "product_reveal",
+                "Act 4 · Living Harbor & Spire",
+                ["miniature brass train crossing viaduct", "shimmering resin river", "illuminated windows"],
+                ["brushed miniature brass", "clear poured resin water", "warm timber"],
+                "50mm tilt-shift crane · rising diagonal sweep over the valley",
+                "Tiny golden reflections dance across the harbor beneath the central spire",
+                "Craft and imagination move in quiet harmony.",
+            ),
+            (
+                "deep_dive",
+                "Act 5 · Enclosing Crystal",
+                ["crystal apothecary glass jar descending", "glowing miniature village"],
+                ["borosilicate crystal glass", "refracted golden caustics", "aged oak grain"],
+                "85mm cinema lens · slow circular orbit catching glass refractions",
+                "Curved crystal walls refract warm lantern light around the miniature peaks",
+                "Held safely inside pure optical glass.",
+            ),
+            (
+                "proof",
+                "Act 6 · Sealed in Glass",
                 ["crystal apothecary glass jar", "human fingers closing cork lid", "glowing miniature world"],
                 ["borosilicate glass", "natural cork stopper", "golden volumetric dust motes"],
                 "85mm studio cinema · sweeping continuous pull-back reveal",
                 "Locked-off hero shot of the illuminated living world sealed inside the crystal jar",
-                "A complete universe, sealed in glass.",
+                "A complete universe, sealed by hand.",
             ),
             (
-                "Scene 4 · Quiet Afterglow",
+                "climax_cta",
+                "Act 7 · Quiet Afterglow",
                 ["glowing glass jar hero centerpiece", "sunlit artisan workshop"],
                 ["warm oak tabletop", "optical glass caustics", "soft floating dust"],
-                "85mm locked-off macro · gentle 2% breathing push",
+                "85mm locked-off macro · gentle 2% breathing focus",
                 "Serene locked hero still with glowing amber caustics across the oak desk",
                 "Crafted to hold its own light.",
             ),
@@ -695,49 +926,93 @@ def _build_deterministic_scenes(
         hero_ref = brand or "hero centerpiece"
         arc_specs = [
             (
-                f"Scene 1 · {world_label} Hook",
+                "hook",
+                f"Act 1 · {world_label} Hook",
                 [hero_ref, f"{base_mats[0]} sculpted foreground"],
                 base_mats,
                 base_cam,
                 f"{hero_ref} emerging cleanly inside a {world_label.lower()} world ({clean_idea[:65]})",
-                f"Start with the quiet craft of {brand or 'every detail'}.",
+                f"Every breakthrough starts with one clear moment for {brand or 'makers'}.",
             ),
             (
-                f"Scene 2 · {world_label} Transformation",
+                "problem",
+                "Act 2 · Tension & Contrast",
+                [f"fragmented legacy elements giving way to {hero_ref}", f"shadowed {base_mats[0]}"],
+                [*base_mats[:2], "dramatic rim light"],
+                "50mm cinema dolly · crisp lateral tracking shot across shifting shadows",
+                f"Scattered motion converges cleanly toward {hero_ref}",
+                "Old complexity fades the second clarity takes over.",
+            ),
+            (
+                "turning_point",
+                f"Act 3 · {world_label} Awakening",
                 [hero_ref, f"living {base_mats[0]} & light interplay"],
                 [*base_mats[:2], "volumetric golden caustics"],
-                "65mm cinema glide · smooth continuous sculptural orbit",
-                f"Mid-arc {world_label.lower()} peak showcasing {hero_ref} with luminous depth",
-                "Light moves across every surface with effortless precision.",
+                "65mm cinema glide · smooth continuous 180-degree sculptural orbit",
+                f"Mid-arc {world_label.lower()} turning point showcasing {hero_ref} in luminous depth",
+                f"Watch {brand or 'the system'} bring every moving piece into flow.",
             ),
             (
-                "Scene 3 · Hero Pull-Back Reveal",
+                "product_reveal",
+                f"Act 4 · Inside {brand or 'The Experience'}",
+                [hero_ref, "precision hero detail in sharp focus"],
+                [*base_mats[:2], "optical glass reflections"],
+                "90mm macro prime · tactile close-up gliding across precision details",
+                f"Razor-sharp close-up of {hero_ref} with balanced specular highlights",
+                "Designed so every interaction feels effortless and immediate.",
+            ),
+            (
+                "deep_dive",
+                "Act 5 · Living Architecture",
+                [f"interconnected {hero_ref} ecosystem", f"sculpted {base_mats[-1]} pathways"],
+                base_mats,
+                "40mm overhead cinema rig · smooth top-down architectural glide",
+                f"Complete {hero_ref} architecture pulsing with synchronized momentum",
+                "Under the surface, every workflow runs in lockstep.",
+            ),
+            (
+                "proof",
+                "Act 6 · Climax Reveal",
                 [brand or "flagship hero centerpiece", f"complete {world_label.lower()} tableau"],
                 [*base_mats[:2], base_mats[-1]],
-                "85mm cinema lens · sweeping continuous pull-back into hero lock",
-                f"Locked-off hero composition framing {hero_ref} in {world_label.lower()} craft with balanced negative space",
-                "Pull back to see the entire story lock into place.",
+                "85mm cinema lens · sweeping continuous pull-back into hero tableau",
+                f" Expansive {world_label.lower()} climax framing {hero_ref} at full scale".strip(),
+                "Built for teams who ship at full speed.",
             ),
             (
-                "Scene 4 · Signature Hold",
+                "climax_cta",
+                "Act 7 · Signature Hold",
                 [hero_ref],
                 base_mats,
                 "85mm locked-off cinema frame · subtle breathing focus",
-                f"Unforgettable {world_label.lower()} hero finish with glowing ambient depth",
-                f"{brand or 'Designed'} to stay with you.",
+                f"Unforgettable {world_label.lower()} hero finish with balanced negative space",
+                f"{brand or 'Ready'} when you are.",
             ),
         ]
 
     recipe = _find_gallery_recipe(recipe_id)
-    hybrid_plan: list[str] = list(recipe.get("hybrid_plan") or []) if recipe else []
+    seed_hybrid = list(recipe.get("hybrid_plan") or []) if recipe else []
+    hybrid_plan = (
+        expanded_hybrid_plan
+        if expanded_hybrid_plan is not None
+        else _expand_hybrid_plan_for_target(seed_hybrid, sum(durations))
+    )
     world_id = str(world_data.get("id") or "miniature_diorama")
+    n_total = len(durations)
 
+    # Map indices onto dramatic arc positions so even 2, 3, 4, or 8 scenes start on Hook and end on Signature Hold
     scenes: list[StitchScene] = []
     for idx, dur in enumerate(durations):
-        spec = arc_specs[min(idx, len(arc_specs) - 1)]
-        sc_title, subjs, mats, cam_s, end_f, vo_l = spec
-        if idx >= len(arc_specs):
-            sc_title = f"Scene {idx + 1} · Continuation"
+        if n_total == 1:
+            arc_idx = 0
+        elif idx == n_total - 1:
+            arc_idx = len(arc_specs) - 1
+        else:
+            arc_idx = min(len(arc_specs) - 2, int(round(idx * (len(arc_specs) - 1) / float(max(1, n_total - 1)))))
+        role, sc_title, subjs, mats, cam_s, end_f, vo_l = arc_specs[arc_idx]
+        # Re-number Act prefix cleanly to match idx + 1
+        if "·" in sc_title:
+            sc_title = f"Act {idx + 1} · {sc_title.split('·', 1)[1].strip()}"
 
         sc_kind: SceneKind = "ai_sequence"
         graphic_spec: MotionGraphicSpec | None = None
@@ -791,6 +1066,7 @@ def _build_deterministic_scenes(
                 scene_id=f"sc_{idx + 1}_{uuid4().hex[:6]}",
                 index=idx,
                 title=sc_title,
+                narrative_role=role,
                 duration_sec=dur,
                 kind=sc_kind,
                 continues_from_prev=continues,
@@ -845,7 +1121,10 @@ async def compile_stitch_project(
     scraped = await scrape_optional_url(source_url, mock=mock, cancel=cancel)
     eff_brand = (brand_name or "").strip() or scraped.get("brand_name") or None
     eff_tagline = (brand_tagline or "").strip() or scraped.get("tagline") or None
-    durations = _plan_scene_durations(target_duration_sec, model_spec)
+    theme_rec = _find_gallery_recipe(recipe_id)
+    seed_hybrid = list(theme_rec.get("hybrid_plan") or []) if theme_rec else []
+    expanded_hybrid = _expand_hybrid_plan_for_target(seed_hybrid, target_duration_sec)
+    durations = _plan_scene_durations(target_duration_sec, model_spec, hybrid_plan=expanded_hybrid)
 
     title, main_subject, scenes = _build_deterministic_scenes(
         idea=idea,
@@ -855,6 +1134,7 @@ async def compile_stitch_project(
         camera_data=camera_data,
         lighting_data=lighting_data,
         scraped=scraped,
+        expanded_hybrid_plan=expanded_hybrid,
     )
 
     project_id = f"st_{uuid4().hex[:10]}"
@@ -862,7 +1142,6 @@ async def compile_stitch_project(
     if scraped.get("colors"):
         lighting_spec.color_palette = list(scraped["colors"][:3])
 
-    theme_rec = _find_gallery_recipe(recipe_id)
     is_cinema_theme = bool(theme_rec and theme_rec.get("category") == "cinema")
 
     project = StitchProject(
@@ -940,14 +1219,18 @@ async def compile_stitch_project(
             project.brand_kit_loaded = True
             project.brand_kit_summary = " · ".join(kit_parts)
 
-    # Upgrade with live OpenRouter LLM choreography when live & API key configured
-    if not mock and resolved.openrouter_api_key.strip():
+    # Upgrade with live OpenRouter or Gemini CLI choreography when live & API key configured
+    if not mock and (resolved.openrouter_api_key.strip() or is_gemini_cli_ready(resolved)):
         theme_recipe = _find_gallery_recipe(recipe_id)
         sys_prompt = (
-            "You are a Master Film Director crafting a structured multi-scene Stitch Script "
-            "for AI video models (Kling 3.0 Pro / Veo 3). Every scene has concrete physical "
-            "subjects, materials, camera movement, 3-color hex palette, a locked end_frame, "
+            "You are a Master Film Director crafting a structured multi-act Stitch Script "
+            "for 10s–60s launch & cinema films. Every scene has concrete physical "
+            "subjects, materials, distinct camera movement, 3-color hex palette, a locked end_frame, "
             "and 3-4 timed beats (time, scene, action, camera, sound). "
+            "STORY ARC RULE: Follow `scene_narrative_roles` in exact dramatic order "
+            "(hook -> problem -> turning_point -> product_reveal -> deep_dive -> proof -> climax_cta), "
+            "building rising momentum and varying camera angles between consecutive acts so a 60s film "
+            "never feels repetitive. Keep each `vo_line` concise and natural to speak (<= 2.5 words/sec). "
             "THEME ADAPTATION RULE: `world_theme` and `theme_reference_example` define the "
             "visual style, tactile craft, materials, lighting, and cinematography direction ONLY. "
             "You MUST reimagine and transform the USER'S `idea`, `brand_name`, and "
@@ -971,6 +1254,8 @@ async def compile_stitch_project(
             "scraped_colors": list(scraped.get("colors") or [])[:4],
             "num_scenes": len(durations),
             "scene_durations_sec": durations,
+            "scene_narrative_roles": [s.narrative_role for s in project.scenes],
+            "scene_kinds": [s.kind for s in project.scenes],
             "aspect_ratio": aspect_ratio,
             "world_theme": {
                 "label": world_data.get("label", ""),
@@ -1119,7 +1404,9 @@ async def generate_scene_keyframe(
 ) -> StitchProject:
     """Generate or regenerate ONE Start or End anchor still for a Scene."""
     resolved = settings or get_settings()
-    use_mock = mock or project.video_model_id == "mock" or not resolved.fal_key.strip()
+    has_fal = bool(resolved.fal_key.strip())
+    has_gemini = is_gemini_cli_ready(resolved)
+    use_mock = mock or project.video_model_id == "mock" or (not has_fal and not has_gemini)
     media_dir.mkdir(parents=True, exist_ok=True)
     idx = max(0, min(scene_idx, len(project.scenes) - 1))
     sc = project.scenes[idx]
@@ -1130,12 +1417,17 @@ async def generate_scene_keyframe(
 
     # Pick continuity anchor URL for Flux Kontext if available
     anchor_url: str | None = None
+    anchor_local: Path | None = None
     if is_end and sc.start_keyframe_url:
         anchor_url = sc.start_keyframe_url
     elif not is_end and idx > 0 and project.scenes[idx - 1].end_keyframe_url:
         anchor_url = project.scenes[idx - 1].end_keyframe_url
     elif project.scenes and project.scenes[0].start_keyframe_url:
         anchor_url = project.scenes[0].start_keyframe_url
+    if is_end and sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file():
+        anchor_local = Path(sc.start_keyframe_path)
+    elif not is_end and idx > 0 and project.scenes[idx - 1].end_keyframe_path and Path(project.scenes[idx - 1].end_keyframe_path).is_file():
+        anchor_local = Path(project.scenes[idx - 1].end_keyframe_path)
 
     if use_mock or sc.kind == "kinetic_ui":
         _render_mock_keyframe_jpeg(
@@ -1151,7 +1443,7 @@ async def generate_scene_keyframe(
             fonts_dir=resolved.fonts_dir,
         )
         remote_url = None
-    else:
+    elif has_fal:
         _, remote_url, usd = await _generate_flux_image(
             prompt=prompt,
             aspect=project.aspect_ratio,
@@ -1161,6 +1453,26 @@ async def generate_scene_keyframe(
             cancel=cancel,
         )
         project.actual_usd = round(project.actual_usd + usd, 4)
+    else:
+        gem_img = await gemini_generate_image(
+            prompt=prompt,
+            out_path=out_file,
+            aspect_ratio=project.aspect_ratio,
+            reference_image_path=anchor_local,
+            settings=resolved,
+            cancel=cancel,
+        )
+        if not isinstance(gem_img, Path) or not gem_img.is_file():
+            _render_mock_keyframe_jpeg(
+                title=f"{sc.title} · {'End' if is_end else 'Start'} Frame",
+                subtitle=(sc.end_frame if is_end else (sc.beats[0].scene if sc.beats else sc.title)),
+                footer=f"{sc.camera_spec[:54]} · {project.aspect_ratio}",
+                aspect=project.aspect_ratio,
+                palette=sc.colors or project.lighting.color_palette,
+                out_path=out_file,
+                fonts_dir=resolved.fonts_dir,
+            )
+        remote_url = None
 
     if is_end:
         sc.end_keyframe_path = str(out_file)
@@ -1221,7 +1533,14 @@ async def render_single_scene_take(
     reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
     chosen_engine = (engine_id or project.video_model_id or "").strip()
     spec = reg.get_video_model(chosen_engine)
-    use_mock = mock or spec.provider == "mock" or not resolved.fal_key.strip()
+    has_fal = bool(resolved.fal_key.strip())
+    has_gemini = is_gemini_cli_ready(resolved)
+    use_mock = (
+        mock
+        or spec.provider == "mock"
+        or (spec.provider == "gemini" and not has_gemini)
+        or (spec.provider == "fal" and not has_fal and not has_gemini)
+    )
 
     idx = max(0, min(scene_idx, len(project.scenes) - 1))
     sc = project.scenes[idx]
@@ -1372,6 +1691,40 @@ async def render_single_scene_take(
                 usd=0.0,
                 chained_from_prev=chained_from_prev,
             )
+        elif spec.provider == "gemini" or (not has_fal and has_gemini):
+            gem_label = spec.label if spec.provider == "gemini" else "Google Gemini Omni 1.2 (Gemini CLI)"
+            await _report(f"Shooting {sc.title} · Take {take_num} via {gem_label}...")
+            start_local: Path | None = (
+                Path(sc.start_keyframe_path)
+                if sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file()
+                else None
+            )
+            compiled_json = project.compile_scene_model_prompt(idx, max_chars=spec.max_prompt_chars)
+            gem_clip = await gemini_generate_video(
+                prompt=compiled_json,
+                out_path=out_clip,
+                aspect_ratio=project.aspect_ratio,
+                resolution=spec.resolution,
+                start_image_path=start_local,
+                model=spec.id if spec.provider == "gemini" else "gemini-omni-1.2-flash",
+                settings=resolved,
+                cancel=cancel,
+            )
+            if not isinstance(gem_clip, Path) or not gem_clip.is_file():
+                raise RuntimeError("Gemini CLI video generation returned no output file.")
+            probe = await probe_media(out_clip, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+            est_dur = round(float(probe.duration_sec or sc.duration_sec), 2)
+            est_cost = round(est_dur * 0.12, 4)
+            take = StitchTake(
+                take_id=take_num,
+                engine_id=spec.id if spec.provider == "gemini" else "gemini-omni-1.2-flash",
+                engine_label=gem_label,
+                clip_path=str(out_clip),
+                duration_sec=est_dur,
+                usd=est_cost,
+                chained_from_prev=chained_from_prev,
+            )
+            project.actual_usd = round(project.actual_usd + est_cost, 4)
         else:
             # 3. Live Dynamic-Registry AI Video Render (Kling 3.0 Pro, Kling 4.0 Flash, Native 4K, Veo 3, or Custom!)
             await _report(
@@ -1526,26 +1879,61 @@ def _synthesize_riser_bed_wav(
     seam_times: list[float],
     out_path: Path,
 ) -> Path:
-    """Synthesize warm ambient pad with subtle harmonic risers at each Scene seam ($0)."""
+    """Synthesize a 4-stage cinematic launch score (Intro -> Build -> Drop/Climax -> Resolve) with Act seam accents."""
     sr = 24000
-    n = max(sr, int(sr * duration_sec))
+    dur = max(2.0, float(duration_sec))
+    n = max(sr, int(sr * dur))
     frames = bytearray()
-    freqs = (130.81, 196.00, 261.63, 329.63)
+    two_pi = 2.0 * math.pi
+    pulse_hz = 1.85  # ~111 BPM subtle modern launch pulse
     for i in range(n):
         t = i / sr
-        fade_in = min(1.0, t / 0.7)
-        fade_out = min(1.0, max(0.0, (duration_sec - t) / 0.9))
+        arc_p = t / dur
+        fade_in = min(1.0, t / 0.55)
+        fade_out = min(1.0, max(0.0, (dur - t) / 0.85))
+
+        # 4-stage dramatic energy contour across the film
+        if arc_p < 0.20:
+            arc_gain = 0.72 + 0.15 * (arc_p / 0.20)
+        elif arc_p < 0.50:
+            arc_gain = 0.87 + 0.18 * ((arc_p - 0.20) / 0.30)
+        elif arc_p < 0.84:
+            arc_gain = 1.08 + 0.12 * math.sin(math.pi * (arc_p - 0.50) / 0.34)
+        else:
+            arc_gain = 0.95 - 0.20 * ((arc_p - 0.84) / 0.16)
+
         riser = 0.0
+        impact = 0.0
         for st in seam_times:
             dist = t - st
-            if -0.8 <= dist <= 0.35:
-                # Subtle harmonic swell peaking right on the cut
-                riser = max(riser, math.exp(-((dist / 0.32) ** 2)) * 0.45)
-        env = fade_in * fade_out * (0.75 + 0.12 * math.sin(2.0 * math.pi * 0.25 * t) + riser)
-        sample = sum(math.sin(2.0 * math.pi * f * t) for f in freqs) / len(freqs)
-        if riser > 0.05:
-            sample += 0.25 * riser * math.sin(2.0 * math.pi * (392.0 + 120.0 * riser) * t)
-        val = int(max(-32767, min(32767, sample * env * 4600.0)))
+            if -0.75 <= dist <= 0.30:
+                riser = max(riser, math.exp(-((dist / 0.30) ** 2)) * 0.48)
+            if 0.0 <= dist <= 0.28:
+                impact = max(impact, math.exp(-dist * 12.0) * 0.55)
+
+        # Warm root + fifth + octave + climax shimmer harmonics
+        sub = 0.42 * math.sin(two_pi * 65.41 * t)
+        pad = (
+            0.30 * math.sin(two_pi * 130.81 * t)
+            + 0.26 * math.sin(two_pi * 196.00 * t)
+            + 0.20 * math.sin(two_pi * 261.63 * t)
+        )
+        if arc_p >= 0.22:
+            # Subtle rhythmic pulse & shimmer entering in Act 2+
+            beat_env = 0.5 + 0.5 * math.sin(two_pi * pulse_hz * t)
+            pad += 0.14 * beat_env * math.sin(two_pi * 329.63 * t)
+        if arc_p >= 0.48:
+            # Climax high-harmonic warmth
+            pad += 0.12 * math.sin(two_pi * 392.00 * t)
+
+        sample = sub + pad
+        if riser > 0.04:
+            sample += 0.26 * riser * math.sin(two_pi * (392.0 + 130.0 * riser) * t)
+        if impact > 0.02:
+            sample += 0.38 * impact * math.sin(two_pi * 55.0 * t)
+
+        env = fade_in * fade_out * arc_gain * (0.82 + 0.10 * math.sin(two_pi * 0.22 * t) + riser * 0.35)
+        val = int(max(-32767, min(32767, sample * env * 4700.0)))
         frames.extend(struct.pack("<h", val))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out_path), "wb") as wf:
@@ -2134,55 +2522,73 @@ async def stitch_master_cut(
         assembled_mp4 = tmp_dir / "assembled.mp4"
         if len(norm_paths) == 1:
             shutil.copyfile(norm_paths[0], assembled_mp4)
-        elif project.seam_transition == "micro_dissolve" and len(norm_paths) <= 5:
-            # Pairwise or chained 0.35s xfade + acrossfade (Render-512MB safe with threads=1)
+        elif project.seam_transition == "micro_dissolve" and len(norm_paths) <= 11:
+            # Memory-safe chunked 0.35s xfade + acrossfade (at most 4 inputs per FFmpeg pass -> <512MB RAM)
             xf = 0.35
-            inputs: list[str] = []
-            for p in norm_paths:
-                inputs.extend(["-i", str(p)])
-            vf_parts: list[str] = []
-            af_parts: list[str] = []
-            cur_v = "0:v"
-            cur_a = "0:a"
-            offset = max(0.2, clip_durations[0] - xf)
-            for i in range(1, len(norm_paths)):
-                nxt_v = f"v{i}"
-                nxt_a = f"a{i}"
-                vf_parts.append(
-                    f"[{cur_v}][{i}:v]xfade=transition=fade:duration={xf:.2f}:offset={offset:.2f}[{nxt_v}]"
-                )
-                af_parts.append(f"[{cur_a}][{i}:a]acrossfade=d={xf:.2f}[{nxt_a}]")
-                cur_v = nxt_v
-                cur_a = nxt_a
-                offset = max(0.2, offset + clip_durations[i] - xf)
-            fc = ";".join([*vf_parts, *af_parts])
-            xf_cmd = [
-                resolved.ffmpeg_bin,
-                "-y",
-                "-threads",
-                str(eff_threads),
-                *inputs,
-                "-filter_complex",
-                fc,
-                "-map",
-                f"[{cur_v}]",
-                "-map",
-                f"[{cur_a}]",
-                *_pinned_h264_flags(fps, threads=eff_threads),
-                "-c:a",
-                "aac",
-                "-ar",
-                "48000",
-                "-ac",
-                "2",
-                "-b:a",
-                "160k",
-                "-movflags",
-                "+faststart",
-                str(assembled_mp4),
-            ]
-            rc_xf, _, _ = await run_subprocess(xf_cmd, timeout_sec=180.0, cancel=cancel, check=False)
-            if rc_xf != 0 or not assembled_mp4.is_file():
+            cur_p = norm_paths[0]
+            cur_dur = clip_durations[0]
+            cursor_idx = 1
+            batch_no = 0
+            xf_ok = True
+            while cursor_idx < len(norm_paths):
+                batch_no += 1
+                chunk_paths = [cur_p, *norm_paths[cursor_idx : cursor_idx + 3]]
+                chunk_durs = [cur_dur, *clip_durations[cursor_idx : cursor_idx + 3]]
+                cursor_idx += len(chunk_paths) - 1
+                out_batch = assembled_mp4 if cursor_idx >= len(norm_paths) else (tmp_dir / f"xf_batch_{batch_no}.mp4")
+
+                inputs: list[str] = []
+                for p in chunk_paths:
+                    inputs.extend(["-i", str(p)])
+                vf_parts: list[str] = []
+                af_parts: list[str] = []
+                cur_v = "0:v"
+                cur_a = "0:a"
+                offset = max(0.2, chunk_durs[0] - xf)
+                for i in range(1, len(chunk_paths)):
+                    nxt_v = f"v{i}"
+                    nxt_a = f"a{i}"
+                    vf_parts.append(
+                        f"[{cur_v}][{i}:v]xfade=transition=fade:duration={xf:.2f}:offset={offset:.2f}[{nxt_v}]"
+                    )
+                    af_parts.append(f"[{cur_a}][{i}:a]acrossfade=d={xf:.2f}[{nxt_a}]")
+                    cur_v = nxt_v
+                    cur_a = nxt_a
+                    offset = max(0.2, offset + chunk_durs[i] - xf)
+                fc = ";".join([*vf_parts, *af_parts])
+                xf_cmd = [
+                    resolved.ffmpeg_bin,
+                    "-y",
+                    "-threads",
+                    str(eff_threads),
+                    *inputs,
+                    "-filter_complex",
+                    fc,
+                    "-map",
+                    f"[{cur_v}]",
+                    "-map",
+                    f"[{cur_a}]",
+                    *_pinned_h264_flags(fps, threads=eff_threads),
+                    "-c:a",
+                    "aac",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-b:a",
+                    "160k",
+                    "-movflags",
+                    "+faststart",
+                    str(out_batch),
+                ]
+                rc_xf, _, _ = await run_subprocess(xf_cmd, timeout_sec=180.0, cancel=cancel, check=False)
+                if rc_xf != 0 or not out_batch.is_file():
+                    xf_ok = False
+                    break
+                cur_p = out_batch
+                cur_dur = sum(chunk_durs) - xf * (len(chunk_durs) - 1)
+
+            if not xf_ok or not assembled_mp4.is_file():
                 # Clean fallback to zero-overhead concat
                 list_txt = tmp_dir / "list.txt"
                 lines = [f"file '{str(p.resolve())}'" for p in norm_paths]
@@ -2247,13 +2653,9 @@ async def stitch_master_cut(
         # Audio Mastering (3 Soundstage Modes)
         final_tmp = tmp_dir / "master_final.mp4"
         vo_path: Path | None = None
-        if (
-            project.audio_mode == "vo_plus_ducked_score"
-            and not mock
-            and resolved.fal_key.strip()
-        ):
+        if project.audio_mode == "vo_plus_ducked_score" and not mock:
             vo_script = " ".join(s.vo_line.strip() for s in project.scenes if s.vo_line.strip())
-            if vo_script:
+            if vo_script and resolved.fal_key.strip():
                 try:
                     ap = AudioProvider(
                         settings=resolved,
@@ -2262,7 +2664,7 @@ async def stitch_master_cut(
                     rendered_vo = await ap.generate_voice(
                         VoiceCue(
                             shot_id="stitch_vo",
-                            text=vo_script[:420],
+                            text=vo_script[:720],
                             voice=project.voice_name or "Rachel",
                         ),
                         cancel=cancel,
@@ -2272,10 +2674,21 @@ async def stitch_master_cut(
                         project.actual_usd = round(project.actual_usd + float(rendered_vo.usd), 4)
                 except Exception:
                     vo_path = None
+            elif vo_script and is_gemini_cli_ready(resolved):
+                gem_vo = await gemini_generate_tts(
+                    text=vo_script[:720],
+                    out_path=tmp_dir / "gemini_vo.wav",
+                    voice=project.voice_name or "Kore",
+                    style="confident, warm commercial launch narration",
+                    settings=resolved,
+                    cancel=cancel,
+                )
+                if isinstance(gem_vo, Path) and gem_vo.is_file():
+                    vo_path = gem_vo
 
         bed_wav = (
             _synthesize_riser_bed_wav(total_dur, seam_times, tmp_dir / "bed.wav")
-            if project.seam_transition == "audio_riser"
+            if project.seam_transition == "audio_riser" or len(seam_times) >= 1
             else _synthesize_ambient_cinematic_wav(total_dur, tmp_dir / "bed.wav")
         )
 
@@ -2523,13 +2936,180 @@ async def stitch_master_cut(
         _move_output_atomically(final_tmp, master_out)
         project.master_video_path = str(master_out)
         project.campaign_pack_paths[project.aspect_ratio] = str(master_out)
+        project.qa_report = await evaluate_stitch_master_qa(
+            project,
+            deep_vision=False,
+            mock=mock,
+            settings=resolved,
+            cancel=cancel,
+        )
+        qa_sc = project.qa_report.get("banger_score", 0) if project.qa_report else 0
+        qa_gr = project.qa_report.get("grade", "") if project.qa_report else ""
         project.status = "done"
         project.status_message = (
-            f"Master Cut ready ({len(norm_paths)} segment(s), {project.seam_transition.replace('_', ' ')})."
+            f"Master Cut ready ({len(norm_paths)} acts · QA Score {qa_sc}/100 {qa_gr})."
         )
         return project
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+async def autofix_from_qa_report(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    registry_store: ModelRegistryStore | None = None,
+    settings: Settings | None = None,
+    mock: bool = False,
+    on_progress: Any | None = None,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Self-healing QA loop: repair flagged Acts, re-render weak takes, re-master audio & re-stitch."""
+    resolved = settings or get_settings()
+    reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
+    model_spec = reg.get_video_model(project.video_model_id)
+
+    if project.qa_report is None and project.master_video_path:
+        project.qa_report = await evaluate_stitch_master_qa(
+            project, deep_vision=False, mock=mock, settings=resolved, cancel=cancel
+        )
+
+    qa = project.qa_report or {}
+    apply_deterministic_script_autofix(project, model_spec)
+
+    # If audio was flagged silent under native_only, upgrade soundstage to native_plus_score
+    blocking_txt = " ".join(str(x) for x in (qa.get("blocking_issues") or [])).lower()
+    if ("silent" in blocking_txt or "missing" in blocking_txt) and project.audio_mode == "native_only":
+        project.audio_mode = "native_plus_score"
+
+    # Identify Acts flagged fail/warn or missing winning takes
+    flagged_by_id = {
+        str(item.get("scene_id")): item
+        for item in (qa.get("scene_scores") or [])
+        if isinstance(item, dict) and item.get("status") in ("fail", "warn")
+    }
+
+    repaired_count = 0
+    for idx, sc in enumerate(project.scenes):
+        flag = flagged_by_id.get(sc.scene_id)
+        needs_rerender = flag is not None or sc.winning_take() is None
+        if not needs_rerender:
+            continue
+        fix_hint = str((flag or {}).get("suggested_fix") or "").strip()
+        if fix_hint and sc.kind == "ai_sequence":
+            if "continuous" in fix_hint.lower() and "continuous" not in sc.camera_spec.lower():
+                sc.camera_spec = f"{sc.camera_spec.rstrip('.')} · continuous smooth glide"
+            if sc.beats:
+                sc.beats[0].action = (
+                    f"{sc.beats[0].action.rstrip('.')}. Immediate vibrant illumination and fluid motion from frame 1."
+                )[:220]
+        elif (
+            sc.kind == "motion_graphic"
+            and sc.graphic_spec is not None
+            and flag
+            and any("ocr" in str(i).lower() for i in (flag.get("issues") or []))
+        ):
+            sc.graphic_spec.headline = " ".join(sc.graphic_spec.headline.split()[:6])[:48]
+
+        await render_single_scene_take(
+            project,
+            idx,
+            media_dir,
+            registry_store=reg,
+            settings=resolved,
+            mock=mock,
+            on_progress=on_progress,
+            cancel=cancel,
+        )
+        repaired_count += 1
+
+    await stitch_master_cut(
+        project,
+        media_dir,
+        settings=resolved,
+        mock=mock,
+        cancel=cancel,
+    )
+    new_score = (project.qa_report or {}).get("banger_score", 0)
+    new_grade = (project.qa_report or {}).get("grade", "")
+    project.status = "done"
+    project.status_message = (
+        f"Auto-Polished {repaired_count} act(s) & re-stitched — QA Score now {new_score}/100 ({new_grade})!"
+    )
+    return project
+
+
+async def autopilot_produce_project(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    registry_store: ModelRegistryStore | None = None,
+    settings: Settings | None = None,
+    mock: bool = False,
+    on_progress: Any | None = None,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """1-Click Express Autopilot: Script Gate -> Shoot All Acts -> Master Cut -> QA & Self-Heal."""
+    resolved = settings or get_settings()
+    reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
+    spec = reg.get_video_model(project.video_model_id)
+
+    async def _step(msg: str) -> None:
+        project.status_message = msg
+        if on_progress is not None:
+            res = on_progress(project)
+            if asyncio.iscoroutine(res):
+                await res
+
+    await _step("Step 1/4 · Sharpening storyboard & Script Gate...")
+    apply_deterministic_script_autofix(project, spec)
+    project.target_duration_sec = project.total_duration_sec()
+
+    await _step(f"Step 2/4 · Shooting all {len(project.scenes)} acts ({project.total_duration_sec()}s)...")
+    await render_all_scenes(
+        project,
+        media_dir,
+        registry_store=reg,
+        settings=resolved,
+        mock=mock,
+        on_progress=on_progress,
+        cancel=cancel,
+    )
+
+    await _step("Step 3/4 · Mastering soundstage & stitching final film...")
+    await stitch_master_cut(
+        project,
+        media_dir,
+        settings=resolved,
+        mock=mock,
+        cancel=cancel,
+    )
+
+    qa = project.qa_report or {}
+    if not qa.get("passed", True) and qa.get("auto_fixable", False):
+        await _step("Step 4/4 · QA flagged polish opportunity — auto-healing weak acts...")
+        await autofix_from_qa_report(
+            project,
+            media_dir,
+            registry_store=reg,
+            settings=resolved,
+            mock=mock,
+            on_progress=on_progress,
+            cancel=cancel,
+        )
+
+    final_qa = project.qa_report or {}
+    sc_num = final_qa.get("banger_score", 90)
+    sc_grd = final_qa.get("grade", "A")
+    project.status = "done"
+    project.status_message = (
+        f"Finished {project.total_duration_sec()}s film · QA Score {sc_num}/100 ({sc_grd})!"
+    )
+    if on_progress is not None:
+        res = on_progress(project)
+        if asyncio.iscoroutine(res):
+            await res
+    return project
 
 
 async def sync_vo_pacing(
@@ -2661,6 +3241,8 @@ async def export_campaign_pack(
 
 __all__ = [
     "StitchProjectStore",
+    "autofix_from_qa_report",
+    "autopilot_produce_project",
     "compile_stitch_project",
     "export_campaign_pack",
     "generate_all_keyframes",

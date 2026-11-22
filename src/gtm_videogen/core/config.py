@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     hf_token: str = Field(default="", alias="HF_TOKEN")
     fal_key: str = Field(default="", alias="FAL_KEY")
     hf_api_key: str = Field(default="", alias="HF_API_KEY")
@@ -70,10 +71,11 @@ class Settings(BaseSettings):
     http_pool_timeout_sec: float = Field(default=15.0, gt=0.0, alias="GTM_HTTP_POOL_TIMEOUT_SEC")
     http_max_retries: int = Field(default=3, ge=0, le=10, alias="GTM_HTTP_MAX_RETRIES")
 
-    # Local media binaries
+    # Local media & Gemini CLI binaries
     ffmpeg_bin: str = Field(default="ffmpeg", alias="FFMPEG_BIN")
     ffprobe_bin: str = Field(default="ffprobe", alias="FFPROBE_BIN")
     tesseract_bin: str = Field(default="tesseract", alias="TESSERACT_BIN")
+    gemini_cli_bin: str = Field(default="gemini-api", alias="GEMINI_CLI_BIN")
     ocr_lang: str = Field(default="eng", alias="OCR_LANG")
     whisper_bin: str = Field(default="", alias="WHISPER_BIN")
     whisper_model_path: str = Field(default="", alias="WHISPER_MODEL_PATH")
@@ -87,6 +89,17 @@ class Settings(BaseSettings):
         alias="GTM_ALLOWED_ORIGINS",
     )
     log_level: str = Field(default="INFO", alias="GTM_LOG_LEVEL")
+
+    def effective_gemini_key(self) -> str:
+        """Return GEMINI_API_KEY or GOOGLE_API_KEY interchangeably."""
+        import os
+
+        return (
+            self.gemini_api_key.strip()
+            or self.google_api_key.strip()
+            or os.getenv("GEMINI_API_KEY", "").strip()
+            or os.getenv("GOOGLE_API_KEY", "").strip()
+        )
 
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

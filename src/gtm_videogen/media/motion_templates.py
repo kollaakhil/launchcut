@@ -237,7 +237,64 @@ def _find_perspective_coeffs(
     return tuple(matrix[i][n] for i in range(n))
 
 
+def _apply_living_camera_polish(
+    frame: Image.Image,
+    pal: dict[str, tuple[int, int, int]],
+    t_sec: float,
+    duration_sec: float,
+) -> Image.Image:
+    """Apply smooth sub-pixel continuous camera drift + live progress bar so holds never freeze."""
+    w, h = frame.size
+    p = max(0.0, min(1.0, t_sec / max(0.25, duration_sec)))
+    # Smooth 3.0% continuous push-in + subtle floating pan using float EXTENT transform
+    zoom = 1.0 + 0.030 * p
+    view_w = w / zoom
+    view_h = h / zoom
+    pan_x = math.sin(t_sec * 0.95) * (w * 0.004)
+    pan_y = math.cos(t_sec * 0.75) * (h * 0.003)
+    cx = w * 0.5 + pan_x
+    cy = h * 0.5 + pan_y
+    x0 = max(0.0, min(w - view_w, cx - view_w * 0.5))
+    y0 = max(0.0, min(h - view_h, cy - view_h * 0.5))
+    drifted = frame.transform(
+        (w, h),
+        Image.Transform.EXTENT,
+        (x0, y0, x0 + view_w, y0 + view_h),
+        resample=Image.Resampling.BILINEAR,
+    )
+    draw = ImageDraw.Draw(drifted)
+    bar_h = max(3, int(h * 0.0045))
+    prog_w = max(8, int(w * max(0.03, p)))
+    draw.rectangle([0, h - bar_h, prog_w, h], fill=pal["accent"])
+    return drifted
+
+
 def render_motion_template_frame(
+    *,
+    spec: MotionGraphicSpec,
+    backdrop: Image.Image,
+    fonts: dict[str, ImageFont.FreeTypeFont | ImageFont.ImageFont],
+    pal: dict[str, tuple[int, int, int]],
+    t_sec: float,
+    duration_sec: float,
+    brand_name: str = "",
+    screenshot_img: Image.Image | None = None,
+) -> Image.Image:
+    """Render a single crisp aspect-aware frame with continuous living camera polish."""
+    raw = _render_motion_template_frame_raw(
+        spec=spec,
+        backdrop=backdrop,
+        fonts=fonts,
+        pal=pal,
+        t_sec=t_sec,
+        duration_sec=duration_sec,
+        brand_name=brand_name,
+        screenshot_img=screenshot_img,
+    )
+    return _apply_living_camera_polish(raw, pal, t_sec, duration_sec)
+
+
+def _render_motion_template_frame_raw(
     *,
     spec: MotionGraphicSpec,
     backdrop: Image.Image,
@@ -754,8 +811,18 @@ async def render_motion_template_mp4(
     dur = max(2.0, min(20.0, float(duration_sec)))
     total_frames = max(int(fps * dur), fps * 2)
     pal = _theme_palette(spec.theme_mode, accent_rgb=accent_rgb)
-    backdrop = _make_radial_backdrop(width, height, pal["bg"], pal["accent"], pal["text"])
-    fonts = _load_fonts(fonts_dir, spec.theme_mode, height)
+
+    # Render Pillow on <=1280px canvas and let FFmpeg SIMD bicubic scale to full 1080p (3x faster, <512MB RAM)
+    max_dim = max(width, height)
+    if max_dim > 1280:
+        scale_r = 1280.0 / float(max_dim)
+        rw = max(2, (int(round(width * scale_r)) // 2) * 2)
+        rh = max(2, (int(round(height * scale_r)) // 2) * 2)
+    else:
+        rw, rh = width, height
+
+    backdrop = _make_radial_backdrop(rw, rh, pal["bg"], pal["accent"], pal["text"])
+    fonts = _load_fonts(fonts_dir, spec.theme_mode, rh)
 
     screenshot_img: Image.Image | None = None
     if spec.screenshot_path and Path(spec.screenshot_path).is_file():
@@ -766,6 +833,7 @@ async def render_motion_template_mp4(
 
     raw_t = os.getenv("GTM_FFMPEG_THREADS", "1").strip()
     eff_threads = max(1, int(raw_t)) if raw_t.isdigit() else 1
+    vf_args = ["-vf", f"scale={width}:{height}:flags=bicubic"] if (rw != width or rh != height) else []
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="motion_tpl_"))
     try:
@@ -783,19 +851,20 @@ async def render_motion_template_mp4(
             "-pix_fmt",
             "rgb24",
             "-s",
-            f"{width}x{height}",
+            f"{rw}x{rh}",
             "-r",
             str(fps),
             "-i",
             "-",
             "-i",
             str(foley_wav),
+            *vf_args,
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            "ultrafast",
             "-crf",
-            "20",
+            "19",
             "-pix_fmt",
             "yuv420p",
             "-r",

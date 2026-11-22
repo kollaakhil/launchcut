@@ -205,6 +205,7 @@ class StitchScene(BaseModel):
     scene_id: str
     index: int = 0
     title: str = "Scene 1 · Opening Hook"
+    narrative_role: str = ""  # hook | problem | turning_point | product_reveal | deep_dive | proof | climax_cta
     duration_sec: int = Field(default=10, ge=3, le=60)
     kind: SceneKind = "ai_sequence"
     continues_from_prev: bool = False
@@ -313,10 +314,11 @@ class StitchProject(BaseModel):
     brand_tagline: str | None = None
     brand_logo_path: str | None = None
 
-    # Master Cut & Multi-Format Campaign Pack Telemetry
+    # Master Cut, Automated Video QA Scorecard & Multi-Format Campaign Pack Telemetry
     cinema_letterbox: bool = False
     film_grain: bool = False
     master_video_path: str | None = None
+    qa_report: dict[str, Any] | None = None
     campaign_pack_paths: dict[str, str] = Field(default_factory=dict)
     status: str = "draft"  # draft | validated | shooting | stitching | done | failed
     status_message: str = "Ready to review on your Pinboard."
@@ -477,6 +479,15 @@ def validate_stitch_project(
         compiled = project.compile_scene_model_prompt(idx, max_chars=model_spec.max_prompt_chars)
         raw_len = len(json.dumps(project.to_scene_prompt_dict(idx), ensure_ascii=False, separators=(",", ":")))
 
+        # Voiceover speakability check across all scene kinds (target <= 3.1 words/sec)
+        vo_words = [w for w in sc.vo_line.strip().split() if w]
+        if vo_words and len(vo_words) / float(max(3, sc.duration_sec)) > 3.1:
+            wps = round(len(vo_words) / float(max(3, sc.duration_sec)), 1)
+            issues.append({
+                "code": "vo_too_fast",
+                "message": f"Narration rate ({wps} words/sec) exceeds natural broadcast pace (≤ 3.0 wps) — trim copy or extend scene duration.",
+            })
+
         if sc.kind == "ai_sequence":
             if not sc.subjects:
                 issues.append({"code": "missing_subjects", "message": "Add at least 1 character or subject so the video model knows what to focus on."})
@@ -509,6 +520,20 @@ def validate_stitch_project(
                         "message": f"Beat 1 should explicitly continue from Scene {idx}'s locked end frame for a seamless pixel-chained handoff.",
                     })
 
+            if (
+                idx >= 2
+                and len(project.scenes) >= 4
+                and project.scenes[idx - 1].kind == "ai_sequence"
+                and project.scenes[idx - 2].kind == "ai_sequence"
+                and sc.camera_spec.strip().lower()
+                == project.scenes[idx - 1].camera_spec.strip().lower()
+                == project.scenes[idx - 2].camera_spec.strip().lower()
+            ):
+                issues.append({
+                    "code": "monotonous_camera",
+                    "message": "3 consecutive AI scenes share identical camera framing — vary camera movement to keep 60s retention high.",
+                })
+
         total_warnings += len(issues)
         scene_reports.append({
             "scene_id": sc.scene_id,
@@ -527,12 +552,30 @@ def validate_stitch_project(
     }
 
 
+_CAMERA_VARIATION_CYCLE: list[str] = [
+    "90mm macro tilt-shift · extreme close-up slowly pushing in",
+    "65mm cinema glide · smooth continuous lateral dolly",
+    "85mm sculptural lens · 180-degree continuous orbital arc",
+    "50mm anamorphic prime · sweeping continuous pull-back reveal",
+    "85mm studio cinema · poised hero lock-off with subtle breathing focus",
+]
+
+
 def apply_deterministic_script_autofix(
     project: StitchProject,
     model_spec: VideoModelSpec,
 ) -> StitchProject:
     """Fix common Script Gate warnings cleanly in 1 click without losing user intent."""
     for idx, sc in enumerate(project.scenes):
+        # Trim rushed narration to <= 2.8 words/sec across any scene kind
+        vo_words = [w for w in sc.vo_line.strip().split() if w]
+        max_words = max(7, int(max(3, sc.duration_sec) * 2.8))
+        if len(vo_words) > max_words and len(vo_words) / float(max(3, sc.duration_sec)) > 3.1:
+            trimmed_vo = " ".join(vo_words[:max_words]).rstrip(",;:-")
+            if not trimmed_vo.endswith((".", "!", "?")):
+                trimmed_vo += "."
+            sc.vo_line = trimmed_vo
+
         if sc.kind != "ai_sequence":
             continue
         if not sc.subjects:
@@ -551,6 +594,18 @@ def apply_deterministic_script_autofix(
         # Snap duration cleanly if model doesn't support it
         if model_spec.durations_sec and sc.duration_sec not in model_spec.durations_sec:
             sc.duration_sec = model_spec.snap_duration(sc.duration_sec)
+
+        # Diversify monotonous 3-in-a-row camera moves
+        if (
+            idx >= 2
+            and len(project.scenes) >= 4
+            and project.scenes[idx - 1].kind == "ai_sequence"
+            and project.scenes[idx - 2].kind == "ai_sequence"
+            and sc.camera_spec.strip().lower()
+            == project.scenes[idx - 1].camera_spec.strip().lower()
+            == project.scenes[idx - 2].camera_spec.strip().lower()
+        ):
+            sc.camera_spec = _CAMERA_VARIATION_CYCLE[idx % len(_CAMERA_VARIATION_CYCLE)]
 
         # Anchor continuity on Scene 2+
         if idx > 0 and sc.continues_from_prev and sc.beats:

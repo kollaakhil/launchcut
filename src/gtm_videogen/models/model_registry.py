@@ -31,7 +31,7 @@ class VideoModelSpec(BaseModel):
     i2v_id: str | None = None
     label: str = Field(..., min_length=2)
     tier: str = "master"  # draft | master | 4k | audio | mock | custom
-    provider: Literal["fal", "openrouter", "mock"] = "fal"
+    provider: Literal["fal", "gemini", "openrouter", "mock"] = "fal"
     resolution: str = "1080p"
     durations_sec: list[int] = Field(default_factory=lambda: [5, 8, 10, 15])
     default_duration_sec: int = 10
@@ -196,6 +196,25 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         badge="Studio Flagship",
     ),
     VideoModelSpec(
+        id="gemini-omni-1.2-flash",
+        i2v_id="gemini-omni-1.2-flash",
+        label="Google Gemini Omni 1.2 (Gemini CLI)",
+        tier="master",
+        provider="gemini",
+        resolution="1080p",
+        durations_sec=[5, 8, 10],
+        default_duration_sec=8,
+        duration_format="int",
+        max_prompt_chars=2800,
+        supports_start_frame=True,
+        supports_end_frame=False,
+        supports_elements=False,
+        supports_native_audio=True,
+        est_usd_per_sec=0.12,
+        fallback_id="fal-ai/veo3/fast",
+        badge="Gemini CLI Native",
+    ),
+    VideoModelSpec(
         id="mock",
         i2v_id="mock",
         label="Studio Animatic ($0 Offline)",
@@ -217,7 +236,8 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
 ]
 
 BUILTIN_LLM_MODELS: list[dict[str, str]] = [
-    {"id": "", "label": "Server Default Flagship LLM (OpenRouter)"},
+    {"id": "", "label": "Server Default Flagship LLM (Auto: OpenRouter / Gemini CLI)"},
+    {"id": "gemini-cli/gemini-4-hydrogen", "label": "Gemini 4 Hydrogen (Gemini CLI Native)"},
     {"id": "google/gemini-2.5-pro", "label": "Gemini 2.5 Pro (Director Craft)"},
     {"id": "anthropic/claude-sonnet-4", "label": "Claude Sonnet 4 (Story & Beats)"},
     {"id": "openai/gpt-4o", "label": "GPT-4o (Structured JSON)"},

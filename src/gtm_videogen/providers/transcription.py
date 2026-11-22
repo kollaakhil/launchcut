@@ -17,6 +17,7 @@ from gtm_videogen.core.config import Settings, get_settings
 from gtm_videogen.core.http_client import ResilientHttpClient
 from gtm_videogen.core.job_registry import CancellationToken
 from gtm_videogen.media._subprocess import probe_media, run_subprocess
+from gtm_videogen.providers.gemini_cli import gemini_transcribe_media, is_gemini_cli_ready
 
 
 def _deterministic_mock_words(
@@ -56,7 +57,20 @@ async def transcribe_video_words(
     probe = await probe_media(video_path, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
     duration_sec = max(1.0, float(probe.duration_sec or 10.0))
 
-    if mock or not resolved.fal_key.strip() or not probe.has_audio:
+    if mock or not probe.has_audio:
+        words = _deterministic_mock_words(fallback_text, duration_sec)
+        return " ".join(w["word"] for w in words), words, duration_sec
+
+    if not resolved.fal_key.strip():
+        if is_gemini_cli_ready(resolved):
+            gem_res = await gemini_transcribe_media(
+                video_path,
+                duration_sec=duration_sec,
+                settings=resolved,
+                cancel=cancel,
+            )
+            if gem_res is not None:
+                return gem_res[0], gem_res[1], duration_sec
         words = _deterministic_mock_words(fallback_text, duration_sec)
         return " ".join(w["word"] for w in words), words, duration_sec
 

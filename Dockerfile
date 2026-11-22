@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     ca-certificates \
     curl \
+    && ARCH="$(uname -m)" \
+    && if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then G_ARCH="arm64"; else G_ARCH="x86_64"; fi \
+    && curl -fsSL "https://github.com/google-gemini/gemini-api-cli/releases/download/v0.5.0/gemini-api_Linux_${G_ARCH}.tar.gz" \
+       | tar -xz -C /usr/local/bin gemini-api \
+    && chmod +x /usr/local/bin/gemini-api \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
