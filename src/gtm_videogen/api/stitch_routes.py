@@ -57,7 +57,10 @@ from gtm_videogen.models.stitch_project import (
     get_stitch_catalog,
     validate_stitch_project,
 )
-from gtm_videogen.providers.genie_world import mint_genie4_browser_session
+from gtm_videogen.providers.genie_world import (
+    mint_genie4_browser_session,
+    verify_gemini_and_genie4_access,
+)
 from gtm_videogen.providers.transcription import transcribe_video_words
 
 stitch_router = APIRouter(prefix="/api/stitch", tags=["stitch"])
@@ -400,6 +403,12 @@ async def create_genie4_session(services: ServicesDep) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Genie 4 session creation failed: {exc}") from exc
+
+
+@stitch_router.post("/gemini/verify")
+async def verify_gemini_key_endpoint(services: ServicesDep) -> dict[str, Any]:
+    """Verify the active or browser-supplied Gemini API key (`AIza...` or `AQ....`) and Genie 4 Paid-Tier readiness."""
+    return await verify_gemini_and_genie4_access(settings=services.settings)
 
 
 @stitch_router.get("/gallery/{filename}")

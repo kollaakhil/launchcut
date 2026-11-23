@@ -1917,7 +1917,13 @@ async def render_single_scene_take(
             except Exception as genie_exc:
                 if has_fal and spec.fallback_id:
                     fb_spec = reg.get_video_model(spec.fallback_id)
-                    await _report(f"Genie 4 unavailable ({str(genie_exc)[:64]}) — switching to {fb_spec.label}...")
+                    err_s = str(genie_exc)
+                    reason = (
+                        "Free Tier has 0 Genie 4 sessions (upgrade at ai.dev/rate-limit)"
+                        if ("free tier" in err_s.lower() or "limit: 0" in err_s.lower())
+                        else err_s[:64]
+                    )
+                    await _report(f"Genie 4 unavailable ({reason}) — switching to {fb_spec.label}...")
                     fb_provider = VideoProvider(
                         settings=resolved,
                         media_store=media_store or MediaStore(media_dir / "store"),

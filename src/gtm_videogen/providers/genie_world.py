@@ -125,10 +125,15 @@ async def mint_genie4_browser_session(
 
     from google import genai
 
-    client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
+    client = genai.Client(
+        api_key=api_key,
+        http_options={"api_version": "v1beta", "timeout": 20000, "retry_options": {"attempts": 1}},
+    )
     interaction = await client.aio.interactions.create(
-        model=GENIE4_MODEL_ID,
+        model="genie-4",
         api_version="v1beta",
+        automatic_continuation=False,
+        timeout=18.0,
     )
     tok_resp = await client.aio.interactions.auth_tokens.create(
         interaction.id,
@@ -147,6 +152,90 @@ async def mint_genie4_browser_session(
         "est_usd_per_sec": GENIE4_USD_PER_SEC,
         "max_session_sec": 120,
     }
+
+
+async def verify_gemini_and_genie4_access(
+    *,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Verify a Gemini API key (`AIza...` or `AQ....`), count visible models, and check Paid-Tier Genie 4 access without billing."""
+    resolved = settings or get_settings()
+    api_key = resolved.effective_gemini_key()
+    if not api_key:
+        return {
+            "valid_key": False,
+            "genie4_listed": False,
+            "genie4_paid_ready": False,
+            "tier": "missing",
+            "models_count": 0,
+            "message": "GEMINI_API_KEY is not set.",
+        }
+
+    import httpx
+
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=12.0) as hc:
+        m_resp = await hc.get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100", headers=headers)
+        if m_resp.status_code != 200:
+            detail = m_resp.text[:200]
+            return {
+                "valid_key": False,
+                "genie4_listed": False,
+                "genie4_paid_ready": False,
+                "tier": "invalid",
+                "models_count": 0,
+                "message": f"Gemini API rejected key (HTTP {m_resp.status_code}): {detail}",
+            }
+        m_json = m_resp.json()
+        model_names = [str(it.get("name") or "") for it in (m_json.get("models") or [])]
+        genie4_listed = "models/genie-4" in model_names
+
+        # Probe Genie 4 session quota and immediately cancel if created (0 frames streamed = $0 billed!)
+        i_resp = await hc.post(
+            "https://generativelanguage.googleapis.com/v1beta/interactions",
+            headers=headers,
+            json={"model": "genie-4"},
+        )
+        if i_resp.status_code in (200, 201):
+            i_data = i_resp.json()
+            inter_id = str(i_data.get("id") or "")
+            if inter_id:
+                with contextlib.suppress(Exception):
+                    await hc.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/interactions/{inter_id}:cancel",
+                        headers=headers,
+                    )
+            return {
+                "valid_key": True,
+                "genie4_listed": genie4_listed,
+                "genie4_paid_ready": True,
+                "tier": "paid",
+                "models_count": len(model_names),
+                "message": f"Gemini & Genie 4 Paid Tier verified ({len(model_names)} models unlocked)!",
+            }
+
+        err_txt = i_resp.text
+        if "Free Tier" in err_txt or "limit: 0" in err_txt:
+            return {
+                "valid_key": True,
+                "genie4_listed": genie4_listed,
+                "genie4_paid_ready": False,
+                "tier": "free",
+                "models_count": len(model_names),
+                "message": (
+                    f"Valid Gemini key ({len(model_names)} models, Gemini 4 text/QA ready), "
+                    "but currently on Free Tier (0 Genie 4 sessions). Enable Billing / Tier 1 at https://ai.dev/rate-limit to unlock Genie 4!"
+                ),
+            }
+
+        return {
+            "valid_key": True,
+            "genie4_listed": genie4_listed,
+            "genie4_paid_ready": False,
+            "tier": "limited",
+            "models_count": len(model_names),
+            "message": f"Valid Gemini key ({len(model_names)} models), Genie 4 returned HTTP {i_resp.status_code}: {err_txt[:160]}",
+        }
 
 
 async def genie4_generate_steered_clip(
@@ -189,10 +278,15 @@ async def genie4_generate_steered_clip(
     video_only_mp4 = tmp_dir / "genie_video.mp4"
     audio_pcm_path = tmp_dir / "genie_audio.pcm"
 
-    client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
+    client = genai.Client(
+        api_key=api_key,
+        http_options={"api_version": "v1beta", "timeout": 20000, "retry_options": {"attempts": 1}},
+    )
     interaction = await client.aio.interactions.create(
-        model=GENIE4_MODEL_ID,
+        model="genie-4",
         api_version="v1beta",
+        automatic_continuation=False,
+        timeout=18.0,
     )
     interaction_id = interaction.id
     completed_cleanly = False
@@ -421,4 +515,5 @@ __all__ = [
     "is_genie4_ready",
     "mint_genie4_browser_session",
     "prepare_genie4_reference_jpeg",
+    "verify_gemini_and_genie4_access",
 ]

@@ -2136,10 +2136,28 @@
       }
     }
 
+    function _getBrowserGeminiKey() {
+      try {
+        return (localStorage.getItem('stitch_gemini_api_key') || '').trim();
+      } catch {
+        return '';
+      }
+    }
+
+    function _browserKeyHeaders() {
+      const k = _getBrowserGeminiKey();
+      return k.length >= 12 ? { 'X-Gemini-Api-Key': k } : {};
+    }
+
     async function api(path, opts = {}) {
+      const mergedHeaders = {
+        'Content-Type': 'application/json',
+        ..._browserKeyHeaders(),
+        ...(opts.headers || {}),
+      };
       const res = await fetch(path, {
-        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
         ...opts,
+        headers: mergedHeaders,
       });
       let data = null;
       try { data = await res.json(); } catch {}
@@ -2188,7 +2206,7 @@
           api('/api/stitch/projects'),
         ]);
         state.catalog = cat;
-        if (!cat.live_video_ready && !cat.live_llm_ready) {
+        if (!cat.live_video_ready && !cat.live_llm_ready && !cat.live_gemini_ready) {
           setMockMode(true);
         }
         populateCatalogControls();
@@ -2240,11 +2258,21 @@
       updateLiveCostEstimate();
     }
 
+    function _promptGeminiKeyIfMissing(val) {
+      if ((val === 'models/genie-4' || val === 'gemini-omni-1.2-flash') && !state.mockMode && !state.catalog?.live_gemini_ready && !_getBrowserGeminiKey()) {
+        openModelsModal().then(() => {
+          document.getElementById('browser-gemini-key-input')?.focus();
+        });
+        showBanner('Paste your Google AI Studio Gemini key (AQ.… or AIza…) in ⚙ Models to activate Genie 4 & Gemini CLI!', 'info');
+      }
+    }
+
     function onQualityTierChange(val) {
       const sv = document.getElementById('spark-video-model');
       if (sv && val) sv.value = val;
       if (val === 'mock') setMockMode(true);
       updateLiveCostEstimate();
+      _promptGeminiKeyIfMissing(val);
     }
 
     function onSparkModelChange(val) {
@@ -2252,6 +2280,7 @@
       if (qt && Array.from(qt.options).some(o => o.value === val)) qt.value = val;
       if (val === 'mock') setMockMode(true);
       updateLiveCostEstimate();
+      _promptGeminiKeyIfMissing(val);
     }
 
     function updateLiveCostEstimate() {
@@ -4367,12 +4396,33 @@
       if (keyBox) {
         const falOk = Boolean(cat.live_video_ready);
         const llmOk = Boolean(cat.live_llm_ready);
-        const gemOk = Boolean(cat.live_gemini_ready);
+        const savedBrowserKey = _getBrowserGeminiKey();
+        const gemOk = Boolean(cat.live_gemini_ready || savedBrowserKey.length >= 12);
+        const masked = savedBrowserKey.length >= 12
+          ? `${savedBrowserKey.slice(0, 6)}…${savedBrowserKey.slice(-4)}`
+          : '';
         keyBox.innerHTML = `
-          <span class="tag-pill ${falOk ? 'ok' : 'warn'}">${falOk ? '✓ fal.ai Ready' : '⚠ Missing FAL_KEY'}</span>
-          <span class="tag-pill ${llmOk ? 'ok' : 'warn'}">${llmOk ? '✓ OpenRouter Ready' : '⚠ Missing OPENROUTER_API_KEY'}</span>
-          <span class="tag-pill ${gemOk ? 'ok' : 'warn'}">${gemOk ? '✓ Gemini & Genie 4 Ready' : '⚠ GEMINI_API_KEY not set'}</span>
-          ${!gemOk ? '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:var(--coral);">Get Paid-Tier Gemini Key for Genie 4 →</a>' : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;">
+            <span class="tag-pill ${falOk ? 'ok' : 'warn'}">${falOk ? '✓ fal.ai Ready' : '⚠ Missing FAL_KEY'}</span>
+            <span class="tag-pill ${llmOk ? 'ok' : 'warn'}">${llmOk ? '✓ OpenRouter Ready' : '⚠ Missing OPENROUTER_API_KEY'}</span>
+            <span class="tag-pill ${gemOk ? 'ok' : 'warn'}">${gemOk ? (savedBrowserKey ? `✓ Gemini Key (${esc(masked)})` : '✓ Gemini & Genie 4 Server Key') : '⚠ GEMINI_API_KEY not set'}</span>
+          </div>
+          <div style="width:100%;background:var(--bg-paper);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:4px;display:flex;flex-direction:column;gap:7px;">
+            <div style="font-size:12px;font-weight:700;color:var(--ink);">
+              🔑 Connect Google Gemini / Genie 4 API Key <span style="font-weight:500;color:var(--ink-muted);">(supports <code>AQ.…</code> &amp; <code>AIza…</code> — stored privately in your browser)</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input class="field-input" id="browser-gemini-key-input" type="password" autocomplete="off"
+                style="flex:1;min-width:220px;"
+                value="${esc(savedBrowserKey)}"
+                placeholder="Paste Google AI Studio key (AQ.… or AIza…) or set GEMINI_API_KEY on Render" />
+              <button type="button" class="mini-btn" style="font-weight:700;" onclick="saveAndVerifyGeminiKeyUI()">✓ Save &amp; Check Tier</button>
+              ${savedBrowserKey ? '<button type="button" class="mini-btn danger" onclick="clearBrowserGeminiKeyUI()">Clear</button>' : ''}
+            </div>
+            <div id="gemini-tier-result" style="font-size:11.5px;color:var(--ink-soft);">
+              Note: Genie 4 (<code>models/genie-4</code>) and Gemini Omni Video require Billing / Paid Tier 1 enabled on your Google AI Studio key (<a href="https://ai.dev/rate-limit" target="_blank" rel="noopener" style="color:var(--coral);font-weight:700;">ai.dev/rate-limit</a>).
+            </div>
+          </div>
         `;
       }
       document.getElementById('models-list').innerHTML = models.map(m => `
@@ -4400,6 +4450,41 @@
           </div>
         </div>
       `).join('');
+    }
+
+    async function saveAndVerifyGeminiKeyUI() {
+      const inp = document.getElementById('browser-gemini-key-input');
+      const val = (inp?.value || '').trim();
+      if (val.length < 12) {
+        showBanner('Paste a valid Google AI Studio API key (AQ.… or AIza…) first.', 'error');
+        return;
+      }
+      try {
+        localStorage.setItem('stitch_gemini_api_key', val);
+      } catch {}
+      const resBox = document.getElementById('gemini-tier-result');
+      if (resBox) resBox.textContent = 'Checking Gemini API key & Genie 4 tier…';
+      try {
+        const ver = await api('/api/stitch/gemini/verify', { method: 'POST' });
+        if (state.catalog) state.catalog.live_gemini_ready = Boolean(ver.valid_key);
+        renderModelsList();
+        const boxAfter = document.getElementById('gemini-tier-result');
+        if (boxAfter) {
+          const col = ver.genie4_paid_ready ? '#15803D' : (ver.valid_key ? '#B45309' : '#B91C1C');
+          boxAfter.innerHTML = `<strong style="color:${col};">${esc(ver.message || '')}</strong>`;
+        }
+        showBanner(ver.message || 'Saved Gemini API key in browser!', ver.valid_key ? 'success' : 'error');
+      } catch (err) {
+        if (resBox) resBox.textContent = `Verification error: ${err.message}`;
+      }
+    }
+
+    async function clearBrowserGeminiKeyUI() {
+      try { localStorage.removeItem('stitch_gemini_api_key'); } catch {}
+      const cat = await api('/api/stitch/catalog');
+      state.catalog = cat;
+      renderModelsList();
+      showBanner('Cleared browser-saved Gemini API key.', 'info');
     }
 
     async function pickModelFromModal(modelId) {

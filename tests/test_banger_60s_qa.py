@@ -619,6 +619,15 @@ async def test_genie4_registry_and_real_progress_bar_stages(tmp_path: Path, monk
         assert cat["live_gemini_ready"] is False
         assert any(m["id"] == "models/genie-4" for m in cat["video_models"])
 
+        # Private browser X-Gemini-Api-Key header activates live_gemini_ready per-request without mutating global env!
+        cat_hdr = client.get(
+            "/api/stitch/catalog",
+            headers={"X-Gemini-Api-Key": "AQ.test_dummy_key_for_header_isolation"},
+        ).json()
+        assert cat_hdr["live_gemini_ready"] is True
+        assert client.get("/api/stitch/catalog").json()["live_gemini_ready"] is False
+        assert 'id="browser-gemini-key-input"' in html
+
         gs = client.post("/api/stitch/genie/session")
         assert gs.status_code == 400
         assert "GEMINI_API_KEY" in gs.json()["detail"]

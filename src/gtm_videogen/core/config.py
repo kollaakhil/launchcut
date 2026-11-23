@@ -91,15 +91,30 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="GTM_LOG_LEVEL")
 
     def effective_gemini_key(self) -> str:
-        """Return GEMINI_API_KEY or GOOGLE_API_KEY interchangeably."""
+        """Return GEMINI_API_KEY, GOOGLE_API_KEY, GENIE_API_KEY, or `~/.config/gemini-api/config.yaml`."""
         import os
+        import re
 
-        return (
+        direct = (
             self.gemini_api_key.strip()
             or self.google_api_key.strip()
             or os.getenv("GEMINI_API_KEY", "").strip()
             or os.getenv("GOOGLE_API_KEY", "").strip()
+            or os.getenv("GENIE_API_KEY", "").strip()
+            or os.getenv("GOOGLE_GEMINI_API_KEY", "").strip()
         )
+        if direct:
+            return direct
+        cfg_file = Path.home() / ".config" / "gemini-api" / "config.yaml"
+        if cfg_file.is_file():
+            try:
+                raw = cfg_file.read_text(encoding="utf-8", errors="ignore")
+                m = re.search(r"""^\s*api[_-]?key\s*:\s*['"]?([A-Za-z0-9_.\-]{16,})['"]?\s*$""", raw, re.M)
+                if m:
+                    return m.group(1).strip()
+            except Exception:
+                pass
+        return ""
 
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

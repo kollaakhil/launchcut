@@ -21,7 +21,7 @@ import re
 import shutil
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, Protocol, runtime_checkable
@@ -38,6 +38,7 @@ from gtm_videogen.core.media_store import MediaStore, MediaStoreError
 from gtm_videogen.core.run_store import RunStore
 from gtm_videogen.media.manim_renderer import manim_diagnostics
 from gtm_videogen.models.schemas import CostLedger, RunInput, RunState
+from gtm_videogen.providers.gemini_cli import resolve_gemini_cli_bin
 
 EventCallback = Callable[[dict[str, Any]], Awaitable[None] | None]
 
@@ -283,7 +284,20 @@ class AppServices:
 
 
 def _get_services(request: Request) -> AppServices:
-    return request.app.state.services  # type: ignore[no-any-return]
+    base: AppServices = request.app.state.services  # type: ignore[assignment]
+    hdr_gemini = request.headers.get("x-gemini-api-key", "").strip()
+    hdr_fal = request.headers.get("x-fal-key", "").strip()
+    hdr_or = request.headers.get("x-openrouter-api-key", "").strip()
+    overrides: dict[str, Any] = {}
+    if len(hdr_gemini) >= 12:
+        overrides["gemini_api_key"] = hdr_gemini
+    if len(hdr_fal) >= 12:
+        overrides["fal_key"] = hdr_fal
+    if len(hdr_or) >= 12:
+        overrides["openrouter_api_key"] = hdr_or
+    if overrides:
+        return replace(base, settings=base.settings.model_copy(update=overrides))
+    return base
 
 
 def _parse_byte_range(range_header: str, file_size: int) -> tuple[int, int] | None:
@@ -342,11 +356,12 @@ router = APIRouter(prefix="/api")
 
 @router.get("/health")
 async def health_check(services: ServicesDep) -> dict[str, Any]:
-    """Report live local tool availability (`ffmpeg`, `ffprobe`, `tesseract`, `manim`)."""
+    """Report live local tool availability (`ffmpeg`, `ffprobe`, `tesseract`, `gemini_cli`, `manim`)."""
     settings = services.settings
     ffmpeg_ok = shutil.which(settings.ffmpeg_bin) is not None
     ffprobe_ok = shutil.which(settings.ffprobe_bin) is not None
     tesseract_ok = shutil.which(settings.tesseract_bin) is not None
+    gemini_cli_ok = resolve_gemini_cli_bin(settings) is not None
     manim_info = manim_diagnostics()
 
     llm_ready = any(
@@ -355,7 +370,7 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             settings.openrouter_api_key,
             settings.openai_api_key,
             settings.anthropic_api_key,
-            settings.google_api_key,
+            settings.effective_gemini_key(),
         )
     )
     fal_ready = bool(settings.fal_key)
@@ -369,6 +384,7 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
             "ffmpeg": ffmpeg_ok,
             "ffprobe": ffprobe_ok,
             "tesseract": tesseract_ok,
+            "gemini_cli": gemini_cli_ok,
             "fonts": fonts_ok,
             "ffmpeg_threads": int(os.getenv("GTM_FFMPEG_THREADS", "2") or "2"),
             "manim": bool(manim_info.get("available", False)),
