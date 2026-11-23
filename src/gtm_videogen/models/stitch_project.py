@@ -326,6 +326,8 @@ class StitchProject(BaseModel):
     campaign_pack_paths: dict[str, str] = Field(default_factory=dict)
     status: str = "draft"  # draft | validated | shooting | stitching | done | failed
     status_message: str = "Ready to review on your Pinboard."
+    progress_pct: int = 0
+    progress_stage: str = ""
     error: str | None = None
     actual_usd: float = 0.0
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

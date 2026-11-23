@@ -359,6 +359,7 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
         )
     )
     fal_ready = bool(settings.fal_key)
+    gemini_ready = bool(settings.effective_gemini_key())
 
     fonts_ok = (Path(settings.fonts_dir) / "Roboto-Bold.ttf").is_file()
 
@@ -375,7 +376,8 @@ async def health_check(services: ServicesDep) -> dict[str, Any]:
         "api_keys": {
             "llm": llm_ready,
             "fal": fal_ready,
-            "live_ready": llm_ready and fal_ready,
+            "gemini": gemini_ready,
+            "live_ready": llm_ready and (fal_ready or gemini_ready),
         },
         "features": {
             "upgrades_v2": True,

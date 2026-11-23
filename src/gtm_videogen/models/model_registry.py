@@ -31,8 +31,8 @@ class VideoModelSpec(BaseModel):
     id: str = Field(..., min_length=2)
     i2v_id: str | None = None
     label: str = Field(..., min_length=2)
-    tier: str = "master"  # smart | draft | master | 4k | audio | mock | custom
-    provider: Literal["fal", "gemini", "openrouter", "mock"] = "fal"
+    tier: str = "master"  # smart | draft | master | 4k | audio | world | mock | custom
+    provider: Literal["fal", "gemini", "genie", "openrouter", "mock"] = "fal"
     resolution: str = "1080p"
     prompt_style: PromptStyle = "structured_json"
     durations_sec: list[int] = Field(default_factory=lambda: [5, 8, 10, 15])
@@ -391,6 +391,29 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         badge="Gemini CLI Native",
     ),
     VideoModelSpec(
+        id="models/genie-4",
+        i2v_id="models/genie-4",
+        label="Google Genie 4 (Live World Stream)",
+        tier="world",
+        provider="genie",
+        resolution="720p",
+        prompt_style="cinematic_prose",
+        durations_sec=[5, 8, 10, 15, 20, 30, 45, 60],
+        default_duration_sec=15,
+        duration_format="int",
+        max_prompt_chars=1800,
+        supports_start_frame=True,
+        supports_end_frame=False,
+        supports_elements=False,
+        supports_native_audio=True,
+        supports_negative_prompt=False,
+        aspect_ratios=["16:9"],
+        est_usd_per_sec=0.1008,
+        est_usd_per_sec_audio=0.1008,
+        fallback_id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+        badge="Continuous 60s World",
+    ),
+    VideoModelSpec(
         id="mock",
         i2v_id="mock",
         label="Studio Animatic ($0 Offline)",
@@ -539,6 +562,8 @@ class ModelRegistryStore:
         # Safe alias for legacy playground-gated kling/v4 non-flash IDs
         if clean in ("kling/v4/text-to-video", "kling/v4/image-to-video"):
             clean = "fal-ai/kling-video/v3/pro/text-to-video"
+        elif clean in ("genie-4", "google/genie-4"):
+            clean = "models/genie-4"
         for m in self.list_video_models():
             if m.id == clean or (m.i2v_id and m.i2v_id == clean):
                 return m

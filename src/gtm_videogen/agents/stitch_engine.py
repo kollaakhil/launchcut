@@ -102,6 +102,10 @@ from gtm_videogen.providers.gemini_cli import (
     gemini_generate_video,
     is_gemini_cli_ready,
 )
+from gtm_videogen.providers.genie_world import (
+    genie4_generate_steered_clip,
+    is_genie4_ready,
+)
 from gtm_videogen.providers.scraper import BrandScraper
 from gtm_videogen.providers.transcription import transcribe_video_words
 from gtm_videogen.providers.url_capture import capture_url_viewport_png, download_public_image
@@ -1585,6 +1589,8 @@ async def ensure_master_world_anchor(
     anchor_file = media_dir / f"master_world_anchor_{uuid4().hex[:6]}.jpg"
     prompt = project.compile_scene_keyframe_prompt(first_ai_idx, is_end=False)
 
+    project.progress_pct = max(project.progress_pct, 10)
+    project.progress_stage = "1/4 · Locking 60s World Anchor"
     project.status_message = "Locking 60s Master World & Hero Anchor Sheet..."
     if on_progress is not None:
         res = on_progress(project)
@@ -1648,7 +1654,7 @@ async def render_single_scene_take(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """Render ONE Scene/Act as a versioned Take with Smart Multi-Model Routing, Last-Frame Chaining & Cross-Graphic Continuity."""
+    """Render ONE Scene/Act as a versioned Take with Smart Multi-Model Routing, Genie 4 World Streaming & Last-Frame Chaining."""
     resolved = settings or get_settings()
     reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
     idx = max(0, min(scene_idx, len(project.scenes) - 1))
@@ -1668,9 +1674,17 @@ async def render_single_scene_take(
     )
     has_fal = bool(resolved.fal_key.strip())
     has_gemini = is_gemini_cli_ready(resolved)
+    has_genie = is_genie4_ready(resolved)
+
+    genie_fallback_note = ""
+    if spec.provider == "genie" and not has_genie and has_fal and not mock and spec.fallback_id:
+        spec = reg.get_video_model(spec.fallback_id)
+        genie_fallback_note = " (GEMINI_API_KEY not set — using Kling 2.5 Turbo)"
+
     use_mock = (
         mock
         or spec.provider == "mock"
+        or (spec.provider == "genie" and not has_genie and not has_fal)
         or (spec.provider == "gemini" and not has_gemini)
         or (spec.provider == "fal" and not has_fal and not has_gemini)
     )
@@ -1684,9 +1698,18 @@ async def render_single_scene_take(
     accent_rgb = _hex_to_rgb(palette[1] if len(palette) > 1 else "#E54D3A", (229, 77, 58))
     text_rgb = _hex_to_rgb(palette[2] if len(palette) > 2 else "#F6E7D4", (246, 231, 212))
 
-    async def _report(msg: str) -> None:
+    n_acts = max(1, len(project.scenes))
+    done_before = sum(1 for s in project.scenes if s.winning_take() is not None and s.scene_id != sc.scene_id)
+    act_start_pct = 12 + int(68 * done_before / n_acts)
+    act_end_pct = 12 + int(68 * min(n_acts, done_before + 1) / n_acts)
+
+    async def _report(msg: str, *, pct: int | None = None, stage: str | None = None) -> None:
         sc.render_message = msg
         project.status_message = msg
+        if pct is not None:
+            project.progress_pct = max(0, min(100, int(pct)))
+        if stage is not None:
+            project.progress_stage = stage
         if on_progress is not None:
             res = on_progress(project)
             if asyncio.iscoroutine(res):
@@ -1695,6 +1718,8 @@ async def render_single_scene_take(
     sc.render_status = "rendering"
     sc.render_error = None
     project.status = "shooting"
+    project.progress_pct = max(project.progress_pct if project.progress_pct < 85 else 12, act_start_pct)
+    project.progress_stage = f"2/4 · Act {idx + 1}/{n_acts}"
     take_num = (max((t.take_id for t in sc.takes), default=0)) + 1
     out_clip = media_dir / f"{sc.scene_id}_take{take_num}.mp4"
     chained_from_prev = False
@@ -1706,7 +1731,7 @@ async def render_single_scene_take(
         if idx > 0 and sc.continues_from_prev:
             prev_win = project.scenes[idx - 1].winning_take()
             if prev_win and Path(prev_win.clip_path).is_file():
-                await _report(f"Extracting final pixel frame from Scene {idx} for seamless chain...")
+                await _report(f"Act {idx + 1}/{n_acts} · Extracting final frame from Act {idx} for seamless chain...")
                 chain_jpg = media_dir / f"{sc.scene_id}_chained_start_t{take_num}.jpg"
                 await extract_last_frame_jpeg(
                     Path(prev_win.clip_path),
@@ -1745,7 +1770,7 @@ async def render_single_scene_take(
         )
         if has_uploaded_clip:
             assert sc.user_clip is not None
-            await _report(f"Normalizing {sc.title} ({sc.user_clip.framing}, loudnorm)...")
+            await _report(f"Act {idx + 1}/{n_acts} · Normalizing {sc.title} ({sc.user_clip.framing}, loudnorm)...")
             _, norm_dur = await normalize_user_clip_take(
                 clip_spec=sc.user_clip,
                 output_path=out_clip,
@@ -1776,7 +1801,7 @@ async def render_single_scene_take(
                 world_id=project.world_preset,
             )
             label = f"Motion Graphic · {gspec.template_id.replace('_', ' ').title()} ($0)"
-            await _report(f"Rendering {sc.title} · Take {take_num} ({label})...")
+            await _report(f"Act {idx + 1}/{n_acts} · Rendering {sc.title} ({label})...")
             await render_motion_template_mp4(
                 spec=gspec,
                 output_path=out_clip,
@@ -1803,7 +1828,7 @@ async def render_single_scene_take(
         # 2C. Legacy $0 Kinetic UI Scene OR $0 Offline Animatic Take
         elif sc.kind == "kinetic_ui" or use_mock:
             label = "Kinetic UI ($0)" if sc.kind == "kinetic_ui" else "Studio Animatic ($0)"
-            await _report(f"Rendering {sc.title} · Take {take_num} ({label})...")
+            await _report(f"Act {idx + 1}/{n_acts} · Rendering {sc.title} ({label})...")
             hero_img: Path | None = None
             if sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file():
                 hero_img = Path(sc.start_keyframe_path)
@@ -1840,9 +1865,95 @@ async def render_single_scene_take(
                 usd=0.0,
                 chained_from_prev=chained_from_prev,
             )
+        # 2D. Google DeepMind Genie 4 Live World Stream (models/genie-4 via Gemini Interactions API)
+        elif spec.provider == "genie":
+            target_g_dur = spec.snap_duration(sc.duration_sec)
+            await _report(
+                f"Act {idx + 1}/{n_acts} · Streaming Genie 4 Live World ({target_g_dur}s @ 24fps + stereo audio)..."
+            )
+            seed_img_p: Path | None = None
+            if sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file():
+                seed_img_p = Path(sc.start_keyframe_path)
+            elif project.master_anchor_path and Path(project.master_anchor_path).is_file():
+                seed_img_p = Path(project.master_anchor_path)
+            elif project.elements and Path(project.elements[0].image_path).is_file():
+                seed_img_p = Path(project.elements[0].image_path)
+
+            compiled_prompt = project.compile_scene_for_spec(idx, spec)
+            mid_beats = [b.action for b in sc.beats[1:4] if b.action]
+
+            async def _on_genie_sec(sec_done: int, sec_total: int) -> None:
+                frac = min(0.95, sec_done / float(max(1, sec_total)))
+                interp_pct = act_start_pct + int((act_end_pct - act_start_pct) * frac)
+                await _report(
+                    f"Act {idx + 1}/{n_acts} · Streaming Genie 4 World ({sec_done}/{sec_total}s captured)...",
+                    pct=interp_pct,
+                )
+
+            try:
+                _, g_usd = await genie4_generate_steered_clip(
+                    prompt=compiled_prompt,
+                    out_path=out_clip,
+                    duration_sec=target_g_dur,
+                    camera_spec=sc.camera_spec,
+                    audio_direction=project.audio_direction,
+                    start_image_path=seed_img_p,
+                    mid_beat_prompts=mid_beats,
+                    settings=resolved,
+                    on_frame_progress=_on_genie_sec,
+                    cancel=cancel,
+                )
+                probe = await probe_media(out_clip, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+                take = StitchTake(
+                    take_id=take_num,
+                    engine_id=spec.id,
+                    engine_label=spec.label,
+                    clip_path=str(out_clip),
+                    duration_sec=round(float(probe.duration_sec or target_g_dur), 2),
+                    usd=g_usd,
+                    chained_from_prev=chained_from_prev,
+                )
+                project.actual_usd = round(project.actual_usd + g_usd, 4)
+            except Exception as genie_exc:
+                if has_fal and spec.fallback_id:
+                    fb_spec = reg.get_video_model(spec.fallback_id)
+                    await _report(f"Genie 4 unavailable ({str(genie_exc)[:64]}) — switching to {fb_spec.label}...")
+                    fb_provider = VideoProvider(
+                        settings=resolved,
+                        media_store=media_store or MediaStore(media_dir / "store"),
+                        cost_meter=CostMeter(run_id=f"{project.project_id}_{sc.scene_id}_gfb", cap_usd=15.0),
+                        usd_per_sec=fb_spec.est_usd_per_sec,
+                    )
+                    fb_start = encode_image_data_uri(seed_img_p) if seed_img_p else chained_start_uri
+                    rendered = await fb_provider.generate_from_registry(
+                        spec=fb_spec,
+                        shot_id=f"{sc.scene_id}_t{take_num}_gfb",
+                        prompt=project.compile_scene_for_spec(idx, fb_spec),
+                        duration_sec=fb_spec.snap_duration(sc.duration_sec),
+                        aspect=project.aspect_ratio,
+                        fps=fps,
+                        start_image=fb_start,
+                        negative_prompt=", ".join(project.negative_constraints),
+                        generate_audio=want_native_audio,
+                        cancel=cancel,
+                    )
+                    shutil.copyfile(rendered.path, out_clip)
+                    probe = await probe_media(out_clip, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
+                    take = StitchTake(
+                        take_id=take_num,
+                        engine_id=fb_spec.id,
+                        engine_label=fb_spec.label,
+                        clip_path=str(out_clip),
+                        duration_sec=round(float(probe.duration_sec or sc.duration_sec), 2),
+                        usd=round(float(rendered.usd), 4),
+                        chained_from_prev=chained_from_prev,
+                    )
+                    project.actual_usd = round(project.actual_usd + float(rendered.usd), 4)
+                else:
+                    raise
         elif spec.provider == "gemini" or (not has_fal and has_gemini):
             gem_label = spec.label if spec.provider == "gemini" else "Google Gemini Omni 1.2 (Gemini CLI)"
-            await _report(f"Shooting {sc.title} · Take {take_num} via {gem_label}...")
+            await _report(f"Act {idx + 1}/{n_acts} · Shooting {sc.title} via {gem_label}...")
             start_local: Path | None = (
                 Path(sc.start_keyframe_path)
                 if sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file()
@@ -1877,7 +1988,7 @@ async def render_single_scene_take(
         else:
             # 3. Live Multi-Model AI Video Render (Smart Router, Kling 2.5/3.0, Seedance, Wan 2.5, Hailuo 2.3, Veo 3, or Custom)
             await _report(
-                f"Shooting {sc.title} · Take {take_num} via {spec.label} ({spec.snap_duration(sc.duration_sec)}s)..."
+                f"Act {idx + 1}/{n_acts} · Shooting {sc.title} via {spec.label} ({spec.snap_duration(sc.duration_sec)}s){genie_fallback_note}..."
             )
             start_ref: str | None = chained_start_uri
             if not start_ref:
@@ -1972,10 +2083,16 @@ async def render_single_scene_take(
         sc.winning_take_id = take.take_id
         sc.render_status = "done"
         sc.render_message = f"Take {take.take_id} ready ({take.engine_label})."
-        project.status_message = f"{sc.title} · Take {take.take_id} ready."
+        project.progress_pct = max(project.progress_pct, act_end_pct)
+        project.progress_stage = f"2/4 · Completed Act {idx + 1}/{n_acts}"
+        project.status_message = f"Act {idx + 1}/{n_acts} · Take {take.take_id} ready ({take.engine_label})."
         if not any(s.render_status == "rendering" for s in project.scenes):
             all_shot = all(s.winning_take() is not None for s in project.scenes)
             project.status = "done" if all_shot else "validated"
+        if on_progress is not None:
+            res = on_progress(project)
+            if asyncio.iscoroutine(res):
+                await res
         return project
     except Exception as exc:
         sc.render_status = "failed"
@@ -2000,7 +2117,9 @@ async def render_all_scenes(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """Render independent $0 Motion Graphics concurrently (512MB-safe Semaphore(2)), then shoot AI acts sequentially for pixel-locked continuity."""
+    """Sequentially render all Acts (512MB Render safe) with live progress_pct, then stitch & run QA once."""
+    project.progress_pct = 8
+    project.progress_stage = "1/4 · Preparing Shoot"
     if engine_id != "mock":
         await ensure_master_world_anchor(
             project,
@@ -2047,77 +2166,77 @@ def _synthesize_riser_bed_wav(
     *,
     graphic_start_times: list[float] | None = None,
 ) -> Path:
-    """Synthesize a 4-stage cinematic launch score (Intro -> Build -> Drop/Climax -> Resolve) with Act seam & tactile UI accents."""
+    """Synthesize a 4-stage cinematic launch score in 4,096-sample chunks (~8 KB RAM)."""
     sr = 24000
     dur = max(2.0, float(duration_sec))
     n = max(sr, int(sr * dur))
-    frames = bytearray()
     two_pi = 2.0 * math.pi
     pulse_hz = 1.85  # ~111 BPM subtle modern launch pulse
     ui_cues = list(graphic_start_times or [])
-    for i in range(n):
-        t = i / sr
-        arc_p = t / dur
-        fade_in = min(1.0, t / 0.55)
-        fade_out = min(1.0, max(0.0, (dur - t) / 0.85))
-
-        # 4-stage dramatic energy contour across the film
-        if arc_p < 0.20:
-            arc_gain = 0.72 + 0.15 * (arc_p / 0.20)
-        elif arc_p < 0.50:
-            arc_gain = 0.87 + 0.18 * ((arc_p - 0.20) / 0.30)
-        elif arc_p < 0.84:
-            arc_gain = 1.08 + 0.12 * math.sin(math.pi * (arc_p - 0.50) / 0.34)
-        else:
-            arc_gain = 0.95 - 0.20 * ((arc_p - 0.84) / 0.16)
-
-        riser = 0.0
-        impact = 0.0
-        for st in seam_times:
-            dist = t - st
-            if -0.75 <= dist <= 0.30:
-                riser = max(riser, math.exp(-((dist / 0.30) ** 2)) * 0.48)
-            if 0.0 <= dist <= 0.28:
-                impact = max(impact, math.exp(-dist * 12.0) * 0.55)
-
-        ui_tick = 0.0
-        for gt in ui_cues:
-            dt = t - gt
-            if 0.0 <= dt <= 0.14:
-                ui_tick = max(ui_tick, math.exp(-dt * 28.0) * 0.32)
-
-        # Warm root + fifth + octave + climax shimmer harmonics
-        sub = 0.42 * math.sin(two_pi * 65.41 * t)
-        pad = (
-            0.30 * math.sin(two_pi * 130.81 * t)
-            + 0.26 * math.sin(two_pi * 196.00 * t)
-            + 0.20 * math.sin(two_pi * 261.63 * t)
-        )
-        if arc_p >= 0.22:
-            # Subtle rhythmic pulse & shimmer entering in Act 2+
-            beat_env = 0.5 + 0.5 * math.sin(two_pi * pulse_hz * t)
-            pad += 0.14 * beat_env * math.sin(two_pi * 329.63 * t)
-        if arc_p >= 0.48:
-            # Climax high-harmonic warmth
-            pad += 0.12 * math.sin(two_pi * 392.00 * t)
-
-        sample = sub + pad
-        if riser > 0.04:
-            sample += 0.26 * riser * math.sin(two_pi * (392.0 + 130.0 * riser) * t)
-        if impact > 0.02:
-            sample += 0.38 * impact * math.sin(two_pi * 55.0 * t)
-        if ui_tick > 0.01:
-            sample += ui_tick * (0.22 * math.sin(two_pi * 880.0 * t) + 0.14 * math.sin(two_pi * 1318.5 * t))
-
-        env = fade_in * fade_out * arc_gain * (0.82 + 0.10 * math.sin(two_pi * 0.22 * t) + riser * 0.35)
-        val = int(max(-32767, min(32767, sample * env * 4700.0)))
-        frames.extend(struct.pack("<h", val))
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    chunk_buf = bytearray()
     with wave.open(str(out_path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sr)
-        wf.writeframes(bytes(frames))
+        for i in range(n):
+            t = i / sr
+            arc_p = t / dur
+            fade_in = min(1.0, t / 0.55)
+            fade_out = min(1.0, max(0.0, (dur - t) / 0.85))
+
+            if arc_p < 0.20:
+                arc_gain = 0.72 + 0.15 * (arc_p / 0.20)
+            elif arc_p < 0.50:
+                arc_gain = 0.87 + 0.18 * ((arc_p - 0.20) / 0.30)
+            elif arc_p < 0.84:
+                arc_gain = 1.08 + 0.12 * math.sin(math.pi * (arc_p - 0.50) / 0.34)
+            else:
+                arc_gain = 0.95 - 0.20 * ((arc_p - 0.84) / 0.16)
+
+            riser = 0.0
+            impact = 0.0
+            for st in seam_times:
+                dist = t - st
+                if -0.75 <= dist <= 0.30:
+                    riser = max(riser, math.exp(-((dist / 0.30) ** 2)) * 0.48)
+                if 0.0 <= dist <= 0.28:
+                    impact = max(impact, math.exp(-dist * 12.0) * 0.55)
+
+            ui_tick = 0.0
+            for gt in ui_cues:
+                dt = t - gt
+                if 0.0 <= dt <= 0.14:
+                    ui_tick = max(ui_tick, math.exp(-dt * 28.0) * 0.32)
+
+            sub = 0.42 * math.sin(two_pi * 65.41 * t)
+            pad = (
+                0.30 * math.sin(two_pi * 130.81 * t)
+                + 0.26 * math.sin(two_pi * 196.00 * t)
+                + 0.20 * math.sin(two_pi * 261.63 * t)
+            )
+            if arc_p >= 0.22:
+                beat_env = 0.5 + 0.5 * math.sin(two_pi * pulse_hz * t)
+                pad += 0.14 * beat_env * math.sin(two_pi * 329.63 * t)
+            if arc_p >= 0.48:
+                pad += 0.12 * math.sin(two_pi * 392.00 * t)
+
+            sample = sub + pad
+            if riser > 0.04:
+                sample += 0.26 * riser * math.sin(two_pi * (392.0 + 130.0 * riser) * t)
+            if impact > 0.02:
+                sample += 0.38 * impact * math.sin(two_pi * 55.0 * t)
+            if ui_tick > 0.01:
+                sample += ui_tick * (0.22 * math.sin(two_pi * 880.0 * t) + 0.14 * math.sin(two_pi * 1318.5 * t))
+
+            env = fade_in * fade_out * arc_gain * (0.82 + 0.10 * math.sin(two_pi * 0.22 * t) + riser * 0.35)
+            val = int(max(-32767, min(32767, sample * env * 4700.0)))
+            chunk_buf.extend(struct.pack("<h", val))
+            if len(chunk_buf) >= 8192:
+                wf.writeframes(bytes(chunk_buf))
+                chunk_buf.clear()
+        if chunk_buf:
+            wf.writeframes(bytes(chunk_buf))
     return out_path
 
 
@@ -2402,8 +2521,12 @@ async def stitch_master_cut(
     raw_t = os.getenv("GTM_FFMPEG_THREADS", "2").strip()
     eff_threads = max(1, int(raw_t)) if raw_t.isdigit() else 2
 
-    async def _report(msg: str) -> None:
+    async def _report(msg: str, *, pct: int | None = None, stage: str | None = None) -> None:
         project.status_message = msg
+        if pct is not None:
+            project.progress_pct = max(0, min(100, int(pct)))
+        if stage is not None:
+            project.progress_stage = stage
         if on_progress is not None:
             res = on_progress(project)
             if asyncio.iscoroutine(res):
@@ -2431,7 +2554,9 @@ async def stitch_master_cut(
     await _report(
         "Stitching Founder A-Roll + Cutaways into Master Cut..."
         if use_aroll_mode
-        else f"Stitching {len(winning_pairs)} Scene(s) into Master Cut..."
+        else f"Normalizing & stitching {len(winning_pairs)} Act(s) into Master Cut...",
+        pct=82,
+        stage="3/4 · Normalizing Clips",
     )
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="stitch_master_"))
@@ -2661,6 +2786,11 @@ async def stitch_master_cut(
                 winning_pairs.append((None, outro_mp4))
 
             for idx, (sc_obj, clip_p) in enumerate(winning_pairs):
+                await _report(
+                    f"Normalizing clip {idx + 1}/{len(winning_pairs)}...",
+                    pct=82 + int(6 * (idx + 1) / max(1, len(winning_pairs))),
+                    stage="3/4 · Normalizing Clips",
+                )
                 probe = await probe_media(clip_p, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
                 has_a = bool(probe.has_audio and preserve_native)
                 if has_a:
@@ -2696,43 +2826,38 @@ async def stitch_master_cut(
                     )
                 norm_paths.append(norm_p)
 
+        await _report(
+            f"Assembling {len(norm_paths)} clip(s) across seam transitions...",
+            pct=89,
+            stage="3/4 · Assembling Seam Transitions",
+        )
         assembled_mp4 = tmp_dir / "assembled.mp4"
         if len(norm_paths) == 1:
             shutil.copyfile(norm_paths[0], assembled_mp4)
         elif project.seam_transition == "micro_dissolve" and len(norm_paths) <= 11:
-            # Memory-safe chunked 0.35s xfade + acrossfade (at most 4 inputs per FFmpeg pass -> <512MB RAM)
+            # Strict pairwise 2-input 0.35s xfade + acrossfade (never decodes >2 1080p streams on 512MB RAM)
             xf = 0.35
             cur_p = norm_paths[0]
             cur_dur = clip_durations[0]
             cursor_idx = 1
             batch_no = 0
+            prev_batch_tmp: Path | None = None
             xf_ok = True
             while cursor_idx < len(norm_paths):
                 batch_no += 1
-                chunk_paths = [cur_p, *norm_paths[cursor_idx : cursor_idx + 3]]
-                chunk_durs = [cur_dur, *clip_durations[cursor_idx : cursor_idx + 3]]
-                cursor_idx += len(chunk_paths) - 1
+                chunk_paths = [cur_p, norm_paths[cursor_idx]]
+                chunk_durs = [cur_dur, clip_durations[cursor_idx]]
+                cursor_idx += 1
                 out_batch = assembled_mp4 if cursor_idx >= len(norm_paths) else (tmp_dir / f"xf_batch_{batch_no}.mp4")
 
                 inputs: list[str] = []
                 for p in chunk_paths:
                     inputs.extend(["-i", str(p)])
-                vf_parts: list[str] = []
-                af_parts: list[str] = []
-                cur_v = "0:v"
-                cur_a = "0:a"
                 offset = max(0.2, chunk_durs[0] - xf)
-                for i in range(1, len(chunk_paths)):
-                    nxt_v = f"v{i}"
-                    nxt_a = f"a{i}"
-                    vf_parts.append(
-                        f"[{cur_v}][{i}:v]xfade=transition=fade:duration={xf:.2f}:offset={offset:.2f}[{nxt_v}]"
-                    )
-                    af_parts.append(f"[{cur_a}][{i}:a]acrossfade=d={xf:.2f}[{nxt_a}]")
-                    cur_v = nxt_v
-                    cur_a = nxt_a
-                    offset = max(0.2, offset + chunk_durs[i] - xf)
-                fc = ";".join([*vf_parts, *af_parts])
+                fc = (
+                    f"[0:v][1:v]xfade=transition=fade:duration={xf:.2f}:offset={offset:.2f}[v1];"
+                    f"[0:a][1:a]acrossfade=d={xf:.2f}[a1]"
+                )
                 xf_cmd = [
                     resolved.ffmpeg_bin,
                     "-y",
@@ -2742,9 +2867,9 @@ async def stitch_master_cut(
                     "-filter_complex",
                     fc,
                     "-map",
-                    f"[{cur_v}]",
+                    "[v1]",
                     "-map",
-                    f"[{cur_a}]",
+                    "[a1]",
                     *_pinned_h264_flags(fps, threads=eff_threads),
                     "-c:a",
                     "aac",
@@ -2759,11 +2884,14 @@ async def stitch_master_cut(
                     str(out_batch),
                 ]
                 rc_xf, _, _ = await run_subprocess(xf_cmd, timeout_sec=180.0, cancel=cancel, check=False)
+                if prev_batch_tmp is not None and prev_batch_tmp != out_batch:
+                    prev_batch_tmp.unlink(missing_ok=True)
                 if rc_xf != 0 or not out_batch.is_file():
                     xf_ok = False
                     break
                 cur_p = out_batch
                 cur_dur = sum(chunk_durs) - xf * (len(chunk_durs) - 1)
+                prev_batch_tmp = out_batch if out_batch != assembled_mp4 else None
 
             if not xf_ok or not assembled_mp4.is_file():
                 # Clean fallback to zero-overhead concat
@@ -2819,6 +2947,11 @@ async def stitch_master_cut(
                 check=True,
             )
 
+        # Free normalized clip disk space inside tmp_dir once assembled_mp4 exists
+        for np in norm_paths:
+            if np.is_file() and np != assembled_mp4:
+                np.unlink(missing_ok=True)
+
         # Compute seam timestamps & Motion Graphic entrance cues for score + tactile UI accents
         seam_times: list[float] = []
         graphic_start_times: list[float] = []
@@ -2834,6 +2967,11 @@ async def stitch_master_cut(
         total_dur = max(3.0, sum(clip_durations))
 
         # Audio Mastering (3 Soundstage Modes)
+        await _report(
+            "Mastering 4-stage score & voiceover (-14 LUFS)...",
+            pct=93,
+            stage="3/4 · Mastering Soundstage & Voiceover",
+        )
         final_tmp = tmp_dir / "master_final.mp4"
         vo_path: Path | None = None
         if project.audio_mode == "vo_plus_ducked_score" and not mock:
@@ -2870,14 +3008,15 @@ async def stitch_master_cut(
                     vo_path = gem_vo
 
         bed_wav = (
-            _synthesize_riser_bed_wav(
+            await asyncio.to_thread(
+                _synthesize_riser_bed_wav,
                 total_dur,
                 seam_times,
                 tmp_dir / "bed.wav",
                 graphic_start_times=graphic_start_times,
             )
             if project.seam_transition == "audio_riser" or len(seam_times) >= 1 or bool(graphic_start_times)
-            else _synthesize_ambient_cinematic_wav(total_dur, tmp_dir / "bed.wav")
+            else await asyncio.to_thread(_synthesize_ambient_cinematic_wav, total_dur, tmp_dir / "bed.wav")
         )
 
         if aroll_audio_spine is not None and aroll_audio_spine.is_file():
@@ -3105,6 +3244,11 @@ async def stitch_master_cut(
                 finish_filters.append(f"ass='{esc_ass}':fontsdir='{esc_fonts}'")
 
         if finish_filters:
+            await _report(
+                "Applying captions & cinema grade...",
+                pct=96,
+                stage="3/4 · Applying Captions & Cinema Grade",
+            )
             fin_tmp = tmp_dir / "master_finished.mp4"
             rc_fin, _, _ = await run_subprocess(
                 [
@@ -3134,6 +3278,15 @@ async def stitch_master_cut(
         _move_output_atomically(final_tmp, master_out)
         project.master_video_path = str(master_out)
         project.campaign_pack_paths[project.aspect_ratio] = str(master_out)
+
+        import gc as _gc
+
+        _gc.collect()
+        await _report(
+            "Running Video QA Scorecard (black/freeze scan, -14 LUFS loudness & OCR)...",
+            pct=98,
+            stage="4/4 · Running Video QA Scorecard",
+        )
         project.qa_report = await evaluate_stitch_master_qa(
             project,
             deep_vision=False,
@@ -3144,8 +3297,10 @@ async def stitch_master_cut(
         qa_sc = project.qa_report.get("banger_score", 0) if project.qa_report else 0
         qa_gr = project.qa_report.get("grade", "") if project.qa_report else ""
         project.status = "done"
-        project.status_message = (
-            f"Master Cut ready ({len(norm_paths)} acts · QA Score {qa_sc}/100 {qa_gr})."
+        await _report(
+            f"Master Cut ready ({len(norm_paths)} acts · QA Score {qa_sc}/100 {qa_gr}).",
+            pct=100,
+            stage="Complete",
         )
         return project
     finally:
@@ -3226,11 +3381,14 @@ async def autofix_from_qa_report(
         media_dir,
         settings=resolved,
         mock=mock,
+        on_progress=on_progress,
         cancel=cancel,
     )
     new_score = (project.qa_report or {}).get("banger_score", 0)
     new_grade = (project.qa_report or {}).get("grade", "")
     project.status = "done"
+    project.progress_pct = 100
+    project.progress_stage = "Complete"
     project.status_message = (
         f"Auto-Polished {repaired_count} act(s) & re-stitched — QA Score now {new_score}/100 ({new_grade})!"
     )
@@ -3247,23 +3405,32 @@ async def autopilot_produce_project(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """1-Click Express Autopilot: Script Gate -> Shoot All Acts -> Master Cut -> QA & Self-Heal."""
+    """1-Click Express Autopilot: Script Gate -> Shoot All Acts (incl. Master Stitch & QA) -> Self-Heal."""
     resolved = settings or get_settings()
     reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
     spec = reg.get_video_model(project.video_model_id)
 
-    async def _step(msg: str) -> None:
+    async def _step(msg: str, *, pct: int | None = None, stage: str | None = None) -> None:
         project.status_message = msg
+        if pct is not None:
+            project.progress_pct = max(0, min(100, int(pct)))
+        if stage is not None:
+            project.progress_stage = stage
         if on_progress is not None:
             res = on_progress(project)
             if asyncio.iscoroutine(res):
                 await res
 
-    await _step("Step 1/4 · Sharpening storyboard & Script Gate...")
+    await _step("Step 1/4 · Sharpening storyboard & Script Gate...", pct=6, stage="1/4 · Storyboard & Script Gate")
     apply_deterministic_script_autofix(project, spec)
     project.target_duration_sec = project.total_duration_sec()
 
-    await _step(f"Step 2/4 · Shooting all {len(project.scenes)} acts ({project.total_duration_sec()}s)...")
+    await _step(
+        f"Step 2/4 · Shooting all {len(project.scenes)} acts ({project.total_duration_sec()}s)...",
+        pct=10,
+        stage=f"2/4 · Shooting {len(project.scenes)} Acts",
+    )
+    # Note: render_all_scenes automatically calls stitch_master_cut + evaluate_stitch_master_qa once all acts finish!
     await render_all_scenes(
         project,
         media_dir,
@@ -3274,18 +3441,23 @@ async def autopilot_produce_project(
         cancel=cancel,
     )
 
-    await _step("Step 3/4 · Mastering soundstage & stitching final film...")
-    await stitch_master_cut(
-        project,
-        media_dir,
-        settings=resolved,
-        mock=mock,
-        cancel=cancel,
-    )
+    if not project.master_video_path or not Path(project.master_video_path).is_file():
+        await stitch_master_cut(
+            project,
+            media_dir,
+            settings=resolved,
+            mock=mock,
+            on_progress=on_progress,
+            cancel=cancel,
+        )
 
     qa = project.qa_report or {}
     if not qa.get("passed", True) and qa.get("auto_fixable", False):
-        await _step("Step 4/4 · QA flagged polish opportunity — auto-healing weak acts...")
+        await _step(
+            "Step 4/4 · QA flagged polish opportunity — auto-healing weak acts...",
+            pct=90,
+            stage="4/4 · Auto-Polishing Weak Acts",
+        )
         await autofix_from_qa_report(
             project,
             media_dir,
@@ -3300,6 +3472,8 @@ async def autopilot_produce_project(
     sc_num = final_qa.get("banger_score", 90)
     sc_grd = final_qa.get("grade", "A")
     project.status = "done"
+    project.progress_pct = 100
+    project.progress_stage = "Complete"
     project.status_message = (
         f"Finished {project.total_duration_sec()}s film · QA Score {sc_num}/100 ({sc_grd})!"
     )
@@ -3594,8 +3768,9 @@ async def apply_director_intent_edit(
             project.seam_transition = "micro_dissolve"
             global_changed = True
 
-        # Detect plain-English multi-model engine requests (e.g. "use seedance", "fast draft", "shoot Act 1 on hailuo")
+        # Detect plain-English multi-model engine requests (e.g. "use seedance", "fast draft", "use genie 4")
         model_intent_map: list[tuple[tuple[str, ...], str]] = [
+            (("genie 4", "genie4", "genie world", "live world"), "models/genie-4"),
             (("seedance", "fast draft", "cheap test", "budget mode"), "fal-ai/bytedance/seedance/v1/lite/text-to-video"),
             (("wan 2.5", "wan2.5", "alibaba wan"), "fal-ai/wan-25-preview/text-to-video"),
             (("hailuo", "minimax"), "fal-ai/minimax/hailuo-2.3/pro/text-to-video"),
@@ -3726,6 +3901,7 @@ async def apply_director_intent_edit(
                 media_dir,
                 settings=resolved,
                 mock=mock,
+                on_progress=on_progress,
                 cancel=cancel,
             )
 

@@ -57,6 +57,7 @@ from gtm_videogen.models.stitch_project import (
     get_stitch_catalog,
     validate_stitch_project,
 )
+from gtm_videogen.providers.genie_world import mint_genie4_browser_session
 from gtm_videogen.providers.transcription import transcribe_video_words
 
 stitch_router = APIRouter(prefix="/api/stitch", tags=["stitch"])
@@ -386,7 +387,19 @@ async def get_catalog(services: ServicesDep) -> dict[str, Any]:
     cat["llm_models"] = BUILTIN_LLM_MODELS
     cat["live_video_ready"] = bool(services.settings.fal_key.strip())
     cat["live_llm_ready"] = bool(services.settings.openrouter_api_key.strip())
+    cat["live_gemini_ready"] = bool(services.settings.effective_gemini_key())
     return cat
+
+
+@stitch_router.post("/genie/session")
+async def create_genie4_session(services: ServicesDep) -> dict[str, Any]:
+    """Mint a single-session Google DeepMind Genie 4 (models/genie-4) auth token safely on the server."""
+    try:
+        return await mint_genie4_browser_session(settings=services.settings)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Genie 4 session creation failed: {exc}") from exc
 
 
 @stitch_router.get("/gallery/{filename}")
@@ -405,6 +418,9 @@ async def list_models(services: ServicesDep) -> dict[str, Any]:
     return {
         "video_models": [m.model_dump() for m in reg.list_video_models()],
         "llm_models": BUILTIN_LLM_MODELS,
+        "live_video_ready": bool(services.settings.fal_key.strip()),
+        "live_llm_ready": bool(services.settings.openrouter_api_key.strip()),
+        "live_gemini_ready": bool(services.settings.effective_gemini_key()),
     }
 
 
@@ -506,13 +522,13 @@ async def get_project(project_id: str, services: ServicesDep) -> dict[str, Any]:
     project = store.load(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Stitch project not found")
-    # Self-heal orphaned shooting/rendering state if no background task is active for this project
+    # Self-heal orphaned shooting/stitching/rendering state if no background task is active for this project
     has_active_task = any(
         k.startswith(f"{project_id}:") and not t.done()
         for k, t in _ACTIVE_STITCH_TASKS.items()
     )
     if not has_active_task and (
-        project.status == "shooting"
+        project.status in ("shooting", "stitching")
         or any(s.render_status == "rendering" for s in project.scenes)
     ):
         for s in project.scenes:
@@ -1260,6 +1276,7 @@ async def stitch_master_endpoint(
             store.media_dir(project_id),
             settings=services.settings,
             mock=payload.mock,
+            on_progress=lambda p: store.save(p),
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1572,6 +1589,7 @@ async def autopilot_endpoint(
         return _serialize_project(project, reg)
 
     pid = project.project_id
+    task_key = f"{pid}:autopilot"
 
     async def _bg_autopilot() -> None:
         try:
@@ -1594,8 +1612,9 @@ async def autopilot_endpoint(
                 if s.render_status == "rendering":
                     s.render_status = "failed"
             store.save(err_proj)
+        finally:
+            _ACTIVE_STITCH_TASKS.pop(task_key, None)
 
-    task_key = f"{pid}:autopilot"
     _ACTIVE_STITCH_TASKS[task_key] = asyncio.create_task(_bg_autopilot())
     return _serialize_project(project, reg)
 

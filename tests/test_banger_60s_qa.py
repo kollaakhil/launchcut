@@ -557,3 +557,125 @@ def test_multimodel_cost_reducer_prose_adapter_and_60s_continuity(tmp_path: Path
         assert done60["qa_report"]["banger_score"] >= 86
 
 
+@pytest.mark.asyncio
+async def test_genie4_registry_and_real_progress_bar_stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify Google Genie 4 world provider helpers, session guard, 0->100% progress stages & single stitch."""
+    import base64
+
+    from fastapi.testclient import TestClient
+    from PIL import Image
+
+    import gtm_videogen.agents.stitch_engine as se
+    from gtm_videogen.api.app import create_app
+    from gtm_videogen.models.model_registry import ModelRegistryStore
+    from gtm_videogen.providers.genie_world import (
+        GENIE4_MODEL_ID,
+        GENIE4_USD_PER_SEC,
+        compile_genie4_world_prompt,
+        prepare_genie4_reference_jpeg,
+    )
+
+    # 1. Registry + alias resolution for Google DeepMind Genie 4
+    reg = ModelRegistryStore(tmp_path / "reg_genie")
+    g4 = reg.get_video_model("genie-4")
+    assert g4.id == GENIE4_MODEL_ID == "models/genie-4"
+    assert g4.provider == "genie"
+    assert g4.est_usd_per_sec == GENIE4_USD_PER_SEC
+    assert g4.supports_native_audio is True
+
+    # 2. <44 KB 16:9 JPEG reference seeder + spatial world prompt adapter
+    big_png = tmp_path / "hero_large.png"
+    Image.new("RGB", (1920, 1920), (42, 88, 140)).save(big_png, format="PNG")
+    ref_b64 = prepare_genie4_reference_jpeg(big_png)
+    assert ref_b64 is not None
+    raw_jpg = base64.b64decode(ref_b64)
+    assert len(raw_jpg) <= 44_000
+
+    world_prompt = compile_genie4_world_prompt(
+        "Warm studio desk, cut to glowing brass dial with orchestral soundtrack",
+        camera_spec="35mm gentle push-in",
+        audio_direction="soft mechanical click and room tone",
+    )
+    assert "cut to" not in world_prompt.lower()
+    assert "spatial" in world_prompt.lower() or "environment" in world_prompt.lower()
+
+    # 3. API catalog, health, UI markup & /genie/session key guard
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    settings = Settings(data_dir=tmp_path / "data_genie", gemini_api_key="", google_api_key="")
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        html = client.get("/").text
+        assert 'value="models/genie-4"' in html
+        assert "serverDriven: true" in html
+        assert "!proj.master_video_url" in html
+        assert 'id="models-key-status"' in html
+
+        health = client.get("/api/health").json()
+        assert "gemini" in health["api_keys"]
+        assert health["api_keys"]["gemini"] is False
+
+        cat = client.get("/api/stitch/catalog").json()
+        assert cat["live_gemini_ready"] is False
+        assert any(m["id"] == "models/genie-4" for m in cat["video_models"])
+
+        gs = client.post("/api/stitch/genie/session")
+        assert gs.status_code == 400
+        assert "GEMINI_API_KEY" in gs.json()["detail"]
+
+    # 4. Track real server-driven progress_pct / progress_stage & verify stitch_master_cut runs ONCE in autopilot!
+    proj = await se.compile_stitch_project(
+        idea="Launch OrbitSQL zero-latency distributed database",
+        target_duration_sec=15,
+        brand_name="OrbitSQL",
+        registry_store=reg,
+        settings=settings,
+        mock=True,
+    )
+    # Test Director Co-Pilot switching to Genie 4
+    await se.apply_director_intent_edit(
+        proj,
+        tmp_path / "media",
+        instruction="Use Genie 4 live world for this film",
+        auto_render=False,
+        registry_store=reg,
+        settings=settings,
+        mock=True,
+    )
+    assert proj.video_model_id == "models/genie-4"
+
+    seen_pcts: list[int] = []
+    seen_stages: list[str] = []
+    stitch_calls = 0
+    orig_stitch = se.stitch_master_cut
+
+    async def _counted_stitch(*args, **kwargs):
+        nonlocal stitch_calls
+        stitch_calls += 1
+        return await orig_stitch(*args, **kwargs)
+
+    monkeypatch.setattr(se, "stitch_master_cut", _counted_stitch)
+
+    def _on_prog(p) -> None:
+        seen_pcts.append(int(p.progress_pct))
+        if p.progress_stage:
+            seen_stages.append(p.progress_stage)
+
+    await se.autopilot_produce_project(
+        proj,
+        tmp_path / "media_auto",
+        registry_store=reg,
+        settings=settings,
+        mock=True,
+        on_progress=_on_prog,
+    )
+    assert stitch_calls == 1, f"Expected stitch_master_cut to run once, ran {stitch_calls} times!"
+    assert proj.progress_pct == 100
+    assert proj.progress_stage == "Complete"
+    assert any(82 <= p <= 96 for p in seen_pcts), f"Expected stitching progress stages in {seen_pcts}"
+    assert 98 in seen_pcts, f"Expected 98% QA stage in {seen_pcts}"
+    assert any("Normalizing Clips" in st for st in seen_stages)
+    assert any("Soundstage" in st for st in seen_stages)
+    assert any("Video QA" in st for st in seen_stages)
+
+

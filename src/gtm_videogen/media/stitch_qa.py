@@ -127,12 +127,15 @@ async def evaluate_stitch_master_qa(
     probe = await probe_media(master_path, ffprobe_bin=resolved.ffprobe_bin, cancel=cancel)
     actual_dur = float(probe.duration_sec or 0.0)
 
-    # Run black/freeze scan and EBU R128 loudness in parallel
-    bf_task = qa_engine.detect_black_and_freeze(
+    import gc
+
+    # Run black/freeze scan then EBU R128 loudness sequentially (512MB Render Starter safe)
+    bf_res = await qa_engine.detect_black_and_freeze(
         master_path, total_duration=actual_dur, cancel=cancel
     )
-    loud_task = qa_engine.measure_loudness(master_path, cancel=cancel)
-    bf_res, loud_res = await asyncio.gather(bf_task, loud_task)
+    gc.collect()
+    loud_res = await qa_engine.measure_loudness(master_path, cancel=cancel)
+    gc.collect()
 
     black_segs = [
         seg for seg in (bf_res.get("black_segments") or []) if float(seg.get("duration", 0.0)) >= 0.15
