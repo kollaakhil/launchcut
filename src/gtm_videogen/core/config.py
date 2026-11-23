@@ -90,8 +90,13 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", alias="GTM_LOG_LEVEL")
 
+    def runtime_keys_path(self) -> Path:
+        """Return isolated runtime secrets file path (`<data_dir>/stitch/.runtime_keys.json`)."""
+        return self.data_dir / "stitch" / ".runtime_keys.json"
+
     def effective_gemini_key(self) -> str:
-        """Return GEMINI_API_KEY, GOOGLE_API_KEY, GENIE_API_KEY, or `~/.config/gemini-api/config.yaml`."""
+        """Return GEMINI_API_KEY, GOOGLE_API_KEY, GENIE_API_KEY, runtime store, or `~/.config/gemini-api/config.yaml`."""
+        import json
         import os
         import re
 
@@ -105,6 +110,16 @@ class Settings(BaseSettings):
         )
         if direct:
             return direct
+        rt_file = self.runtime_keys_path()
+        if rt_file.is_file():
+            try:
+                doc = json.loads(rt_file.read_text(encoding="utf-8"))
+                if isinstance(doc, dict):
+                    rt_k = str(doc.get("gemini_api_key") or "").strip()
+                    if len(rt_k) >= 12:
+                        return rt_k
+            except Exception:
+                pass
         cfg_file = Path.home() / ".config" / "gemini-api" / "config.yaml"
         if cfg_file.is_file():
             try:

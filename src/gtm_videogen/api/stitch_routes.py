@@ -405,10 +405,45 @@ async def create_genie4_session(services: ServicesDep) -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"Genie 4 session creation failed: {exc}") from exc
 
 
+class ConfigureGeminiKeyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    api_key: str = Field(..., min_length=12, max_length=256)
+
+
 @stitch_router.post("/gemini/verify")
 async def verify_gemini_key_endpoint(services: ServicesDep) -> dict[str, Any]:
     """Verify the active or browser-supplied Gemini API key (`AIza...` or `AQ....`) and Genie 4 Paid-Tier readiness."""
     return await verify_gemini_and_genie4_access(settings=services.settings)
+
+
+@stitch_router.post("/gemini/configure")
+async def configure_gemini_key_endpoint(
+    payload: ConfigureGeminiKeyRequest,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    """Validate a Gemini API key against Google `/v1beta/models` and persist write-only in `<data_dir>/stitch/.runtime_keys.json`."""
+    import contextlib
+    import json
+    import os
+
+    candidate = payload.api_key.strip()
+    probe_settings = services.settings.model_copy(update={"gemini_api_key": candidate})
+    ver = await verify_gemini_and_genie4_access(settings=probe_settings)
+    if not ver.get("valid_key"):
+        raise HTTPException(status_code=400, detail=str(ver.get("message") or "Invalid Gemini API key."))
+
+    rt_path = services.settings.runtime_keys_path()
+    rt_path.parent.mkdir(parents=True, exist_ok=True)
+    rt_path.write_text(json.dumps({"gemini_api_key": candidate}), encoding="utf-8")
+    with contextlib.suppress(OSError):
+        os.chmod(rt_path, 0o600)
+    masked = f"{candidate[:6]}…{candidate[-4:]}"
+    return {
+        **ver,
+        "configured": True,
+        "masked_key": masked,
+    }
 
 
 @stitch_router.get("/gallery/{filename}")
