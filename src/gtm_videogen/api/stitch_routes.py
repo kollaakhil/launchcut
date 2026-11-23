@@ -37,6 +37,7 @@ from gtm_videogen.models.model_registry import (
     BUILTIN_LLM_MODELS,
     ModelRegistryStore,
     VideoModelSpec,
+    select_optimal_scene_model,
 )
 from gtm_videogen.models.stitch_project import (
     AudioMode,
@@ -158,12 +159,17 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
     data["master_video_url"] = _murl(project.master_video_path)
     data["brand_logo_url"] = _murl(project.brand_logo_path)
     data["aroll_video_url"] = _murl(project.aroll_clip_path)
+    data["master_anchor_media_url"] = _murl(project.master_anchor_path)
     data["campaign_pack_urls"] = {
         k: u for k, p in (project.campaign_pack_paths or {}).items() if (u := _murl(p))
     }
     data["total_duration_sec"] = project.total_duration_sec()
 
     est_usd = 0.0
+    ai_count = sum(1 for s in project.scenes if s.kind == "ai_sequence")
+    if ai_count >= 2 and not project.elements and not project.master_anchor_path and project.video_model_id != "mock":
+        est_usd += 0.025
+
     for el_dict, el_obj in zip(data.get("elements", []), project.elements, strict=False):
         el_dict["image_url"] = _murl(el_obj.image_path)
 
@@ -174,14 +180,33 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
             sc_dict["user_clip"]["clip_url"] = _murl(sc_obj.user_clip.raw_video_path)
         if sc_obj.graphic_spec and isinstance(sc_dict.get("graphic_spec"), dict):
             sc_dict["graphic_spec"]["screenshot_url"] = _murl(sc_obj.graphic_spec.screenshot_path)
-        compiled_str = project.compile_scene_model_prompt(idx, max_chars=model_spec.max_prompt_chars)
+
+        want_audio = bool(sc_obj.enable_native_audio or project.audio_mode == "native_only")
+        sc_spec = select_optimal_scene_model(
+            registry,
+            project_model_id=project.video_model_id,
+            scene_model_id=sc_obj.video_model_id,
+            narrative_role=sc_obj.narrative_role,
+            duration_sec=sc_obj.duration_sec,
+            has_elements=bool(project.elements) or ai_count >= 2,
+            has_end_frame=bool(sc_obj.end_keyframe_path or sc_obj.end_keyframe_url),
+            needs_native_audio=want_audio,
+            aspect_ratio=project.aspect_ratio,
+        )
+        compiled_str = project.compile_scene_for_spec(idx, sc_spec)
+        sc_dict["resolved_model_id"] = sc_spec.id
+        sc_dict["resolved_model_label"] = sc_spec.label
+        sc_dict["compiled_prompt_str"] = compiled_str
         sc_dict["compiled_prompt_dict"] = project.to_scene_prompt_dict(idx)
         sc_dict["compiled_prompt_chars"] = len(compiled_str)
-        sc_dict["max_prompt_chars"] = model_spec.max_prompt_chars
-        if sc_obj.kind == "ai_sequence":
-            est_usd += float(model_spec.snap_duration(sc_obj.duration_sec)) * float(
-                model_spec.est_usd_per_sec
-            )
+        sc_dict["max_prompt_chars"] = sc_spec.max_prompt_chars
+        sc_cost = (
+            sc_spec.estimate_clip_usd(sc_obj.duration_sec, with_audio=want_audio)
+            if sc_obj.kind == "ai_sequence"
+            else 0.0
+        )
+        sc_dict["estimated_usd"] = round(sc_cost, 3)
+        est_usd += sc_cost
         for t_dict, t_obj in zip(sc_dict.get("takes", []), sc_obj.takes, strict=False):
             t_dict["clip_url"] = _murl(t_obj.clip_path)
         win = sc_obj.winning_take()
@@ -213,7 +238,7 @@ class CreateProjectRequest(BaseModel):
     idea: str = Field(..., min_length=2, max_length=3000)
     target_duration_sec: int = Field(default=15, ge=5, le=60)
     aspect_ratio: StitchAspect = "16:9"
-    video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
+    video_model_id: str = "auto"
     llm_model_id: str = ""
     world_preset: str = "miniature_diorama"
     camera_preset: str = "macro_tilt_shift"
@@ -554,6 +579,7 @@ async def patch_project(
                     "narrative_role",
                     "duration_sec",
                     "kind",
+                    "enable_native_audio",
                     "continues_from_prev",
                     "subjects",
                     "materials",
@@ -585,6 +611,9 @@ async def patch_project(
                             merged[k] = gs
                         else:
                             merged[k] = raw_sc[k]
+                if "video_model_id" in raw_sc:
+                    vm = str(raw_sc["video_model_id"] or "").strip()
+                    merged["video_model_id"] = vm or None
                 merged["index"] = idx
                 if idx == 0:
                     merged["continues_from_prev"] = False
@@ -1309,7 +1338,7 @@ class AutopilotRequest(BaseModel):
     idea: str = Field(..., min_length=2, max_length=3000)
     target_duration_sec: int = Field(default=60, ge=5, le=60)
     aspect_ratio: StitchAspect = "16:9"
-    video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
+    video_model_id: str = "auto"
     llm_model_id: str = ""
     world_preset: str = "miniature_diorama"
     camera_preset: str = "macro_tilt_shift"

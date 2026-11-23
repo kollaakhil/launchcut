@@ -511,11 +511,14 @@ class VideoProvider:
         width, height = ASPECT_DIMENSIONS[aspect]
 
         meter = self._cost_meter or current_cost_meter()
-        est_usd = round(
-            max(float(duration_sec), self._min_seconds)
-            * float(getattr(spec, "est_usd_per_sec", self._usd_per_sec)),
-            6,
-        )
+        if hasattr(spec, "estimate_clip_usd"):
+            est_usd = float(spec.estimate_clip_usd(duration_sec, with_audio=generate_audio))
+        else:
+            est_usd = round(
+                max(float(duration_sec), self._min_seconds)
+                * float(getattr(spec, "est_usd_per_sec", self._usd_per_sec)),
+                6,
+            )
         reservation_id: str | None = None
         if meter is not None:
             reservation_id = meter.reserve(

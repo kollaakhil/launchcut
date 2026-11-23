@@ -62,7 +62,11 @@ from gtm_videogen.models.director_blueprint import (
     MotionSpec,
     SubjectDetailsSpec,
 )
-from gtm_videogen.models.model_registry import ModelRegistryStore, VideoModelSpec
+from gtm_videogen.models.model_registry import (
+    ModelRegistryStore,
+    VideoModelSpec,
+    select_optimal_scene_model,
+)
 from gtm_videogen.models.schemas import (
     BeatSpec,
     CameraGrammar,
@@ -1085,12 +1089,38 @@ def _build_deterministic_scenes(
     return title[:72], main_subject[:220], scenes
 
 
+_TECH_LAUNCH_RE = re.compile(
+    r"\b(launch|saas|app|platform|software|api|sdk|cli|code|dashboard|ai|agent|"
+    r"startup|product|tool|workflow|benchmark|faster|users|revenue|cloud|deploy|"
+    r"database|analytics|browser|workspace|automation|pr\b|dev|repo)\b",
+    re.IGNORECASE,
+)
+_PURE_CINEMA_FICTION_RE = re.compile(
+    r"\b(diorama|origami|samurai|desert|forest|dragon|knight|temple|spaceship|"
+    r"noir|detective|glacier|volcano|medieval|mythic)\b",
+    re.IGNORECASE,
+)
+
+
+def _infer_auto_hybrid_seed(idea: str, source_url: str | None) -> list[str]:
+    """Infer a high-converting Hybrid Launch plan ($0 Motion Graphics + AI Cinema) when no theme was explicitly forced."""
+    has_url = bool(source_url and source_url.strip())
+    low = (idea or "").strip()
+    if _PURE_CINEMA_FICTION_RE.search(low) and not has_url:
+        return []
+    if has_url or _TECH_LAUNCH_RE.search(low):
+        if re.search(r"\b(cli|sdk|api|terminal|command|code|pr\b|git|repo)\b", low, re.IGNORECASE):
+            return ["ai_sequence", "motion_graphic:terminal_code", "motion_graphic:benchmark_bars"]
+        return ["ai_sequence", "motion_graphic:device_showcase_25d", "motion_graphic:benchmark_bars"]
+    return []
+
+
 async def compile_stitch_project(
     *,
     idea: str,
     target_duration_sec: int = 15,
     aspect_ratio: StitchAspect = "16:9",
-    video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video",
+    video_model_id: str = "auto",
     llm_model_id: str = "",
     world_preset: str = "miniature_diorama",
     camera_preset: str = "macro_tilt_shift",
@@ -1122,7 +1152,11 @@ async def compile_stitch_project(
     eff_brand = (brand_name or "").strip() or scraped.get("brand_name") or None
     eff_tagline = (brand_tagline or "").strip() or scraped.get("tagline") or None
     theme_rec = _find_gallery_recipe(recipe_id)
-    seed_hybrid = list(theme_rec.get("hybrid_plan") or []) if theme_rec else []
+    seed_hybrid = (
+        list(theme_rec.get("hybrid_plan") or [])
+        if theme_rec
+        else _infer_auto_hybrid_seed(idea, source_url)
+    )
     expanded_hybrid = _expand_hybrid_plan_for_target(seed_hybrid, target_duration_sec)
     durations = _plan_scene_durations(target_duration_sec, model_spec, hybrid_plan=expanded_hybrid)
 
@@ -1136,6 +1170,11 @@ async def compile_stitch_project(
         scraped=scraped,
         expanded_hybrid_plan=expanded_hybrid,
     )
+    is_asmr_theme = bool((theme_rec and theme_rec.get("category") == "asmr") or world_preset == "asmr_glass")
+    if is_asmr_theme:
+        for sc_item in scenes:
+            if sc_item.kind == "ai_sequence":
+                sc_item.enable_native_audio = True
 
     project_id = f"st_{uuid4().hex[:10]}"
     lighting_spec = LightingSpec.model_validate(lighting_data["lighting"])
@@ -1515,6 +1554,87 @@ async def generate_all_keyframes(
     return project
 
 
+async def ensure_master_world_anchor(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    settings: Settings | None = None,
+    mock: bool = False,
+    on_progress: Any | None = None,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Auto-generate 1 Master World & Hero Anchor Sheet (~$0.025) before multi-act live shoots so 0s->60s shares one visual world."""
+    ai_indices = [i for i, s in enumerate(project.scenes) if s.kind == "ai_sequence"]
+    if (
+        mock
+        or project.video_model_id == "mock"
+        or len(ai_indices) < 2
+        or project.elements
+        or (project.master_anchor_path and Path(project.master_anchor_path).is_file())
+    ):
+        return project
+
+    resolved = settings or get_settings()
+    has_fal = bool(resolved.fal_key.strip())
+    has_gemini = is_gemini_cli_ready(resolved)
+    if not has_fal and not has_gemini:
+        return project
+
+    media_dir.mkdir(parents=True, exist_ok=True)
+    first_ai_idx = ai_indices[0]
+    anchor_file = media_dir / f"master_world_anchor_{uuid4().hex[:6]}.jpg"
+    prompt = project.compile_scene_keyframe_prompt(first_ai_idx, is_end=False)
+
+    project.status_message = "Locking 60s Master World & Hero Anchor Sheet..."
+    if on_progress is not None:
+        res = on_progress(project)
+        if asyncio.iscoroutine(res):
+            await res
+
+    remote_url: str | None = None
+    try:
+        if has_fal:
+            _, remote_url, usd = await _generate_flux_image(
+                prompt=prompt,
+                aspect=project.aspect_ratio,
+                out_path=anchor_file,
+                settings=resolved,
+                anchor_url=None,
+                cancel=cancel,
+            )
+            project.actual_usd = round(project.actual_usd + usd, 4)
+        else:
+            await gemini_generate_image(
+                prompt=prompt,
+                out_path=anchor_file,
+                aspect_ratio=project.aspect_ratio,
+                reference_image_path=None,
+                settings=resolved,
+                cancel=cancel,
+            )
+    except Exception:
+        return project
+
+    if anchor_file.is_file():
+        project.master_anchor_path = str(anchor_file)
+        project.master_anchor_url = remote_url
+        project.elements = [
+            StitchElement(
+                slot=1,
+                tag="@Element1",
+                role="style",
+                label="Master World Anchor",
+                image_path=str(anchor_file),
+                filename=anchor_file.name,
+            )
+        ]
+        first_sc = project.scenes[first_ai_idx]
+        if not first_sc.start_keyframe_path:
+            first_sc.start_keyframe_path = str(anchor_file)
+            first_sc.start_keyframe_url = remote_url
+    return project
+
+
 async def render_single_scene_take(
     project: StitchProject,
     scene_idx: int,
@@ -1528,11 +1648,24 @@ async def render_single_scene_take(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """Render ONE Scene/Act as a versioned Take with automatic Last-Frame Chaining & @Elements."""
+    """Render ONE Scene/Act as a versioned Take with Smart Multi-Model Routing, Last-Frame Chaining & Cross-Graphic Continuity."""
     resolved = settings or get_settings()
     reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
-    chosen_engine = (engine_id or project.video_model_id or "").strip()
-    spec = reg.get_video_model(chosen_engine)
+    idx = max(0, min(scene_idx, len(project.scenes) - 1))
+    sc = project.scenes[idx]
+    want_native_audio = bool(sc.enable_native_audio or project.audio_mode == "native_only")
+
+    spec = select_optimal_scene_model(
+        reg,
+        project_model_id=(engine_id or project.video_model_id or "auto").strip(),
+        scene_model_id=None if engine_id else sc.video_model_id,
+        narrative_role=sc.narrative_role,
+        duration_sec=sc.duration_sec,
+        has_elements=bool(project.elements),
+        has_end_frame=bool(sc.end_keyframe_path or sc.end_keyframe_url),
+        needs_native_audio=want_native_audio,
+        aspect_ratio=project.aspect_ratio,
+    )
     has_fal = bool(resolved.fal_key.strip())
     has_gemini = is_gemini_cli_ready(resolved)
     use_mock = (
@@ -1542,8 +1675,6 @@ async def render_single_scene_take(
         or (spec.provider == "fal" and not has_fal and not has_gemini)
     )
 
-    idx = max(0, min(scene_idx, len(project.scenes) - 1))
-    sc = project.scenes[idx]
     media_dir.mkdir(parents=True, exist_ok=True)
     fps = 24
     width, height = aspect_to_dimensions(project.aspect_ratio)
@@ -1569,8 +1700,9 @@ async def render_single_scene_take(
     chained_from_prev = False
 
     try:
-        # 1. Check Last-Frame Chaining from previous Scene's winning take!
+        # 1. Check Last-Frame Chaining from adjacent Scene OR Cross-Graphic Continuity from earlier AI Act!
         chained_start_uri: str | None = None
+        cross_graphic_anchor_uri: str | None = None
         if idx > 0 and sc.continues_from_prev:
             prev_win = project.scenes[idx - 1].winning_take()
             if prev_win and Path(prev_win.clip_path).is_file():
@@ -1586,6 +1718,23 @@ async def render_single_scene_take(
                 sc.start_keyframe_url = None
                 chained_start_uri = encode_image_data_uri(chain_jpg)
                 chained_from_prev = True
+        elif idx > 0 and sc.kind == "ai_sequence":
+            # Cross-Graphic Continuity: lock world/hero appearance across intervening Motion Graphic acts!
+            for prev_i in range(idx - 1, -1, -1):
+                prev_ai = project.scenes[prev_i]
+                if prev_ai.kind == "ai_sequence":
+                    prev_ai_win = prev_ai.winning_take()
+                    if prev_ai_win and Path(prev_ai_win.clip_path).is_file():
+                        cross_jpg = media_dir / f"{sc.scene_id}_cross_anchor_t{take_num}.jpg"
+                        await extract_last_frame_jpeg(
+                            Path(prev_ai_win.clip_path),
+                            cross_jpg,
+                            ffmpeg_bin=resolved.ffmpeg_bin,
+                            cancel=cancel,
+                        )
+                        if cross_jpg.is_file():
+                            cross_graphic_anchor_uri = encode_image_data_uri(cross_jpg, max_width=1024)
+                        break
 
         # 2A. User / Founder Video Clip Take ($0 — trimmed, framed & loudnormed) when a clip is uploaded
         has_uploaded_clip = (
@@ -1699,9 +1848,9 @@ async def render_single_scene_take(
                 if sc.start_keyframe_path and Path(sc.start_keyframe_path).is_file()
                 else None
             )
-            compiled_json = project.compile_scene_model_prompt(idx, max_chars=spec.max_prompt_chars)
+            compiled_prompt = project.compile_scene_for_spec(idx, spec)
             gem_clip = await gemini_generate_video(
-                prompt=compiled_json,
+                prompt=compiled_prompt,
                 out_path=out_clip,
                 aspect_ratio=project.aspect_ratio,
                 resolution=spec.resolution,
@@ -1726,7 +1875,7 @@ async def render_single_scene_take(
             )
             project.actual_usd = round(project.actual_usd + est_cost, 4)
         else:
-            # 3. Live Dynamic-Registry AI Video Render (Kling 3.0 Pro, Kling 4.0 Flash, Native 4K, Veo 3, or Custom!)
+            # 3. Live Multi-Model AI Video Render (Smart Router, Kling 2.5/3.0, Seedance, Wan 2.5, Hailuo 2.3, Veo 3, or Custom)
             await _report(
                 f"Shooting {sc.title} · Take {take_num} via {spec.label} ({spec.snap_duration(sc.duration_sec)}s)..."
             )
@@ -1745,16 +1894,19 @@ async def render_single_scene_take(
                     end_ref = encode_image_data_uri(Path(sc.end_keyframe_path))
 
             element_uris: list[str] = []
-            if spec.supports_elements and project.elements:
+            if spec.supports_elements:
                 for el in sorted(project.elements, key=lambda e: e.slot)[:3]:
                     if Path(el.image_path).is_file():
                         element_uris.append(encode_image_data_uri(Path(el.image_path), max_width=1024))
+                if cross_graphic_anchor_uri and len(element_uris) < 3:
+                    element_uris.append(cross_graphic_anchor_uri)
 
-            compiled_json = project.compile_scene_model_prompt(idx, max_chars=spec.max_prompt_chars)
+            compiled_prompt = project.compile_scene_for_spec(idx, spec)
             neg_str = ", ".join(project.negative_constraints)
+            est_clip_cost = spec.estimate_clip_usd(sc.duration_sec, with_audio=want_native_audio)
             cost_meter = CostMeter(
                 run_id=f"{project.project_id}_{sc.scene_id}_t{take_num}",
-                cap_usd=max(12.0, spec.est_usd_per_sec * sc.duration_sec * 3.0 + 4.0),
+                cap_usd=max(12.0, est_clip_cost * 3.0 + 4.0),
             )
             provider = VideoProvider(
                 settings=resolved,
@@ -1767,14 +1919,14 @@ async def render_single_scene_take(
                 rendered = await provider.generate_from_registry(
                     spec=spec,
                     shot_id=f"{sc.scene_id}_t{take_num}",
-                    prompt=compiled_json,
+                    prompt=compiled_prompt,
                     duration_sec=spec.snap_duration(sc.duration_sec),
                     aspect=project.aspect_ratio,
                     fps=fps,
                     start_image=start_ref,
                     end_image=end_ref,
                     negative_prompt=neg_str,
-                    generate_audio=(project.audio_mode != "vo_plus_ducked_score"),
+                    generate_audio=want_native_audio,
                     element_image_urls=element_uris,
                     cancel=cancel,
                 )
@@ -1788,14 +1940,14 @@ async def render_single_scene_take(
                     rendered = await provider.generate_from_registry(
                         spec=fb_spec,
                         shot_id=f"{sc.scene_id}_t{take_num}_fb",
-                        prompt=project.compile_scene_model_prompt(idx, max_chars=fb_spec.max_prompt_chars),
+                        prompt=project.compile_scene_for_spec(idx, fb_spec),
                         duration_sec=fb_spec.snap_duration(sc.duration_sec),
                         aspect=project.aspect_ratio,
                         fps=fps,
                         start_image=start_ref,
                         end_image=end_ref if fb_spec.supports_end_frame else None,
                         negative_prompt=neg_str,
-                        generate_audio=(project.audio_mode != "vo_plus_ducked_score"),
+                        generate_audio=want_native_audio,
                         element_image_urls=element_uris if fb_spec.supports_elements else None,
                         cancel=cancel,
                     )
@@ -1848,8 +2000,59 @@ async def render_all_scenes(
     on_progress: Any | None = None,
     cancel: CancellationToken | None = None,
 ) -> StitchProject:
-    """Sequentially render all Scenes (Act 1 -> Act N) so Last-Frame Chaining flows cleanly."""
-    for idx in range(len(project.scenes)):
+    """Render independent $0 Motion Graphics concurrently (512MB-safe Semaphore(2)), then shoot AI acts sequentially for pixel-locked continuity."""
+    if engine_id != "mock":
+        await ensure_master_world_anchor(
+            project,
+            media_dir,
+            settings=settings,
+            mock=mock,
+            on_progress=on_progress,
+            cancel=cancel,
+        )
+
+    local_indices = [i for i, s in enumerate(project.scenes) if s.kind != "ai_sequence"]
+    ai_indices = [i for i, s in enumerate(project.scenes) if s.kind == "ai_sequence"]
+
+    if len(local_indices) > 1:
+        sem = asyncio.Semaphore(2)
+
+        async def _render_local(idx: int) -> None:
+            async with sem:
+                if cancel is not None:
+                    cancel.raise_if_cancelled()
+                await render_single_scene_take(
+                    project,
+                    idx,
+                    media_dir,
+                    engine_id=engine_id,
+                    registry_store=registry_store,
+                    settings=settings,
+                    media_store=media_store,
+                    mock=mock,
+                    on_progress=on_progress,
+                    cancel=cancel,
+                )
+
+        await asyncio.gather(*(_render_local(i) for i in local_indices))
+    else:
+        for idx in local_indices:
+            if cancel is not None:
+                cancel.raise_if_cancelled()
+            await render_single_scene_take(
+                project,
+                idx,
+                media_dir,
+                engine_id=engine_id,
+                registry_store=registry_store,
+                settings=settings,
+                media_store=media_store,
+                mock=mock,
+                on_progress=on_progress,
+                cancel=cancel,
+            )
+
+    for idx in ai_indices:
         if cancel is not None:
             cancel.raise_if_cancelled()
         await render_single_scene_take(
@@ -1864,6 +2067,7 @@ async def render_all_scenes(
             on_progress=on_progress,
             cancel=cancel,
         )
+
     return await stitch_master_cut(
         project,
         media_dir,
@@ -1878,14 +2082,17 @@ def _synthesize_riser_bed_wav(
     duration_sec: float,
     seam_times: list[float],
     out_path: Path,
+    *,
+    graphic_start_times: list[float] | None = None,
 ) -> Path:
-    """Synthesize a 4-stage cinematic launch score (Intro -> Build -> Drop/Climax -> Resolve) with Act seam accents."""
+    """Synthesize a 4-stage cinematic launch score (Intro -> Build -> Drop/Climax -> Resolve) with Act seam & tactile UI accents."""
     sr = 24000
     dur = max(2.0, float(duration_sec))
     n = max(sr, int(sr * dur))
     frames = bytearray()
     two_pi = 2.0 * math.pi
     pulse_hz = 1.85  # ~111 BPM subtle modern launch pulse
+    ui_cues = list(graphic_start_times or [])
     for i in range(n):
         t = i / sr
         arc_p = t / dur
@@ -1911,6 +2118,12 @@ def _synthesize_riser_bed_wav(
             if 0.0 <= dist <= 0.28:
                 impact = max(impact, math.exp(-dist * 12.0) * 0.55)
 
+        ui_tick = 0.0
+        for gt in ui_cues:
+            dt = t - gt
+            if 0.0 <= dt <= 0.14:
+                ui_tick = max(ui_tick, math.exp(-dt * 28.0) * 0.32)
+
         # Warm root + fifth + octave + climax shimmer harmonics
         sub = 0.42 * math.sin(two_pi * 65.41 * t)
         pad = (
@@ -1931,6 +2144,8 @@ def _synthesize_riser_bed_wav(
             sample += 0.26 * riser * math.sin(two_pi * (392.0 + 130.0 * riser) * t)
         if impact > 0.02:
             sample += 0.38 * impact * math.sin(two_pi * 55.0 * t)
+        if ui_tick > 0.01:
+            sample += ui_tick * (0.22 * math.sin(two_pi * 880.0 * t) + 0.14 * math.sin(two_pi * 1318.5 * t))
 
         env = fade_in * fade_out * arc_gain * (0.82 + 0.10 * math.sin(two_pi * 0.22 * t) + riser * 0.35)
         val = int(max(-32767, min(32767, sample * env * 4700.0)))
@@ -2642,12 +2857,18 @@ async def stitch_master_cut(
                 check=True,
             )
 
-        # Compute seam timestamps for audio_riser bed
+        # Compute seam timestamps & Motion Graphic entrance cues for score + tactile UI accents
         seam_times: list[float] = []
+        graphic_start_times: list[float] = []
         acc = 0.0
-        for d in clip_durations[:-1]:
-            acc += d
-            seam_times.append(acc)
+        for i_d, d in enumerate(clip_durations):
+            if not use_aroll_mode and i_d < len(winning_pairs):
+                sc_ref = winning_pairs[i_d][0]
+                if sc_ref is not None and sc_ref.kind == "motion_graphic":
+                    graphic_start_times.append(acc + 0.08)
+            if i_d < len(clip_durations) - 1:
+                acc += d
+                seam_times.append(acc)
         total_dur = max(3.0, sum(clip_durations))
 
         # Audio Mastering (3 Soundstage Modes)
@@ -2687,8 +2908,13 @@ async def stitch_master_cut(
                     vo_path = gem_vo
 
         bed_wav = (
-            _synthesize_riser_bed_wav(total_dur, seam_times, tmp_dir / "bed.wav")
-            if project.seam_transition == "audio_riser" or len(seam_times) >= 1
+            _synthesize_riser_bed_wav(
+                total_dur,
+                seam_times,
+                tmp_dir / "bed.wav",
+                graphic_start_times=graphic_start_times,
+            )
+            if project.seam_transition == "audio_riser" or len(seam_times) >= 1 or bool(graphic_start_times)
             else _synthesize_ambient_cinematic_wav(total_dur, tmp_dir / "bed.wav")
         )
 
@@ -2882,8 +3108,18 @@ async def stitch_master_cut(
         if rc_mix != 0 or not final_tmp.is_file():
             shutil.copyfile(assembled_mp4, final_tmp)
 
-        # Optional Cinematic Finishing (35mm Film Grain + 2.39:1 Letterbox) & ASS Captions in one clean pass
+        # Optional Cinematic Finishing (Multi-Model Color Cohesion + 35mm Grain + 2.39:1 Letterbox) & ASS Captions
+        distinct_ai_engines = {
+            win.engine_id
+            for sc_obj, _ in winning_pairs
+            if sc_obj is not None
+            and sc_obj.kind == "ai_sequence"
+            and (win := sc_obj.winning_take()) is not None
+            and win.engine_id not in ("mock", "kinetic_ui", "user_clip")
+        }
         finish_filters: list[str] = []
+        if len(distinct_ai_engines) >= 2:
+            finish_filters.append("eq=contrast=1.02:saturation=1.03")
         if project.film_grain:
             finish_filters.append("noise=alls=7:allf=t+u")
         if project.cinema_letterbox and width > height:
@@ -3396,6 +3632,23 @@ async def apply_director_intent_edit(
             project.seam_transition = "micro_dissolve"
             global_changed = True
 
+        # Detect plain-English multi-model engine requests (e.g. "use seedance", "fast draft", "shoot Act 1 on hailuo")
+        model_intent_map: list[tuple[tuple[str, ...], str]] = [
+            (("seedance", "fast draft", "cheap test", "budget mode"), "fal-ai/bytedance/seedance/v1/lite/text-to-video"),
+            (("wan 2.5", "wan2.5", "alibaba wan"), "fal-ai/wan-25-preview/text-to-video"),
+            (("hailuo", "minimax"), "fal-ai/minimax/hailuo-2.3/pro/text-to-video"),
+            (("kling 2.5", "kling turbo", "1080p value"), "fal-ai/kling-video/v2.5-turbo/pro/text-to-video"),
+            (("kling 3 standard", "kling standard"), "fal-ai/kling-video/v3/standard/text-to-video"),
+            (("kling 3 pro", "kling pro"), "fal-ai/kling-video/v3/pro/text-to-video"),
+            (("veo 3", "veo3"), "fal-ai/veo3/fast"),
+            (("smart router", "smart multi-model", "auto model"), "auto"),
+        ]
+        requested_model_id: str | None = None
+        for kws, mid in model_intent_map:
+            if any(k in low for k in kws):
+                requested_model_id = mid
+                break
+
         # Pick target scene index (explicit -> hook if "hook"/"opening" -> outro/last if "ending"/"cta" -> middle act)
         target_idx: int | None = None
         if inferred_target_id:
@@ -3407,11 +3660,18 @@ async def apply_director_intent_edit(
             target_idx = 0
         elif any(w in low for w in ("ending", "outro", "final", "last", "cta")):
             target_idx = len(project.scenes) - 1
+        elif requested_model_id is not None:
+            project.video_model_id = requested_model_id
+            model_spec = reg.get_video_model(project.video_model_id)
+            global_changed = True
         elif not global_changed and project.scenes:
             target_idx = min(len(project.scenes) - 1, max(0, len(project.scenes) // 2))
 
         if target_idx is not None and 0 <= target_idx < len(project.scenes):
             sc = project.scenes[target_idx]
+            if requested_model_id is not None:
+                sc.video_model_id = None if requested_model_id == "auto" else requested_model_id
+                changed_indices.add(target_idx)
             brand = project.brand_name or project.title
             # Detect template swap intent
             tpl_map: list[tuple[tuple[str, ...], MotionTemplateId]] = [
@@ -3461,7 +3721,7 @@ async def apply_director_intent_edit(
                 if sc.beats:
                     sc.beats[0].action = f"{clean_inst[:150]}."
                 changed_indices.add(target_idx)
-            else:
+            elif requested_model_id is None:
                 if custom_copy and any(w in low for w in ("say", "vo", "voice", "line", "narrat")):
                     sc.vo_line = custom_copy[:160]
                 elif sc.kind == "motion_graphic" and sc.graphic_spec is not None:
@@ -3518,6 +3778,7 @@ __all__ = [
     "autofix_from_qa_report",
     "autopilot_produce_project",
     "compile_stitch_project",
+    "ensure_master_world_anchor",
     "export_campaign_pack",
     "generate_all_keyframes",
     "generate_scene_keyframe",

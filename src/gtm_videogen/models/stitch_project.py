@@ -209,6 +209,8 @@ class StitchScene(BaseModel):
     duration_sec: int = Field(default=10, ge=3, le=60)
     kind: SceneKind = "ai_sequence"
     continues_from_prev: bool = False
+    video_model_id: str | None = None
+    enable_native_audio: bool = False
 
     # Structured surgical controls shown on the Pinboard & Slide-Over Drawer
     subjects: list[str] = Field(default_factory=list)
@@ -265,8 +267,10 @@ class StitchProject(BaseModel):
 
     aspect_ratio: StitchAspect = "16:9"
     target_duration_sec: int = 15
-    video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
+    video_model_id: str = "auto"
     llm_model_id: str = ""
+    master_anchor_path: str | None = None
+    master_anchor_url: str | None = None
 
     # Visual Preset IDs + Global World Lock (shared across all Scenes)
     world_preset: str = "miniature_diorama"
@@ -382,9 +386,81 @@ class StitchProject(BaseModel):
                 f"Continues pixel-exact from Scene {idx}'s final frame ({prev.end_frame}). "
                 "Match exact lighting, surface grain, scale, and camera momentum with zero cut."
             )
+        elif idx > 0 and sc.kind == "ai_sequence":
+            prior_ai = [s for s in self.scenes[:idx] if s.kind == "ai_sequence"]
+            if prior_ai:
+                anchor_sc = prior_ai[0]
+                doc["world_continuity_lock"] = (
+                    f"Same 60-second film world as Act {anchor_sc.index + 1}: preserve exact hero identity "
+                    f"({self.main_subject or ', '.join(anchor_sc.subjects[:2])}), architectural surfaces, "
+                    f"lighting grade ({self.lighting.style}), and color palette ({', '.join(sc.colors[:3])})."
+                )
         if self.negative_constraints:
             doc["avoid"] = self.negative_constraints
         return doc
+
+    def compile_scene_cinematic_prose(self, scene_idx: int, *, max_chars: int = 2000) -> str:
+        """Compile natural-language cinematography prose tailored for Veo, Hailuo, Seedance, Wan & Kling 2.5."""
+        idx = max(0, min(scene_idx, len(self.scenes) - 1))
+        sc = self.scenes[idx]
+        subjects_txt = ", ".join(sc.subjects) if sc.subjects else (self.main_subject or sc.title)
+        mats_txt = ", ".join(sc.materials) if sc.materials else self.environment.materials
+        beat_actions = [
+            f"{b.scene.rstrip('.')}: {b.action.rstrip('.')}"
+            if b.scene and b.action
+            else (b.action or b.scene).rstrip(".")
+            for b in sc.beats[:3]
+            if (b.scene or b.action)
+        ]
+        motion_story = ". ".join(x for x in beat_actions if x)
+        effects_txt = ", ".join(self.lighting.effects[:3])
+        palette_txt = ", ".join((sc.colors or self.lighting.color_palette)[:3])
+
+        continuity_prefix = ""
+        if sc.continues_from_prev and idx > 0:
+            prev = self.scenes[idx - 1]
+            continuity_prefix = (
+                f"Seamless continuous shot from previous frame ({prev.end_frame.rstrip('.')}), "
+                "maintaining identical lighting, scale, and camera momentum. "
+            )
+        elif idx > 0:
+            prior_ai = [s for s in self.scenes[:idx] if s.kind == "ai_sequence"]
+            if prior_ai:
+                continuity_prefix = (
+                    f"Same consistent visual world and hero subject ({self.main_subject or subjects_txt}) "
+                    "established in the opening scene, matching exact color grade and lens character. "
+                )
+
+        el_hint = ""
+        if self.elements:
+            el_labels = ", ".join(f"{e.label} ({e.role})" for e in self.elements[:2])
+            el_hint = f"Hero visual anchor: {el_labels}. "
+
+        segments = [
+            f"{continuity_prefix}{self.style}.",
+            f"{el_hint}Hero subject: {subjects_txt}, crafted with tactile {mats_txt} in {self.environment.world} ({self.environment.surface}).",
+            f"Action & motion: {motion_story}." if motion_story else "",
+            f"Final composition settles into: {sc.end_frame.rstrip('.')}." if sc.end_frame else "",
+            f"Cinematography: {sc.camera_spec or self.camera.style}, {self.camera.lens_mm}mm cinema prime, {self.camera.depth_of_field} depth of field, {self.motion.feel}.",
+            f"Lighting & color grade: {self.lighting.style}"
+            + (f" with {effects_txt}" if effects_txt else "")
+            + (f", palette {palette_txt}." if palette_txt else "."),
+            f"Subtle natural sound atmosphere: {self.audio_direction.rstrip('.')}."
+            if sc.enable_native_audio and self.audio_direction
+            else "",
+            "Ultra-photorealistic 4K cinema grade, coherent physical motion, strictly zero readable text, signs, UI labels, or watermarks.",
+        ]
+        prose = " ".join(s.strip() for s in segments if s and s.strip())
+        prose = re.sub(r"\s+", " ", prose).strip()
+        if len(prose) <= max_chars:
+            return prose
+        return prose[: max_chars - 1].rstrip() + "."
+
+    def compile_scene_for_spec(self, scene_idx: int, spec: VideoModelSpec) -> str:
+        """Compile prompt tailored to `spec.prompt_style` ('cinematic_prose' vs 'structured_json')."""
+        if getattr(spec, "prompt_style", "structured_json") == "cinematic_prose":
+            return self.compile_scene_cinematic_prose(scene_idx, max_chars=spec.max_prompt_chars)
+        return self.compile_scene_model_prompt(scene_idx, max_chars=spec.max_prompt_chars)
 
     def compile_scene_model_prompt(self, scene_idx: int, *, max_chars: int = 2400) -> str:
         """Compile one Scene into valid compact JSON strictly <= max_chars."""
@@ -394,7 +470,7 @@ class StitchProject(BaseModel):
             return compact
 
         trimmed = copy.deepcopy(doc)
-        for drop_key in ("avoid", "audio", "reference_elements"):
+        for drop_key in ("avoid", "audio", "reference_elements", "world_continuity_lock"):
             trimmed.pop(drop_key, None)
             compact = json.dumps(trimmed, ensure_ascii=False, separators=(",", ":"))
             if len(compact) <= max_chars:
@@ -456,6 +532,7 @@ class StitchProject(BaseModel):
         effects = ", ".join(self.lighting.effects[:4])
         parts = [
             f"{self.style}, {base.rstrip('.')}",
+            f"Consistent hero identity: {self.main_subject}" if self.main_subject else "",
             f"Subjects: {subjects_txt}" if subjects_txt else "",
             f"Materials & surface: {mats_txt} on {self.environment.surface}",
             f"Camera: {sc.camera_spec or self.camera.style}, {self.camera.lens_mm}mm lens, {self.camera.depth_of_field} depth of field",
@@ -476,7 +553,7 @@ def validate_stitch_project(
 
     for idx, sc in enumerate(project.scenes):
         issues: list[dict[str, str]] = []
-        compiled = project.compile_scene_model_prompt(idx, max_chars=model_spec.max_prompt_chars)
+        compiled = project.compile_scene_for_spec(idx, model_spec)
         raw_len = len(json.dumps(project.to_scene_prompt_dict(idx), ensure_ascii=False, separators=(",", ":")))
 
         # Voiceover speakability check across all scene kinds (target <= 3.1 words/sec)
@@ -506,7 +583,13 @@ def validate_stitch_project(
                     "message": f"Anti-Garbled-Text Guard: mentions '{m.group(0)}'. AI video models garble readable words — replace with pure visual detail.",
                 })
 
-            if model_spec.durations_sec and sc.duration_sec not in model_spec.durations_sec:
+            if (
+                model_spec.id != "auto"
+                and not model_spec.omit_duration
+                and not sc.video_model_id
+                and model_spec.durations_sec
+                and sc.duration_sec not in model_spec.durations_sec
+            ):
                 issues.append({
                     "code": "duration_mismatch",
                     "message": f"Scene duration {sc.duration_sec}s will snap to closest {model_spec.label} duration ({model_spec.durations_sec}).",
@@ -591,8 +674,14 @@ def apply_deterministic_script_autofix(
             b.scene = _TEXT_IN_SCENE_RE.sub("warm glowing light reflections", b.scene)
             b.action = _TEXT_IN_SCENE_RE.sub("subtle luminous highlights", b.action)
 
-        # Snap duration cleanly if model doesn't support it
-        if model_spec.durations_sec and sc.duration_sec not in model_spec.durations_sec:
+        # Snap duration cleanly if concrete model doesn't support it
+        if (
+            model_spec.id != "auto"
+            and not model_spec.omit_duration
+            and not sc.video_model_id
+            and model_spec.durations_sec
+            and sc.duration_sec not in model_spec.durations_sec
+        ):
             sc.duration_sec = model_spec.snap_duration(sc.duration_sec)
 
         # Diversify monotonous 3-in-a-row camera moves

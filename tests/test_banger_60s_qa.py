@@ -437,3 +437,123 @@ def test_2screen_intent_studio_copilot_and_smart_attach(tmp_path: Path) -> None:
         assert edited["qa_report"]["passed"] is True
         assert edited["qa_report"]["banger_score"] >= 86
 
+
+def test_multimodel_cost_reducer_prose_adapter_and_60s_continuity(tmp_path: Path) -> None:
+    """Verify multi-model Smart Router, >75% 15s test cost drop, prose vs JSON adapter & 60s world continuity."""
+    from fastapi.testclient import TestClient
+
+    from gtm_videogen.api.app import create_app
+    from gtm_videogen.models.model_registry import (
+        ModelRegistryStore,
+        build_registry_fal_payload,
+    )
+
+    reg = ModelRegistryStore(tmp_path / "reg")
+
+    # 1. Verify verified fal.ai schemas & silent-default cost savings
+    kling3 = reg.get_video_model("fal-ai/kling-video/v3/pro/text-to-video")
+    assert kling3.estimate_clip_usd(15, with_audio=False) == 1.68  # 33% cheaper than $2.52!
+    assert kling3.estimate_clip_usd(15, with_audio=True) == 2.52
+    k3_ep, k3_payload = build_registry_fal_payload(kling3, prompt='{"test":1}', duration_sec=10, aspect_ratio="16:9")
+    assert k3_ep == "fal-ai/kling-video/v3/pro/text-to-video"
+    assert k3_payload["generate_audio"] is False
+
+    hailuo = reg.get_video_model("fal-ai/minimax/hailuo-2.3/pro/text-to-video")
+    assert hailuo.estimate_clip_usd(8, with_audio=False) == 0.49
+    hl_ep, hl_payload = build_registry_fal_payload(
+        hailuo,
+        prompt="Cinematic 50mm push-in",
+        duration_sec=8,
+        aspect_ratio="16:9",
+        start_image="https://example.com/start.jpg",
+        negative_prompt="blurry",
+    )
+    assert hl_ep == "fal-ai/minimax/hailuo-2.3/pro/image-to-video"
+    assert hl_payload["image_url"] == "https://example.com/start.jpg"
+    assert "duration" not in hl_payload
+    assert "aspect_ratio" not in hl_payload
+    assert "negative_prompt" not in hl_payload
+
+    seedance = reg.get_video_model("fal-ai/bytedance/seedance/v1/lite/text-to-video")
+    assert seedance.estimate_clip_usd(5, with_audio=False) == 0.18
+
+    settings = Settings(data_dir=tmp_path / "data")
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        # UI markup sanity for Quality Tier Pill + Live Cost Estimate + Preview Stills + Per-Act Engine
+        html = client.get("/").text
+        assert 'id="spark-quality-tier"' in html
+        assert 'id="live-cost-pill"' in html
+        assert "updateLiveCostEstimate()" in html
+        assert 'id="btn-filmstrip-stills"' in html
+        assert 'id="ed-scene-model"' in html
+        assert 'id="ed-native-audio"' in html
+
+        # 2. Default 15s SaaS launch run (no recipe_id!) -> Smart Router + Auto-Hybrid drops cost from $2.52 to <= $0.55!
+        c15 = client.post(
+            "/api/stitch/projects",
+            json={
+                "idea": "Launch HyperQueue serverless Postgres workflow engine for AI agents",
+                "target_duration_sec": 15,
+                "mock": True,
+            },
+        )
+        assert c15.status_code == 200, c15.text
+        p15 = c15.json()
+        assert p15["video_model_id"] == "auto"
+        assert any(s["kind"] == "motion_graphic" for s in p15["scenes"])
+        assert p15["estimated_usd"] <= 0.55, f"Expected <=$0.55 on 15s default run, got {p15['estimated_usd']}"
+
+        # 3. 60s 7-Act Hybrid Film -> verify Cross-Graphic Continuity Lock & Model-Specific Prose vs JSON
+        c60 = client.post(
+            "/api/stitch/projects",
+            json={
+                "idea": "Introduce NovaDeploy autonomous cloud rollout platform with zero-downtime benchmarks",
+                "target_duration_sec": 60,
+                "brand_name": "NovaDeploy",
+                "mock": True,
+            },
+        )
+        assert c60.status_code == 200, c60.text
+        p60 = c60.json()
+        pid60 = p60["project_id"]
+        ai_acts = [(i, s) for i, s in enumerate(p60["scenes"]) if s["kind"] == "ai_sequence"]
+        assert len(ai_acts) >= 2
+
+        # Later AI act separated by Motion Graphics MUST carry world_continuity_lock!
+        later_idx, later_sc = ai_acts[-1]
+        if later_idx > 0 and not later_sc["continues_from_prev"]:
+            assert "world_continuity_lock" in later_sc["compiled_prompt_dict"]
+
+        # Override Act 1 to Kling 3.0 Pro (Structured JSON) and last AI Act to Seedance Lite (Natural Prose)
+        scenes_patch = list(p60["scenes"])
+        first_ai_idx = ai_acts[0][0]
+        scenes_patch[first_ai_idx]["video_model_id"] = "fal-ai/kling-video/v3/pro/text-to-video"
+        scenes_patch[later_idx]["video_model_id"] = "fal-ai/bytedance/seedance/v1/lite/text-to-video"
+        pr = client.patch(f"/api/stitch/projects/{pid60}", json={"scenes": scenes_patch})
+        assert pr.status_code == 200, pr.text
+        patched60 = pr.json()
+        assert patched60["scenes"][first_ai_idx]["compiled_prompt_str"].lstrip().startswith("{")
+        assert not patched60["scenes"][later_idx]["compiled_prompt_str"].lstrip().startswith("{")
+        assert patched60["scenes"][later_idx]["resolved_model_id"] == "fal-ai/bytedance/seedance/v1/lite/text-to-video"
+
+        # Plain-English Director Co-Pilot switch to Fast Draft mode across film
+        de = client.post(
+            f"/api/stitch/projects/{pid60}/direct-edit",
+            json={"instruction": "Switch to fast draft budget mode", "auto_render": False, "mock": True},
+        )
+        assert de.status_code == 200, de.text
+        assert de.json()["video_model_id"] == "fal-ai/bytedance/seedance/v1/lite/text-to-video"
+
+        # Render all 7 acts (parallel $0 motion graphics + sequential AI acts) & verify Master Cut QA!
+        ra = client.post(
+            f"/api/stitch/projects/{pid60}/render-all",
+            json={"mock": True, "sync": True},
+        )
+        assert ra.status_code == 200, ra.text
+        done60 = ra.json()
+        assert done60["master_video_url"]
+        assert done60["qa_report"]["passed"] is True
+        assert done60["qa_report"]["banger_score"] >= 86
+
+

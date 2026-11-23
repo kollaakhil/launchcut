@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ModelModality = Literal["video", "image", "llm"]
 DurationFormat = Literal["int", "string", "seconds_suffix"]
+PromptStyle = Literal["structured_json", "cinematic_prose"]
 
 
 class VideoModelSpec(BaseModel):
@@ -30,25 +31,31 @@ class VideoModelSpec(BaseModel):
     id: str = Field(..., min_length=2)
     i2v_id: str | None = None
     label: str = Field(..., min_length=2)
-    tier: str = "master"  # draft | master | 4k | audio | mock | custom
+    tier: str = "master"  # smart | draft | master | 4k | audio | mock | custom
     provider: Literal["fal", "gemini", "openrouter", "mock"] = "fal"
     resolution: str = "1080p"
+    prompt_style: PromptStyle = "structured_json"
     durations_sec: list[int] = Field(default_factory=lambda: [5, 8, 10, 15])
     default_duration_sec: int = 10
     duration_format: DurationFormat = "string"
+    omit_duration: bool = False
     max_prompt_chars: int = 2400
     supports_start_frame: bool = True
     supports_end_frame: bool = False
     supports_elements: bool = False
     supports_native_audio: bool = False
+    supports_negative_prompt: bool = True
     start_image_param: str = "start_image_url"
     end_image_param: str | None = "end_image_url"
     audio_param: str | None = "generate_audio"
     aspect_ratios: list[str] = Field(default_factory=lambda: ["16:9", "9:16", "1:1"])
+    omit_aspect: bool = False
     omit_aspect_on_i2v: bool = True
-    est_usd_per_sec: float = 0.168
+    est_usd_per_sec: float = 0.112
+    est_usd_per_sec_audio: float | None = None
+    flat_usd_per_clip: float | None = None
     extra_params: dict[str, Any] = Field(default_factory=dict)
-    fallback_id: str | None = "kling/v4/flash/text-to-video"
+    fallback_id: str | None = "fal-ai/kling-video/v2.5-turbo/pro/text-to-video"
     custom: bool = False
     badge: str = ""
 
@@ -75,8 +82,169 @@ class VideoModelSpec(BaseModel):
             return f"{snapped}s"
         return str(snapped)
 
+    def estimate_clip_usd(self, duration_sec: int | float, *, with_audio: bool = False) -> float:
+        """Estimate USD cost for a single rendered clip honoring silent vs audio & flat-rate pricing."""
+        if self.provider == "mock" or self.est_usd_per_sec <= 0.0 and self.flat_usd_per_clip is None:
+            return 0.0
+        if self.flat_usd_per_clip is not None:
+            return round(float(self.flat_usd_per_clip), 4)
+        snapped = float(self.snap_duration(duration_sec))
+        rate = (
+            float(self.est_usd_per_sec_audio)
+            if (with_audio and self.supports_native_audio and self.est_usd_per_sec_audio is not None)
+            else float(self.est_usd_per_sec)
+        )
+        return round(snapped * rate, 4)
+
 
 BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
+    VideoModelSpec(
+        id="auto",
+        i2v_id="auto",
+        label="Smart Multi-Model Router (Best Quality / $)",
+        tier="smart",
+        provider="fal",
+        resolution="1080p",
+        prompt_style="cinematic_prose",
+        durations_sec=[5, 6, 8, 10, 15],
+        default_duration_sec=8,
+        duration_format="string",
+        max_prompt_chars=2400,
+        supports_start_frame=True,
+        supports_end_frame=True,
+        supports_elements=True,
+        supports_native_audio=True,
+        est_usd_per_sec=0.078,
+        fallback_id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+        badge="Recommended · ~75% Cheaper",
+    ),
+    VideoModelSpec(
+        id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+        i2v_id="fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+        label="Kling 2.5 Turbo Pro (1080p Value)",
+        tier="draft",
+        provider="fal",
+        resolution="1080p",
+        prompt_style="cinematic_prose",
+        durations_sec=[5, 10],
+        default_duration_sec=5,
+        duration_format="string",
+        max_prompt_chars=2200,
+        supports_start_frame=True,
+        supports_end_frame=False,
+        supports_elements=False,
+        supports_native_audio=False,
+        start_image_param="image_url",
+        end_image_param=None,
+        audio_param=None,
+        omit_aspect_on_i2v=True,
+        est_usd_per_sec=0.07,
+        fallback_id="fal-ai/bytedance/seedance/v1/lite/text-to-video",
+        badge="1080p Value · $0.07/s",
+    ),
+    VideoModelSpec(
+        id="fal-ai/bytedance/seedance/v1/lite/text-to-video",
+        i2v_id="fal-ai/bytedance/seedance/v1/lite/image-to-video",
+        label="ByteDance Seedance Lite (Fast Test Draft)",
+        tier="draft",
+        provider="fal",
+        resolution="720p",
+        prompt_style="cinematic_prose",
+        durations_sec=[5, 8, 10],
+        default_duration_sec=5,
+        duration_format="string",
+        max_prompt_chars=1800,
+        supports_start_frame=True,
+        supports_end_frame=True,
+        supports_elements=False,
+        supports_native_audio=False,
+        supports_negative_prompt=False,
+        start_image_param="image_url",
+        end_image_param="end_image_url",
+        audio_param=None,
+        omit_aspect_on_i2v=False,
+        extra_params={"resolution": "720p"},
+        est_usd_per_sec=0.036,
+        fallback_id="fal-ai/wan-25-preview/text-to-video",
+        badge="$0.18 per 5s Test",
+    ),
+    VideoModelSpec(
+        id="fal-ai/wan-25-preview/text-to-video",
+        i2v_id="fal-ai/wan-25-preview/image-to-video",
+        label="Alibaba Wan 2.5 (Budget Motion)",
+        tier="draft",
+        provider="fal",
+        resolution="720p",
+        prompt_style="cinematic_prose",
+        durations_sec=[5, 10],
+        default_duration_sec=5,
+        duration_format="string",
+        max_prompt_chars=1800,
+        supports_start_frame=True,
+        supports_end_frame=False,
+        supports_elements=False,
+        supports_native_audio=False,
+        start_image_param="image_url",
+        end_image_param=None,
+        audio_param=None,
+        omit_aspect_on_i2v=True,
+        est_usd_per_sec=0.05,
+        fallback_id="fal-ai/bytedance/seedance/v1/lite/text-to-video",
+        badge="Budget · $0.05/s",
+    ),
+    VideoModelSpec(
+        id="fal-ai/minimax/hailuo-2.3/pro/text-to-video",
+        i2v_id="fal-ai/minimax/hailuo-2.3/pro/image-to-video",
+        label="MiniMax Hailuo 2.3 Pro (1080p Flat $0.49)",
+        tier="master",
+        provider="fal",
+        resolution="1080p",
+        prompt_style="cinematic_prose",
+        durations_sec=[6, 8],
+        default_duration_sec=6,
+        duration_format="int",
+        omit_duration=True,
+        omit_aspect=True,
+        max_prompt_chars=2000,
+        supports_start_frame=True,
+        supports_end_frame=False,
+        supports_elements=False,
+        supports_native_audio=False,
+        supports_negative_prompt=False,
+        start_image_param="image_url",
+        end_image_param=None,
+        audio_param=None,
+        extra_params={"prompt_optimizer": True},
+        est_usd_per_sec=0.075,
+        flat_usd_per_clip=0.49,
+        fallback_id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+        badge="1080p Physics · $0.49 Flat",
+    ),
+    VideoModelSpec(
+        id="fal-ai/kling-video/v3/standard/text-to-video",
+        i2v_id="fal-ai/kling-video/v3/standard/image-to-video",
+        label="Kling 3.0 Standard (Chained + @Elements)",
+        tier="master",
+        provider="fal",
+        resolution="1080p",
+        prompt_style="structured_json",
+        durations_sec=[5, 8, 10, 15],
+        default_duration_sec=8,
+        duration_format="string",
+        max_prompt_chars=2400,
+        supports_start_frame=True,
+        supports_end_frame=True,
+        supports_elements=True,
+        supports_native_audio=True,
+        start_image_param="start_image_url",
+        end_image_param="end_image_url",
+        audio_param="generate_audio",
+        omit_aspect_on_i2v=True,
+        est_usd_per_sec=0.084,
+        est_usd_per_sec_audio=0.126,
+        fallback_id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+        badge="Best 60s Continuity · $0.084/s",
+    ),
     VideoModelSpec(
         id="fal-ai/kling-video/v3/pro/text-to-video",
         i2v_id="fal-ai/kling-video/v3/pro/image-to-video",
@@ -84,6 +252,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="master",
         provider="fal",
         resolution="1080p",
+        prompt_style="structured_json",
         durations_sec=[5, 8, 10, 15],
         default_duration_sec=10,
         duration_format="string",
@@ -96,9 +265,10 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         end_image_param="end_image_url",
         audio_param="generate_audio",
         omit_aspect_on_i2v=True,
-        est_usd_per_sec=0.168,
-        fallback_id="kling/v4/flash/text-to-video",
-        badge="Best for 15s–60s Chained",
+        est_usd_per_sec=0.112,
+        est_usd_per_sec_audio=0.168,
+        fallback_id="fal-ai/kling-video/v3/standard/text-to-video",
+        badge="Hero Cinema · $0.112/s",
     ),
     VideoModelSpec(
         id="kling/v4/flash/text-to-video",
@@ -107,6 +277,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="draft",
         provider="fal",
         resolution="720p",
+        prompt_style="structured_json",
         durations_sec=[5, 8, 10, 15],
         default_duration_sec=10,
         duration_format="int",
@@ -115,13 +286,14 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         supports_end_frame=False,
         supports_elements=False,
         supports_native_audio=False,
+        supports_negative_prompt=False,
         start_image_param="start_image_url",
         end_image_param=None,
         audio_param=None,
         omit_aspect_on_i2v=True,
         est_usd_per_sec=0.094,
         extra_params={"resolution": "720p"},
-        fallback_id="fal-ai/kling-video/v3/pro/text-to-video",
+        fallback_id="fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
         badge="Fast Draft",
     ),
     VideoModelSpec(
@@ -131,6 +303,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="4k",
         provider="fal",
         resolution="4K",
+        prompt_style="structured_json",
         durations_sec=[5, 8, 10, 15],
         default_duration_sec=10,
         duration_format="string",
@@ -154,6 +327,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="audio",
         provider="fal",
         resolution="720p",
+        prompt_style="cinematic_prose",
         durations_sec=[4, 6, 8],
         default_duration_sec=8,
         duration_format="seconds_suffix",
@@ -168,7 +342,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         omit_aspect_on_i2v=False,
         est_usd_per_sec=0.15,
         extra_params={"resolution": "720p", "auto_fix": True},
-        fallback_id="fal-ai/kling-video/v3/pro/text-to-video",
+        fallback_id="fal-ai/kling-video/v3/standard/text-to-video",
         badge="Native ASMR Audio",
     ),
     VideoModelSpec(
@@ -178,6 +352,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="master",
         provider="fal",
         resolution="1080p",
+        prompt_style="cinematic_prose",
         durations_sec=[4, 6, 8],
         default_duration_sec=8,
         duration_format="seconds_suffix",
@@ -202,6 +377,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="master",
         provider="gemini",
         resolution="1080p",
+        prompt_style="cinematic_prose",
         durations_sec=[5, 8, 10],
         default_duration_sec=8,
         duration_format="int",
@@ -221,6 +397,7 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
         tier="mock",
         provider="mock",
         resolution="1080p",
+        prompt_style="structured_json",
         durations_sec=[5, 8, 10, 15],
         default_duration_sec=10,
         duration_format="int",
@@ -258,7 +435,7 @@ def build_registry_fal_payload(
     start_image: str | None = None,
     end_image: str | None = None,
     negative_prompt: str | None = None,
-    generate_audio: bool = True,
+    generate_audio: bool = False,
     element_image_urls: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Build (endpoint_slug, payload_dict) dynamically from VideoModelSpec capabilities."""
@@ -268,27 +445,33 @@ def build_registry_fal_payload(
 
     payload: dict[str, Any] = {
         "prompt": safe_prompt,
-        "duration": spec.format_duration(int(round(float(duration_sec)))),
     }
+    if not spec.omit_duration:
+        payload["duration"] = spec.format_duration(int(round(float(duration_sec))))
     if spec.extra_params:
         payload.update(spec.extra_params)
 
     if spec.audio_param:
         payload[spec.audio_param] = bool(generate_audio and spec.supports_native_audio)
 
-    if negative_prompt and negative_prompt.strip() and "kling/v4" not in endpoint.lower():
+    if (
+        spec.supports_negative_prompt
+        and negative_prompt
+        and negative_prompt.strip()
+        and "kling/v4" not in endpoint.lower()
+    ):
         payload["negative_prompt"] = negative_prompt.strip()[:500]
 
     if has_start:
         payload[spec.start_image_param] = start_image
         if spec.supports_end_frame and spec.end_image_param and _is_image_ref(end_image):
             payload[spec.end_image_param] = end_image
-        if not spec.omit_aspect_on_i2v:
+        if not spec.omit_aspect and not spec.omit_aspect_on_i2v:
             chosen_aspect = (
                 aspect_ratio if aspect_ratio in spec.aspect_ratios else spec.aspect_ratios[0]
             )
             payload["aspect_ratio"] = chosen_aspect
-    else:
+    elif not spec.omit_aspect:
         chosen_aspect = (
             aspect_ratio if aspect_ratio in spec.aspect_ratios else spec.aspect_ratios[0]
         )
@@ -412,10 +595,57 @@ class ModelRegistryStore:
         os.replace(tmp_path, self.custom_file)
 
 
+def select_optimal_scene_model(
+    registry: ModelRegistryStore,
+    *,
+    project_model_id: str,
+    scene_model_id: str | None = None,
+    narrative_role: str = "",
+    duration_sec: int = 8,
+    has_elements: bool = False,
+    has_end_frame: bool = False,
+    needs_native_audio: bool = False,
+    aspect_ratio: str = "16:9",
+) -> VideoModelSpec:
+    """Resolve the optimal concrete VideoModelSpec for one Act (honors per-act overrides & 'auto' router)."""
+    sc_override = (scene_model_id or "").strip()
+    if sc_override and sc_override != "auto":
+        return registry.get_video_model(sc_override)
+
+    proj_choice = (project_model_id or "").strip()
+    if proj_choice and proj_choice != "auto":
+        return registry.get_video_model(proj_choice)
+
+    # Smart Multi-Model Router ('auto'): pick best price/performance + continuity engine per Act!
+    role = (narrative_role or "").strip().lower()
+    if needs_native_audio and duration_sec <= 8 and not has_elements and not has_end_frame:
+        return registry.get_video_model("fal-ai/veo3/fast")
+
+    if has_elements or has_end_frame or duration_sec >= 12:
+        # Acts needing @Elements identity lock or Start->End bridging:
+        # Use Kling 3.0 Pro ($0.112/s silent) on Hero Hook, and Kling 3.0 Standard ($0.084/s silent) elsewhere!
+        if role == "hook":
+            return registry.get_video_model("fal-ai/kling-video/v3/pro/text-to-video")
+        return registry.get_video_model("fal-ai/kling-video/v3/standard/text-to-video")
+
+    # Standard 5s-10s cinema acts without @Elements lock:
+    if aspect_ratio == "16:9" and 6 <= duration_sec <= 8:
+        # Hailuo 2.3 Pro delivers crisp 1080p cinema physics at a flat $0.49 per clip!
+        return registry.get_video_model("fal-ai/minimax/hailuo-2.3/pro/text-to-video")
+    if duration_sec <= 5:
+        # Crisp 1080p Kling 2.5 Turbo Pro at $0.07/sec ($0.35 for 5s!)
+        return registry.get_video_model("fal-ai/kling-video/v2.5-turbo/pro/text-to-video")
+    if role in ("hook", "climax_cta"):
+        return registry.get_video_model("fal-ai/kling-video/v3/standard/text-to-video")
+    return registry.get_video_model("fal-ai/kling-video/v2.5-turbo/pro/text-to-video")
+
+
 __all__ = [
     "BUILTIN_LLM_MODELS",
     "BUILTIN_VIDEO_MODELS",
     "ModelRegistryStore",
+    "PromptStyle",
     "VideoModelSpec",
     "build_registry_fal_payload",
+    "select_optimal_scene_model",
 ]

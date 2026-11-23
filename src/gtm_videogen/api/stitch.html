@@ -1576,13 +1576,13 @@
            ondragover="onComposerDragOver(event)"
            ondragleave="onComposerDragLeave(event)"
            ondrop="onComposerDrop(event)">
-        <textarea class="brief-textarea" id="spark-idea" rows="3"
+        <textarea class="brief-textarea" id="spark-idea" rows="3" oninput="updateLiveCostEstimate()"
           placeholder="Describe what you want to make — a 1-line idea, product launch brief, key metrics, tone, or spoken script…&#10;e.g. Introduce VeloceAI: 10x faster code review in 200ms, show a live UI zoom, a benchmark chart, and end on a bold launch callout."></textarea>
 
         <div class="brief-attach-row">
           <div class="brief-url-wrap">
             <span style="font-size:13px;opacity:0.65;">🔗</span>
-            <input class="brief-url-input" id="spark-url" type="url" placeholder="Optional product or brand URL (https://yourbrand.com)" />
+            <input class="brief-url-input" id="spark-url" type="url" oninput="updateLiveCostEstimate()" placeholder="Optional product or brand URL (https://yourbrand.com)" />
           </div>
           <label class="pill-btn" style="cursor:pointer;" title="Drop or select UI screenshots, product photos, brand logo, or .mp4 clips">
             📎 Attach Assets
@@ -1593,7 +1593,7 @@
 
         <div class="brief-footer">
           <div class="intent-pills">
-            <select class="intent-select" id="spark-duration" title="Target Video Length">
+            <select class="intent-select" id="spark-duration" title="Target Video Length" onchange="updateLiveCostEstimate()">
               <option value="10">⏱ 10s (Quick Hook)</option>
               <option value="15">⏱ 15s (Short Spot)</option>
               <option value="30">⏱ 30s (Story Spot)</option>
@@ -1605,14 +1605,23 @@
               <option value="9:16">▯ 9:16 Vertical</option>
               <option value="1:1">□ 1:1 Square</option>
             </select>
-            <select class="intent-select" id="spark-audio-intent" title="Audio &amp; Voiceover">
+            <select class="intent-select" id="spark-audio-intent" title="Audio &amp; Voiceover" onchange="updateLiveCostEstimate()">
               <option value="native_plus_score" selected>🎵 Music + Sound</option>
               <option value="vo_plus_ducked_score">🎙 Voiceover + Captions</option>
               <option value="native_only">🔇 Pure Clip Audio</option>
             </select>
+            <select class="intent-select" id="spark-quality-tier" title="Multi-Model Quality &amp; Budget Tier" onchange="onQualityTierChange(this.value)">
+              <option value="auto" selected>🎯 Smart Multi-Model (Best $)</option>
+              <option value="fal-ai/bytedance/seedance/v1/lite/text-to-video">⚡ Fast Test Draft ($0.18/5s)</option>
+              <option value="fal-ai/kling-video/v2.5-turbo/pro/text-to-video">💎 1080p Value ($0.07/s)</option>
+              <option value="fal-ai/minimax/hailuo-2.3/pro/text-to-video">🎥 Hailuo 2.3 Pro ($0.49 Flat)</option>
+              <option value="fal-ai/kling-video/v3/pro/text-to-video">🎬 Kling 3.0 Pro ($0.11/s)</option>
+              <option value="fal-ai/veo3/fast">🔊 Veo 3 Native Audio</option>
+            </select>
           </div>
 
-          <div class="spark-actions">
+          <div class="spark-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="tag-pill ok" id="live-cost-pill" title="Estimated AI render cost (Motion Graphics render locally at $0)">Est. ~$0.98</span>
             <button class="spark-cta ink" id="btn-direct-now" onclick="directFromSpark()" title="Review &amp; customize storyboard in Studio before rendering">✦ Storyboard First</button>
             <button class="spark-cta" id="btn-autopilot" onclick="autoProduceFromSpark()" title="1-click express: writes story, renders motion graphics &amp; cinema, masters audio &amp; runs Video QA">⚡ Auto-Produce</button>
           </div>
@@ -1855,6 +1864,7 @@
           <button type="button" class="copilot-chip" onclick="quickCopilotChip('Turn selected act into a terminal CLI reveal')">⌨ Terminal CLI</button>
           <button type="button" class="copilot-chip" onclick="quickCopilotChip('Enable spoken voiceover and word-synced captions')">🎙 Voiceover + Captions</button>
           <button type="button" class="copilot-chip" onclick="quickCopilotChip('Add 2.39:1 cinema letterbox and 35mm film grain')">🎬 Cinema Finish</button>
+          <button type="button" class="copilot-chip" onclick="quickCopilotChip('Switch to fast draft budget mode')">⚡ Fast Draft ($0.18)</button>
         </div>
       </div>
 
@@ -1862,9 +1872,10 @@
       <div class="studio-filmstrip-head">
         <div>
           <strong style="font-size:16px;">Storyboard &amp; Takes</strong>
-          <span style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Edit spoken lines inline, re-shoot individual acts, or click ✎ Fine-Tune for full control</span>
+          <span style="font-size:12.5px;color:var(--ink-muted);margin-left:8px;">Edit spoken lines inline, preview stills for pennies, or re-shoot individual acts</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button class="pill-btn" id="btn-filmstrip-stills" onclick="generateAllKeyframesUI()" title="Preview continuity-locked Start &amp; End stills across all acts (~$0.03/still) before shooting video">🖼 Preview Stills</button>
           <button class="pill-btn" id="btn-render-all" onclick="renderAllScenesUI()">↻ Re-Shoot All Acts</button>
           <select class="intent-select" id="add-act-select" style="padding:7px 12px;font-size:12px;" onchange="if(this.value){addScenePrompt(this.value);this.value='';}">
             <option value="">＋ Add Act…</option>
@@ -1890,7 +1901,7 @@
     </div>
     <div class="drawer-body" id="drawer-body"></div>
     <div class="drawer-foot">
-      <button class="mini-btn" onclick="toggleDrawerJson()">&lt;/&gt; Inspect Live Model JSON</button>
+      <button class="mini-btn" onclick="toggleDrawerJson()">&lt;/&gt; Inspect Model Prompt</button>
       <div style="display:flex;gap:8px;">
         <button class="pill-btn" onclick="closeSceneDrawer()">Cancel</button>
         <button class="pill-btn primary" id="btn-save-scene" onclick="saveSceneFromDrawer()">Save Scene</button>
@@ -2141,10 +2152,11 @@
       state.mockMode = Boolean(isMock);
       document.getElementById('mode-live-btn').classList.toggle('active', !state.mockMode);
       document.getElementById('mode-mock-btn').classList.toggle('active', state.mockMode);
+      updateLiveCostEstimate();
       showBanner(
         state.mockMode
           ? 'Instant $0 Preview mode enabled — scripts, motion graphics & takes run locally in seconds.'
-          : 'Live AI Studio mode enabled — powered by Gemini CLI, OpenRouter & fal.ai.',
+          : 'Live AI Studio mode enabled — powered by Smart Multi-Model Router, Gemini CLI, OpenRouter & fal.ai.',
         'info'
       );
     }
@@ -2185,6 +2197,14 @@
       }
     }
 
+    function _formatModelPriceTag(m) {
+      if (!m) return '';
+      if (m.id === 'auto') return 'Best Quality/$';
+      if (m.flat_usd_per_clip && m.flat_usd_per_clip > 0) return `$${Number(m.flat_usd_per_clip).toFixed(2)} flat`;
+      if (m.est_usd_per_sec > 0) return `~$${Number(m.est_usd_per_sec).toFixed(3).replace(/0$/, '')}/s`;
+      return '$0';
+    }
+
     function populateCatalogControls() {
       const cat = state.catalog;
       if (!cat) return;
@@ -2201,24 +2221,78 @@
       fill('preset-motion', cat.motions || []);
       fill('spark-llm-model', cat.llm_models || []);
       const vmHtml = (cat.video_models || []).map(m =>
-        `<option value="${esc(m.id)}">${esc(m.label)} (${esc(m.resolution)}${m.est_usd_per_sec > 0 ? ` · ~$${m.est_usd_per_sec.toFixed(2)}/s` : ' · $0'})</option>`
+        `<option value="${esc(m.id)}">${esc(m.label)} (${esc(m.resolution)} · ${esc(_formatModelPriceTag(m))})</option>`
       ).join('');
       for (const sid of ['spark-video-model', 'shoot-model-select']) {
         const el = document.getElementById(sid);
         if (el) {
-          const prev = el.value;
+          const prev = el.value || 'auto';
           el.innerHTML = vmHtml;
-          if (prev && (cat.video_models || []).some(m => m.id === prev)) el.value = prev;
+          if ((cat.video_models || []).some(m => m.id === prev)) el.value = prev;
         }
       }
       if (state.project) {
         const sm = document.getElementById('shoot-model-select');
         if (sm) sm.value = state.project.video_model_id;
       }
+      updateLiveCostEstimate();
+    }
+
+    function onQualityTierChange(val) {
+      const sv = document.getElementById('spark-video-model');
+      if (sv && val) sv.value = val;
+      if (val === 'mock') setMockMode(true);
+      updateLiveCostEstimate();
     }
 
     function onSparkModelChange(val) {
+      const qt = document.getElementById('spark-quality-tier');
+      if (qt && Array.from(qt.options).some(o => o.value === val)) qt.value = val;
       if (val === 'mock') setMockMode(true);
+      updateLiveCostEstimate();
+    }
+
+    function updateLiveCostEstimate() {
+      const pill = document.getElementById('live-cost-pill');
+      if (!pill) return;
+      if (state.mockMode) {
+        pill.textContent = 'Est. $0 (Instant)';
+        pill.className = 'tag-pill ok';
+        return;
+      }
+      const durSec = Number(document.getElementById('spark-duration')?.value || 60);
+      const modelId = document.getElementById('spark-video-model')?.value || document.getElementById('spark-quality-tier')?.value || 'auto';
+      const audioIntent = document.getElementById('spark-audio-intent')?.value || 'native_plus_score';
+      const idea = (document.getElementById('spark-idea')?.value || '').trim();
+      const url = (document.getElementById('spark-url')?.value || '').trim();
+      const rec = (state.catalog?.gallery || []).find(g => g.id === state.selectedRecipeId);
+
+      // Estimate how much of the runtime is $0 Living Motion Graphics vs cloud AI video
+      const hasHybridTheme = Boolean(rec && Array.isArray(rec.hybrid_plan) && rec.hybrid_plan.length);
+      const looksLikeLaunch = Boolean(url) || (!rec && /\b(launch|saas|app|platform|software|api|sdk|cli|code|dashboard|ai|agent|startup|product|tool|workflow|benchmark|faster|cloud|deploy)\b/i.test(idea || 'launch'));
+      let aiSec = durSec;
+      let aiClips = Math.max(1, Math.round(durSec / 9));
+      if (hasHybridTheme || looksLikeLaunch) {
+        aiClips = durSec <= 18 ? 1 : (durSec <= 48 ? 1 : 2);
+        aiSec = aiClips * (durSec <= 11 ? 5 : 8);
+      }
+
+      const spec = (state.catalog?.video_models || []).find(m => m.id === modelId);
+      const withAudio = audioIntent === 'native_only' || Boolean(rec && rec.category === 'asmr');
+      let est = 0;
+      if (modelId === 'mock') {
+        est = 0;
+      } else if (modelId === 'auto' || !spec) {
+        est = aiClips === 1 ? 0.49 : (aiClips * 0.68 + 0.03);
+      } else if (spec.flat_usd_per_clip && spec.flat_usd_per_clip > 0) {
+        est = aiClips * Number(spec.flat_usd_per_clip);
+      } else {
+        const rate = (withAudio && spec.est_usd_per_sec_audio) ? Number(spec.est_usd_per_sec_audio) : Number(spec.est_usd_per_sec || 0.07);
+        est = aiSec * rate + (aiClips >= 2 ? 0.03 : 0);
+      }
+      if (audioIntent === 'vo_plus_ducked_score' && est > 0) est += 0.04;
+      pill.textContent = est <= 0.005 ? 'Est. $0' : `Est. ~$${est.toFixed(2)}`;
+      pill.className = est <= 1.25 ? 'tag-pill ok' : 'tag-pill warn';
     }
 
     function renderSavedProjects(list) {
@@ -2396,6 +2470,7 @@
         document.getElementById('spark-aspect').value = rec.default_aspect;
       }
       renderGallery();
+      updateLiveCostEstimate();
       const hasInput = Boolean(
         document.getElementById('spark-idea').value.trim() ||
         document.getElementById('spark-url').value.trim()
@@ -2411,6 +2486,7 @@
     function clearGalleryTheme() {
       state.selectedRecipeId = null;
       renderGallery();
+      updateLiveCostEstimate();
     }
 
     async function launchGallerySample(recipeId) {
@@ -2423,6 +2499,7 @@
       document.getElementById('preset-lighting').value = rec.lighting_preset;
       document.getElementById('preset-motion').value = rec.motion_preset;
       renderGallery();
+      updateLiveCostEstimate();
       await createProjectFlow({
         idea: rec.idea,
         source_url: null,
@@ -2514,6 +2591,7 @@
       setButtonLoading(btn, true, 'Producing…');
       const durSec = Number(document.getElementById('spark-duration').value || 60);
       const audioIntent = document.getElementById('spark-audio-intent')?.value || 'native_plus_score';
+      const chosenModel = document.getElementById('spark-video-model')?.value || document.getElementById('spark-quality-tier')?.value || 'auto';
       const hasStaged = state.stagedFiles.length > 0;
 
       startProgress({
@@ -2529,7 +2607,7 @@
           source_url: url || null,
           target_duration_sec: durSec,
           aspect_ratio: document.getElementById('spark-aspect').value || '16:9',
-          video_model_id: document.getElementById('spark-video-model').value || 'fal-ai/kling-video/v3/pro/text-to-video',
+          video_model_id: chosenModel,
           llm_model_id: document.getElementById('spark-llm-model').value || '',
           world_preset: document.getElementById('preset-world').value,
           camera_preset: document.getElementById('preset-camera').value,
@@ -2554,7 +2632,7 @@
           state.autopilotActive = true;
           proj = await api(`/api/stitch/projects/${encodeURIComponent(proj.project_id)}/render-all`, {
             method: 'POST',
-            body: JSON.stringify({ engine_id: proj.video_model_id, mock: state.mockMode, sync: false }),
+            body: JSON.stringify({ engine_id: null, mock: state.mockMode, sync: false }),
           });
         } else {
           proj = await api('/api/stitch/autopilot', {
@@ -2599,6 +2677,7 @@
         g => g.id === (overrides.recipe_id !== undefined ? overrides.recipe_id : state.selectedRecipeId)
       );
       const audioIntent = document.getElementById('spark-audio-intent')?.value || 'native_plus_score';
+      const chosenModel = document.getElementById('spark-video-model')?.value || document.getElementById('spark-quality-tier')?.value || 'auto';
       const steps = sourceUrl
         ? ['Research Brand URL', 'Apply Visual Style', 'Write Storyboard', 'Verify Script Gate']
         : ['Apply Visual Style', 'Write Storyboard', 'Verify Script Gate'];
@@ -2615,7 +2694,7 @@
           source_url: sourceUrl,
           target_duration_sec: Number(document.getElementById('spark-duration').value || 60),
           aspect_ratio: document.getElementById('spark-aspect').value || '16:9',
-          video_model_id: document.getElementById('spark-video-model').value || 'fal-ai/kling-video/v3/pro/text-to-video',
+          video_model_id: chosenModel,
           llm_model_id: document.getElementById('spark-llm-model').value || '',
           world_preset: overrides.world_preset || document.getElementById('preset-world').value,
           camera_preset: overrides.camera_preset || document.getElementById('preset-camera').value,
@@ -3021,6 +3100,7 @@
       const stripSig = JSON.stringify(scenes.map(s => [
         s.scene_id, s.title, s.kind, s.duration_sec, s.render_status,
         s.winning_take_id, s.winning_clip_url, s.vo_line,
+        s.resolved_model_id, s.estimated_usd, s.video_model_id,
         s.graphic_spec?.template_id, s.graphic_spec?.headline, s.graphic_spec?.screenshot_url,
         s.user_clip?.clip_url, s.start_keyframe_media_url, (s.takes || []).length,
         state.editingSceneId === s.scene_id,
@@ -3037,11 +3117,22 @@
         const bgGrad = sc.colors && sc.colors.length >= 2
           ? `linear-gradient(135deg, ${esc(sc.colors[0])}, ${esc(sc.colors[1])})`
           : 'linear-gradient(135deg, #27221E, #46392D)';
+        const shortEngine = String(sc.resolved_model_label || 'AI Cinema')
+          .replace(/^ByteDance\s+/i, '')
+          .replace(/^MiniMax\s+/i, '')
+          .replace(/^Alibaba\s+/i, '')
+          .replace(/^Google\s+/i, '')
+          .split('(')[0]
+          .trim()
+          .slice(0, 18);
+        const aiCostStr = (!state.mockMode && Number(sc.estimated_usd || 0) > 0)
+          ? ` · $${Number(sc.estimated_usd).toFixed(2)}`
+          : '';
         const kindBadge = sc.kind === 'motion_graphic'
-          ? _friendlyTemplateLabel(sc.graphic_spec?.template_id)
+          ? `${_friendlyTemplateLabel(sc.graphic_spec?.template_id)} · $0`
           : sc.kind === 'user_clip'
-            ? (sc.user_clip?.clip_url ? '📹 My Video' : '📹 Upload Video')
-            : '✦ AI Cinema';
+            ? (sc.user_clip?.clip_url ? '📹 My Video · $0' : '📹 Upload Video')
+            : `✦ ${shortEngine}${aiCostStr}`;
         const roleTag = sc.narrative_role
           ? `<span class="spec-chip" style="text-transform:uppercase;font-size:10px;letter-spacing:0.05em;">${esc(sc.narrative_role.replace(/_/g, ' '))}</span>`
           : '';
@@ -3463,6 +3554,22 @@
 
         <!-- AI Cinema Controls -->
         <div id="ed-ai-section" style="display:${sc.kind === 'ai_sequence' || sc.kind === 'kinetic_ui' ? 'flex' : 'none'};flex-direction:column;gap:12px;">
+          <div class="form-grid-2">
+            <div class="field-group">
+              <label class="field-label">Video Engine for This Act</label>
+              <select class="field-select" id="ed-scene-model">
+                <option value="" ${!sc.video_model_id ? 'selected' : ''}>🎯 Inherit (${esc(sc.resolved_model_label || 'Smart Router')})</option>
+                ${(state.catalog?.video_models || []).filter(m => m.id !== 'auto').map(m =>
+                  `<option value="${esc(m.id)}" ${sc.video_model_id === m.id ? 'selected' : ''}>${esc(m.label)} (${esc(_formatModelPriceTag(m))})</option>`
+                ).join('')}
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;margin-top:20px;cursor:pointer;" title="Leave unchecked to save ~33% when using music or spoken voiceover">
+              <input type="checkbox" id="ed-native-audio" ${sc.enable_native_audio ? 'checked' : ''} />
+              Native Foley Audio (+$)
+            </label>
+          </div>
+
           <div class="field-group">
             <label class="field-label">Camera Position &amp; Movement</label>
             <input class="field-input" id="ed-camera" value="${esc(sc.camera_spec)}" />
@@ -3563,8 +3670,8 @@
         </details>
 
         <div id="drawer-json-wrap" style="display:${showJson ? 'block' : 'none'};">
-          <div class="field-label" style="margin-bottom:6px;">Live Compiled Model JSON (${esc(activeM.label || 'Video Model')})</div>
-          <pre class="json-preview">${esc(JSON.stringify(sc.compiled_prompt_dict || {}, null, 2))}</pre>
+          <div class="field-label" style="margin-bottom:6px;">Compiled Model Prompt (${esc(sc.resolved_model_label || activeM.label || 'Video Model')} · ${sc.compiled_prompt_chars || 0}/${sc.max_prompt_chars || 2400} chars)</div>
+          <pre class="json-preview">${esc(sc.compiled_prompt_str || JSON.stringify(sc.compiled_prompt_dict || {}, null, 2))}</pre>
         </div>
       `;
 
@@ -3675,6 +3782,8 @@
         title: document.getElementById('ed-title').value.trim() || scenesCopy[idx].title,
         duration_sec: durVal,
         kind: kindVal,
+        video_model_id: (document.getElementById('ed-scene-model')?.value || '').trim() || null,
+        enable_native_audio: Boolean(document.getElementById('ed-native-audio')?.checked),
         continues_from_prev: chainEl ? chainEl.checked : false,
         subjects: splitCsv(document.getElementById('ed-subjects')?.value),
         materials: splitCsv(document.getElementById('ed-materials')?.value),
@@ -3762,7 +3871,7 @@
 
     async function generateAllKeyframesUI() {
       if (!state.project) return;
-      const btn = document.getElementById('btn-gen-all-kf');
+      const btn = document.getElementById('btn-filmstrip-stills') || document.getElementById('btn-gen-all-kf');
       setButtonLoading(btn, true, 'Generating Stills…');
       const count = (state.project.scenes || []).length || 1;
       startProgress({
@@ -3828,12 +3937,13 @@
 
     async function renderSingleSceneUI(sceneId) {
       if (!state.project) return;
-      const engine_id = document.getElementById('shoot-model-select').value;
+      const rawEng = document.getElementById('shoot-model-select')?.value || '';
+      const engine_id = (rawEng && rawEng !== state.project.video_model_id) ? rawEng : null;
       const scIdx = (state.project.scenes || []).findIndex(s => s.scene_id === sceneId);
       const actLabel = scIdx >= 0 ? `Act ${scIdx + 1}` : 'Act';
       startProgress({
         message: `Shooting ${actLabel}…`,
-        steps: ['Queue Engine', `Render ${actLabel} Take`, 'Extract Last Frame'],
+        steps: ['Select Optimal Engine', `Render ${actLabel} Take`, 'Extract Continuity Frame'],
         avgDurationSec: state.mockMode ? 3 : 45,
       });
       try {
@@ -3851,13 +3961,14 @@
 
     async function renderAllScenesUI() {
       if (!state.project) return;
-      const engine_id = document.getElementById('shoot-model-select').value;
+      const rawEng = document.getElementById('shoot-model-select')?.value || '';
+      const engine_id = (rawEng && rawEng !== state.project.video_model_id) ? rawEng : null;
       const scenes = state.project.scenes || [];
       const steps = scenes.map((s, i) => `Act ${i + 1}`);
       startProgress({
-        message: `Shooting ${scenes.length} Act(s) sequentially with continuity chaining…`,
+        message: `Producing ${scenes.length} Act(s) ($0 Motion Graphics in parallel + 60s World-Locked AI Cinema)…`,
         steps: steps.length ? steps : ['Shoot Acts'],
-        avgDurationSec: state.mockMode ? 5 : Math.max(40, scenes.length * 45),
+        avgDurationSec: state.mockMode ? 5 : Math.max(40, scenes.length * 38),
       });
       try {
         const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}/render-all`, {
