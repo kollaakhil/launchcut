@@ -4000,10 +4000,14 @@
 
     function startPollingProject() {
       if (state.pollTimer) clearInterval(state.pollTimer);
+      let notFoundStrikes = 0;
+      let netErrorStrikes = 0;
       state.pollTimer = setInterval(async () => {
         if (!state.project) return;
         try {
           const proj = await api(`/api/stitch/projects/${encodeURIComponent(state.project.project_id)}`);
+          notFoundStrikes = 0;
+          netErrorStrikes = 0;
           setProject(proj);
           if (state.activeStage === 'studio') renderStudioWorkspace(false);
           const scenes = proj.scenes || [];
@@ -4039,7 +4043,26 @@
               steps: scenes.length > 1 ? scenes.map((_, i) => `Act ${i + 1}`) : state.progressSteps,
             });
           }
-        } catch {}
+        } catch (err) {
+          const msg = String(err?.message || '').toLowerCase();
+          if (msg.includes('not found') || msg.includes('404')) {
+            notFoundStrikes += 1;
+            if (notFoundStrikes >= 2) {
+              clearInterval(state.pollTimer);
+              state.pollTimer = null;
+              state.autoStitchAfterRender = false;
+              state.autopilotActive = false;
+              finishProgress('Server restarted during deploy/update — refresh this page and click ⚡ Auto-Produce to run cleanly on the new version.', 'error');
+            }
+          } else {
+            netErrorStrikes += 1;
+            if (netErrorStrikes >= 10) {
+              clearInterval(state.pollTimer);
+              state.pollTimer = null;
+              finishProgress(`Lost connection to server (${err?.message || 'network timeout'}). Please refresh and retry.`, 'error');
+            }
+          }
+        }
       }, 2200);
     }
 

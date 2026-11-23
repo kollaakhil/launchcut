@@ -904,8 +904,10 @@ async def render_motion_template_mp4(
                     screenshot_img=screenshot_img,
                 )
                 proc.stdin.write(frame.tobytes())
-                if fi % 6 == 0:
+                del frame
+                if fi % 4 == 0:
                     await proc.stdin.drain()
+                    await asyncio.sleep(0)
             proc.stdin.close()
         except Exception:
             proc.kill()

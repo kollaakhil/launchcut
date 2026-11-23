@@ -2011,48 +2011,9 @@ async def render_all_scenes(
             cancel=cancel,
         )
 
-    local_indices = [i for i, s in enumerate(project.scenes) if s.kind != "ai_sequence"]
-    ai_indices = [i for i, s in enumerate(project.scenes) if s.kind == "ai_sequence"]
+    import gc
 
-    if len(local_indices) > 1:
-        sem = asyncio.Semaphore(2)
-
-        async def _render_local(idx: int) -> None:
-            async with sem:
-                if cancel is not None:
-                    cancel.raise_if_cancelled()
-                await render_single_scene_take(
-                    project,
-                    idx,
-                    media_dir,
-                    engine_id=engine_id,
-                    registry_store=registry_store,
-                    settings=settings,
-                    media_store=media_store,
-                    mock=mock,
-                    on_progress=on_progress,
-                    cancel=cancel,
-                )
-
-        await asyncio.gather(*(_render_local(i) for i in local_indices))
-    else:
-        for idx in local_indices:
-            if cancel is not None:
-                cancel.raise_if_cancelled()
-            await render_single_scene_take(
-                project,
-                idx,
-                media_dir,
-                engine_id=engine_id,
-                registry_store=registry_store,
-                settings=settings,
-                media_store=media_store,
-                mock=mock,
-                on_progress=on_progress,
-                cancel=cancel,
-            )
-
-    for idx in ai_indices:
+    for idx in range(len(project.scenes)):
         if cancel is not None:
             cancel.raise_if_cancelled()
         await render_single_scene_take(
@@ -2067,6 +2028,7 @@ async def render_all_scenes(
             on_progress=on_progress,
             cancel=cancel,
         )
+        gc.collect()
 
     return await stitch_master_cut(
         project,
