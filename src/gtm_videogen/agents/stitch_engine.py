@@ -3239,8 +3239,282 @@ async def export_campaign_pack(
     return project
 
 
+async def apply_director_intent_edit(
+    project: StitchProject,
+    media_dir: Path,
+    *,
+    instruction: str,
+    target_scene_id: str | None = None,
+    auto_render: bool = True,
+    registry_store: ModelRegistryStore | None = None,
+    settings: Settings | None = None,
+    mock: bool = False,
+    on_progress: Any | None = None,
+    cancel: CancellationToken | None = None,
+) -> StitchProject:
+    """Apply a natural-language Director instruction across 1 Act or the whole film and optionally re-render."""
+    resolved = settings or get_settings()
+    reg = registry_store or ModelRegistryStore(resolved.data_dir / "stitch")
+    model_spec = reg.get_video_model(project.video_model_id)
+    clean_inst = instruction.strip()
+    if not clean_inst:
+        return project
+
+    changed_indices: set[int] = set()
+    global_changed = False
+    low = clean_inst.lower()
+
+    # Resolve explicit "Act N" mention if target_scene_id was not passed
+    inferred_target_id = (target_scene_id or "").strip() or None
+    if not inferred_target_id:
+        act_m = re.search(r"\b(?:act|scene)\s*(\d+)\b", low)
+        if act_m:
+            act_num = int(act_m.group(1)) - 1
+            if 0 <= act_num < len(project.scenes):
+                inferred_target_id = project.scenes[act_num].scene_id
+
+    applied_via_llm = False
+    if not mock and (resolved.openrouter_api_key.strip() or is_gemini_cli_ready(resolved)):
+        sys_prompt = (
+            "You are a Master Film & Motion-Graphics Director updating an existing StitchProject "
+            "from a user's plain-English instruction. Keep unchanged acts intact! "
+            "Available motion_graphic template_ids: kinetic_headline, device_showcase_25d, "
+            "prompt_ui_demo, node_flow_diagram, benchmark_bars, bento_feature_grid, "
+            "terminal_code, split_comparison, customer_quote_proof, kinetic_hook_reel. "
+            "RULES: Never put readable words inside `ai_sequence` scene descriptions (use `motion_graphic` "
+            "templates when the user wants charts, quotes, code, or UI text). Keep `vo_line` <= 2.6 words/sec. "
+            "Return ONLY valid JSON with optional keys: title, audio_mode ('native_only'|'native_plus_score'|'vo_plus_ducked_score'), "
+            "seam_transition ('invisible_chain'|'micro_dissolve'|'audio_riser'), cinema_letterbox (bool), "
+            "film_grain (bool), enable_captions (bool), and `scene_updates` (array of objects with `scene_id` "
+            "plus any updated fields: kind, title, duration_sec, vo_line, camera_spec, subjects, materials, "
+            "colors, end_frame, template_id, eyebrow, headline, subheadline, prompt_text, response_lines)."
+        )
+        usr_prompt = json.dumps(
+            {
+                "instruction": clean_inst,
+                "target_scene_id": inferred_target_id,
+                "project_title": project.title,
+                "brand_name": project.brand_name or "",
+                "scenes": [
+                    {
+                        "scene_id": s.scene_id,
+                        "index": s.index,
+                        "title": s.title,
+                        "kind": s.kind,
+                        "duration_sec": s.duration_sec,
+                        "vo_line": s.vo_line,
+                        "camera_spec": s.camera_spec,
+                        "template_id": s.graphic_spec.template_id if s.graphic_spec else None,
+                        "headline": s.graphic_spec.headline if s.graphic_spec else None,
+                    }
+                    for s in project.scenes
+                ],
+            },
+            indent=2,
+        )
+        llm_patch = await _call_openrouter_json(
+            system_prompt=sys_prompt,
+            user_prompt=usr_prompt,
+            settings=resolved,
+            llm_model_id=project.llm_model_id,
+            max_tokens=3200,
+            temperature=0.45,
+            cancel=cancel,
+        )
+        if isinstance(llm_patch, dict):
+            for gf in ("title", "audio_mode", "seam_transition", "cinema_letterbox", "film_grain", "enable_captions"):
+                if gf in llm_patch and llm_patch[gf] is not None:
+                    setattr(project, gf, llm_patch[gf])
+                    global_changed = True
+            updates = llm_patch.get("scene_updates")
+            if isinstance(updates, list) and updates:
+                by_id = {s.scene_id: (i, s) for i, s in enumerate(project.scenes)}
+                for upd in updates:
+                    if not isinstance(upd, dict):
+                        continue
+                    sid = str(upd.get("scene_id") or "")
+                    if sid not in by_id:
+                        continue
+                    idx, sc = by_id[sid]
+                    if upd.get("kind") in ("ai_sequence", "motion_graphic", "user_clip", "kinetic_ui"):
+                        sc.kind = upd["kind"]
+                    if isinstance(upd.get("title"), str) and upd["title"].strip():
+                        sc.title = upd["title"].strip()[:64]
+                    if isinstance(upd.get("duration_sec"), (int, float)):
+                        sc.duration_sec = max(3, min(20, int(upd["duration_sec"])))
+                    if isinstance(upd.get("vo_line"), str):
+                        sc.vo_line = upd["vo_line"].strip()[:180]
+                    if isinstance(upd.get("camera_spec"), str) and upd["camera_spec"].strip():
+                        sc.camera_spec = upd["camera_spec"].strip()[:180]
+                    if isinstance(upd.get("end_frame"), str) and upd["end_frame"].strip():
+                        sc.end_frame = upd["end_frame"].strip()[:220]
+                    if isinstance(upd.get("subjects"), list) and upd["subjects"]:
+                        sc.subjects = [str(x).strip() for x in upd["subjects"] if str(x).strip()][:4]
+                    if isinstance(upd.get("materials"), list) and upd["materials"]:
+                        sc.materials = [str(x).strip() for x in upd["materials"] if str(x).strip()][:4]
+                    if sc.kind == "motion_graphic":
+                        tpl = str(upd.get("template_id") or (sc.graphic_spec.template_id if sc.graphic_spec else "prompt_ui_demo"))
+                        base_g = sc.graphic_spec or _default_graphic_spec(
+                            tpl,  # type: ignore[arg-type]
+                            brand=project.brand_name or project.title,
+                            idea=project.idea,
+                            scraped={},
+                            world_id=project.world_preset,
+                        )
+                        base_g.template_id = tpl  # type: ignore[assignment]
+                        if isinstance(upd.get("eyebrow"), str) and upd["eyebrow"].strip():
+                            base_g.eyebrow = upd["eyebrow"].strip()[:36]
+                        if isinstance(upd.get("headline"), str) and upd["headline"].strip():
+                            base_g.headline = upd["headline"].strip()[:72]
+                        if isinstance(upd.get("subheadline"), str):
+                            base_g.subheadline = upd["subheadline"].strip()[:110]
+                        if isinstance(upd.get("prompt_text"), str):
+                            base_g.prompt_text = upd["prompt_text"].strip()[:90]
+                        if isinstance(upd.get("response_lines"), list) and upd["response_lines"]:
+                            base_g.response_lines = [str(x).strip() for x in upd["response_lines"] if str(x).strip()][:4]
+                        sc.graphic_spec = base_g
+                    elif sc.beats:
+                        sc.beats[0].action = f"{clean_inst[:140]}. {sc.beats[0].action}"[:220]
+                    changed_indices.add(idx)
+                    applied_via_llm = True
+
+    if not applied_via_llm:
+        # Deterministic instant intent parser ($0 / offline / global-only tweaks)
+        if any(w in low for w in ("letterbox", "2.39", "anamorphic", "widescreen bar")):
+            project.cinema_letterbox = "no letterbox" not in low and "remove letterbox" not in low
+            global_changed = True
+        if any(w in low for w in ("film grain", "35mm", "16mm", "grainy", "vintage grain")):
+            project.film_grain = "no grain" not in low and "remove grain" not in low
+            global_changed = True
+        if any(w in low for w in ("caption", "subtitle")):
+            project.enable_captions = "no caption" not in low and "hide caption" not in low
+            global_changed = True
+        if any(w in low for w in ("voiceover", "narrat", "speak")):
+            project.audio_mode = "vo_plus_ducked_score"
+            global_changed = True
+        if "dissolve" in low or "crossfade" in low:
+            project.seam_transition = "micro_dissolve"
+            global_changed = True
+
+        # Pick target scene index (explicit -> hook if "hook"/"opening" -> outro/last if "ending"/"cta" -> middle act)
+        target_idx: int | None = None
+        if inferred_target_id:
+            for i, s in enumerate(project.scenes):
+                if s.scene_id == inferred_target_id:
+                    target_idx = i
+                    break
+        elif any(w in low for w in ("hook", "opening", "intro", "first")):
+            target_idx = 0
+        elif any(w in low for w in ("ending", "outro", "final", "last", "cta")):
+            target_idx = len(project.scenes) - 1
+        elif not global_changed and project.scenes:
+            target_idx = min(len(project.scenes) - 1, max(0, len(project.scenes) // 2))
+
+        if target_idx is not None and 0 <= target_idx < len(project.scenes):
+            sc = project.scenes[target_idx]
+            brand = project.brand_name or project.title
+            # Detect template swap intent
+            tpl_map: list[tuple[tuple[str, ...], MotionTemplateId]] = [
+                (("before", "after", "split", "compare", "comparison", "vs"), "split_comparison"),
+                (("benchmark", "chart", "bar", "roi", "metric", "faster"), "benchmark_bars"),
+                (("quote", "testimonial", "customer", "review"), "customer_quote_proof"),
+                (("terminal", "cli", "sdk", "code", "command"), "terminal_code"),
+                (("2.5d", "macbook", "iphone", "device", "screen", "dashboard", "tour"), "device_showcase_25d"),
+                (("node", "architecture", "pipeline", "diagram", "workflow"), "node_flow_diagram"),
+                (("bento", "grid", "3 card", "three feature"), "bento_feature_grid"),
+                (("hook slam", "word slam", "social hook"), "kinetic_hook_reel"),
+                (("prompt", "typing", "chat demo"), "prompt_ui_demo"),
+                (("headline", "manifesto", "editorial title"), "kinetic_headline"),
+            ]
+            matched_tpl: MotionTemplateId | None = None
+            for kws, tpl_id in tpl_map:
+                if any(k in low for k in kws):
+                    matched_tpl = tpl_id
+                    break
+
+            quoted = re.findall(r'"([^"]{3,120})"', clean_inst) or re.findall(r"'([^']{3,120})'", clean_inst)
+            custom_copy = quoted[0].strip() if quoted else ""
+
+            if matched_tpl is not None:
+                prev_shot = sc.graphic_spec.screenshot_path if sc.graphic_spec else None
+                gs = _default_graphic_spec(
+                    matched_tpl,
+                    brand=brand,
+                    idea=custom_copy or clean_inst,
+                    scraped={},
+                    world_id=project.world_preset,
+                )
+                if custom_copy:
+                    gs.headline = custom_copy[:68]
+                    sc.vo_line = custom_copy[:160]
+                if prev_shot:
+                    gs.screenshot_path = prev_shot
+                sc.kind = "motion_graphic"
+                sc.graphic_spec = gs
+                sc.title = f"Act {target_idx + 1} · {matched_tpl.replace('_', ' ').title()}"
+                changed_indices.add(target_idx)
+            elif any(w in low for w in ("ai cinema", "cinematic shot", "photoreal", "live action")):
+                sc.kind = "ai_sequence"
+                sc.camera_spec = f"{clean_inst[:95]} · smooth continuous cinema glide"
+                if custom_copy:
+                    sc.vo_line = custom_copy[:160]
+                if sc.beats:
+                    sc.beats[0].action = f"{clean_inst[:150]}."
+                changed_indices.add(target_idx)
+            else:
+                if custom_copy and any(w in low for w in ("say", "vo", "voice", "line", "narrat")):
+                    sc.vo_line = custom_copy[:160]
+                elif sc.kind == "motion_graphic" and sc.graphic_spec is not None:
+                    sc.graphic_spec.headline = (custom_copy or clean_inst)[:68]
+                else:
+                    sc.camera_spec = f"{clean_inst[:110]} · {sc.camera_spec[:55]}"
+                    if sc.beats:
+                        sc.beats[0].action = f"{clean_inst[:140]}. {sc.beats[0].action}"[:220]
+                    if custom_copy:
+                        sc.vo_line = custom_copy[:160]
+                changed_indices.add(target_idx)
+
+    apply_deterministic_script_autofix(project, model_spec)
+    project.target_duration_sec = project.total_duration_sec()
+
+    # Re-render only the changed Act(s) (and chained successor if applicable), then re-stitch if ready
+    if auto_render and (changed_indices or (global_changed and project.master_video_path)):
+        to_shoot = sorted(changed_indices)
+        for idx in list(to_shoot):
+            if (
+                idx + 1 < len(project.scenes)
+                and project.scenes[idx + 1].continues_from_prev
+                and (idx + 1) not in changed_indices
+            ):
+                to_shoot.append(idx + 1)
+        for idx in sorted(set(to_shoot)):
+            await render_single_scene_take(
+                project,
+                idx,
+                media_dir,
+                registry_store=reg,
+                settings=resolved,
+                mock=mock,
+                on_progress=on_progress,
+                cancel=cancel,
+            )
+        if all(s.winning_take() is not None for s in project.scenes):
+            await stitch_master_cut(
+                project,
+                media_dir,
+                settings=resolved,
+                mock=mock,
+                cancel=cancel,
+            )
+
+    summary_acts = ", ".join(f"Act {i + 1}" for i in sorted(changed_indices)) or "film settings"
+    project.status_message = f"Applied Director note to {summary_acts}."
+    return project
+
+
 __all__ = [
     "StitchProjectStore",
+    "apply_director_intent_edit",
     "autofix_from_qa_report",
     "autopilot_produce_project",
     "compile_stitch_project",

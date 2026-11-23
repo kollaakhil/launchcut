@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gtm_videogen.agents.stitch_engine import (
     StitchProjectStore,
+    apply_director_intent_edit,
     autofix_from_qa_report,
     autopilot_produce_project,
     compile_stitch_project,
@@ -200,7 +201,7 @@ def _serialize_project(project: StitchProject, registry: ModelRegistryStore) -> 
 class PitchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    idea: str = Field(default="", max_length=1500)
+    idea: str = Field(default="", max_length=3000)
     source_url: str | None = None
     llm_model_id: str = ""
     mock: bool = False
@@ -209,7 +210,7 @@ class PitchRequest(BaseModel):
 class CreateProjectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    idea: str = Field(..., min_length=2, max_length=1500)
+    idea: str = Field(..., min_length=2, max_length=3000)
     target_duration_sec: int = Field(default=15, ge=5, le=60)
     aspect_ratio: StitchAspect = "16:9"
     video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
@@ -218,6 +219,8 @@ class CreateProjectRequest(BaseModel):
     camera_preset: str = "macro_tilt_shift"
     lighting_preset: str = "volumetric_gold"
     motion_preset: str = "asmr_tactile"
+    audio_mode: AudioMode | None = None
+    enable_captions: bool | None = None
     source_url: str | None = None
     recipe_id: str | None = None
     brand_name: str | None = None
@@ -463,6 +466,10 @@ async def create_project(payload: CreateProjectRequest, services: ServicesDep) -
         settings=services.settings,
         mock=payload.mock,
     )
+    if payload.audio_mode is not None:
+        project.audio_mode = payload.audio_mode
+    if payload.enable_captions is not None:
+        project.enable_captions = payload.enable_captions
     store.save(project)
     return _serialize_project(project, reg)
 
@@ -1299,7 +1306,7 @@ class QARequest(BaseModel):
 class AutopilotRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    idea: str = Field(..., min_length=2, max_length=1500)
+    idea: str = Field(..., min_length=2, max_length=3000)
     target_duration_sec: int = Field(default=60, ge=5, le=60)
     aspect_ratio: StitchAspect = "16:9"
     video_model_id: str = "fal-ai/kling-video/v3/pro/text-to-video"
@@ -1308,12 +1315,140 @@ class AutopilotRequest(BaseModel):
     camera_preset: str = "macro_tilt_shift"
     lighting_preset: str = "volumetric_gold"
     motion_preset: str = "asmr_tactile"
+    audio_mode: AudioMode | None = None
+    enable_captions: bool | None = None
     source_url: str | None = None
     recipe_id: str | None = None
     brand_name: str | None = None
     brand_tagline: str | None = None
     mock: bool = False
     sync: bool = False
+
+
+class DirectEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instruction: str = Field(..., min_length=2, max_length=1500)
+    target_scene_id: str | None = None
+    auto_render: bool = True
+    mock: bool = False
+
+
+@stitch_router.post("/projects/{project_id}/direct-edit")
+async def direct_edit_endpoint(
+    project_id: str, payload: DirectEditRequest, services: ServicesDep
+) -> dict[str, Any]:
+    """Natural-language Director Co-Pilot: update 1 Act or the whole film and incrementally re-render."""
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+    try:
+        await apply_director_intent_edit(
+            project,
+            store.media_dir(project_id),
+            instruction=payload.instruction,
+            target_scene_id=payload.target_scene_id,
+            auto_render=payload.auto_render,
+            registry_store=reg,
+            settings=services.settings,
+            mock=payload.mock,
+            on_progress=lambda p: store.save(p),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    store.save(project)
+    return _serialize_project(project, reg)
+
+
+@stitch_router.post("/projects/{project_id}/smart-attach")
+async def smart_attach_endpoint(
+    project_id: str,
+    file: Annotated[UploadFile, File(...)],
+    services: ServicesDep,
+    role: str = "auto",
+) -> dict[str, Any]:
+    """Unified asset drop: route uploaded image (logo / screenshot / @Element1) or video (A-Roll / clip) automatically."""
+    store = _get_store(services)
+    reg = _get_registry(services)
+    project = store.load(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Stitch project not found")
+
+    media_dir = store.media_dir(project_id)
+    orig_name = (file.filename or "asset").strip()
+    ext = Path(orig_name).suffix.lower()
+    ctype = (file.content_type or "").lower()
+
+    is_video = ext in _ALLOWED_VIDEO_EXTS or ctype.startswith("video/")
+    if is_video:
+        out_path, clean_name, dur = await _save_upload_video_chunked(
+            file, media_dir, "attached_video", ffprobe_bin=services.settings.ffprobe_bin
+        )
+        if role == "aroll" or (role == "auto" and dur >= 16.0):
+            project.aroll_clip_path = str(out_path)
+            project.aroll_filename = clean_name[:80]
+            project.aroll_duration_sec = round(dur, 2)
+            project.timeline_mode = "aroll_with_cutaways"
+            project.status_message = f"Attached Founder video '{clean_name}' ({dur:.1f}s)."
+        else:
+            # Attach onto an existing user_clip Act or Act 2 (showcase slot)
+            target_sc = next((s for s in project.scenes if s.kind == "user_clip"), None)
+            if target_sc is None and project.scenes:
+                idx_pick = min(1, len(project.scenes) - 1)
+                target_sc = project.scenes[idx_pick]
+            if target_sc is not None:
+                target_sc.kind = "user_clip"
+                target_sc.user_clip = UserClipSpec(
+                    raw_video_path=str(out_path),
+                    filename=clean_name[:80],
+                    source_duration_sec=round(dur, 2),
+                    trim_start_sec=0.0,
+                    trim_end_sec=round(min(dur, 12.0), 2),
+                    framing="cover_crop",
+                    keep_original_audio=True,
+                )
+                target_sc.duration_sec = max(3, min(15, int(round(min(dur, 12.0)))))
+                project.target_duration_sec = project.total_duration_sec()
+                project.status_message = f"Attached clip '{clean_name}' onto Act {target_sc.index + 1}."
+        store.save(project)
+        return _serialize_project(project, reg)
+
+    # Image asset (.png / .jpg / .webp)
+    raw = await file.read(16 * 1024 * 1024)
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty.")
+    img_ext = ext if ext in (".png", ".jpg", ".jpeg", ".webp") else ".png"
+    out_img = media_dir / f"asset_{uuid4().hex[:6]}{img_ext}"
+    out_img.write_bytes(raw)
+
+    is_logo = role == "logo" or ("logo" in orig_name.lower() and role == "auto")
+    if is_logo:
+        project.brand_logo_path = str(out_img)
+        project.add_brand_outro = True
+        project.status_message = f"Attached brand logo '{orig_name[:40]}' to Outro."
+    else:
+        # Lock into @Element1 AND inject into any 2.5D / UI demo motion graphic frames!
+        el = StitchElement(
+            slot=1,
+            tag="@Element1",
+            role="product",
+            label=orig_name[:48] or "Product Reference",
+            image_path=str(out_img),
+            filename=orig_name[:80],
+        )
+        project.elements = [e for e in project.elements if e.slot != 1]
+        project.elements.insert(0, el)
+        for sc in project.scenes:
+            if sc.graphic_spec and sc.graphic_spec.template_id in ("device_showcase_25d", "prompt_ui_demo"):
+                sc.graphic_spec.screenshot_path = str(out_img)
+        project.brand_kit_loaded = True
+        project.brand_kit_summary = "Uploaded Product Visual"
+        project.status_message = f"Attached '{orig_name[:40]}' to product scenes & UI frames."
+
+    store.save(project)
+    return _serialize_project(project, reg)
 
 
 @stitch_router.post("/projects/{project_id}/qa")
@@ -1387,6 +1522,10 @@ async def autopilot_endpoint(
         settings=services.settings,
         mock=payload.mock,
     )
+    if payload.audio_mode is not None:
+        project.audio_mode = payload.audio_mode
+    if payload.enable_captions is not None:
+        project.enable_captions = payload.enable_captions
     project.status = "shooting"
     project.status_message = f"Autopilot started · Producing {len(project.scenes)}-act film..."
     store.save(project)

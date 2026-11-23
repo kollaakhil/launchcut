@@ -303,7 +303,7 @@ async def test_loop3_flawed_black_silent_video_caught_by_qa_and_healed_by_autofi
 
 
 def test_loop5_intuitive_ui_autopilot_and_qa_scorecard_markup(tmp_path: Path) -> None:
-    """Verify Stage 1 1-Click Auto-Produce + Stage 4 QA Scorecard UI & Gemini CLI model catalog."""
+    """Verify 2-Screen Intent Studio UI (Brief Composer + Co-Pilot + QA Scorecard) & Gemini CLI catalog."""
     from fastapi.testclient import TestClient
 
     from gtm_videogen.api.app import create_app
@@ -314,9 +314,16 @@ def test_loop5_intuitive_ui_autopilot_and_qa_scorecard_markup(tmp_path: Path) ->
         r = client.get("/")
         assert r.status_code == 200
         html = r.text
+        assert 'id="nav-studio"' in html
+        assert 'id="brief-composer"' in html
+        assert 'id="composer-files"' in html
+        assert 'id="spark-audio-intent"' in html
         assert 'id="btn-autopilot"' in html
         assert "autoProduceFromSpark()" in html
         assert "60s (1-Min Banger Film)" in html
+        assert 'id="copilot-input"' in html
+        assert "applyDirectorCopilotUI()" in html
+        assert 'id="studio-acts-strip"' in html
         assert 'id="qa-scorecard-box"' in html
         assert "renderQAScorecard" in html
         assert "runQAAutofixUI()" in html
@@ -325,3 +332,108 @@ def test_loop5_intuitive_ui_autopilot_and_qa_scorecard_markup(tmp_path: Path) ->
         cat = client.get("/api/stitch/catalog").json()
         assert any(m["id"] == "gemini-omni-1.2-flash" for m in cat["video_models"])
         assert any("gemini-cli/" in m["id"] for m in cat["llm_models"])
+
+
+def test_2screen_intent_studio_copilot_and_smart_attach(tmp_path: Path) -> None:
+    """Verify multi-line creative brief, smart asset routing, and surgical Director Co-Pilot edits."""
+    import io
+
+    from fastapi.testclient import TestClient
+    from PIL import Image
+
+    from gtm_videogen.api.app import create_app
+
+    def _png_bytes(color: tuple[int, int, int]) -> bytes:
+        img = Image.new("RGB", (320, 180), color)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    settings = Settings(data_dir=tmp_path / "data")
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        # 1. Create project from a multi-line creative brief + upfront audio/caption intent
+        brief = (
+            "Launch VeloceAI autonomous PR reviewer:\n"
+            "- Catches production race conditions in 180ms\n"
+            "- Show crisp UI demo and benchmark proof\n"
+            "- Confident editorial tone"
+        )
+        c_resp = client.post(
+            "/api/stitch/projects",
+            json={
+                "idea": brief,
+                "target_duration_sec": 15,
+                "recipe_id": "linear_dark_craft",
+                "brand_name": "VeloceAI",
+                "audio_mode": "vo_plus_ducked_score",
+                "enable_captions": True,
+                "mock": True,
+            },
+        )
+        assert c_resp.status_code == 200, c_resp.text
+        proj = c_resp.json()
+        pid = proj["project_id"]
+        assert proj["audio_mode"] == "vo_plus_ducked_score"
+        assert proj["enable_captions"] is True
+        assert len(proj["scenes"]) >= 2
+
+        # 2. Smart-attach a UI screenshot -> locks @Element1 and attaches to UI showcase act
+        att_ui = client.post(
+            f"/api/stitch/projects/{pid}/smart-attach",
+            files={"file": ("dashboard_ui.png", _png_bytes((24, 34, 52)), "image/png")},
+            data={"role": "auto"},
+        )
+        assert att_ui.status_code == 200, att_ui.text
+        proj_after_ui = att_ui.json()
+        assert len(proj_after_ui["elements"]) == 1
+        assert proj_after_ui["elements"][0]["tag"] == "@Element1"
+        assert any(
+            (s.get("graphic_spec") or {}).get("screenshot_url")
+            for s in proj_after_ui["scenes"]
+        )
+
+        # 3. Smart-attach a brand logo -> automatically enables Brand Logo Outro
+        att_logo = client.post(
+            f"/api/stitch/projects/{pid}/smart-attach",
+            files={"file": ("veloce_logo.png", _png_bytes((229, 77, 58)), "image/png")},
+            data={"role": "auto"},
+        )
+        assert att_logo.status_code == 200, att_logo.text
+        assert att_logo.json()["add_brand_outro"] is True
+
+        # 4. Render all acts & stitch initial Master Cut
+        r_all = client.post(
+            f"/api/stitch/projects/{pid}/render-all",
+            json={"mock": True, "sync": True},
+        )
+        assert r_all.status_code == 200
+        st = client.post(f"/api/stitch/projects/{pid}/stitch", json={"mock": True})
+        assert st.status_code == 200
+        assert st.json()["master_video_url"]
+        act1_takes_before = len(st.json()["scenes"][0]["takes"])
+        act2_takes_before = len(st.json()["scenes"][1]["takes"])
+
+        # 5. Surgical Director Co-Pilot edit: transform Act 2 into a benchmark chart + cinema letterbox
+        edit_resp = client.post(
+            f"/api/stitch/projects/{pid}/direct-edit",
+            json={
+                "instruction": 'Turn Act 2 into an animated benchmark chart saying "Ten times faster than manual review" and add 2.39:1 cinema letterbox',
+                "auto_render": True,
+                "mock": True,
+            },
+        )
+        assert edit_resp.status_code == 200, edit_resp.text
+        edited = edit_resp.json()
+        assert edited["cinema_letterbox"] is True
+        act2 = edited["scenes"][1]
+        assert act2["kind"] == "motion_graphic"
+        assert act2["graphic_spec"]["template_id"] == "benchmark_bars"
+        assert "Ten times faster" in act2["vo_line"]
+        # Surgical re-render: Act 1 was NOT re-shot, while Act 2 got a fresh take and Master Cut re-stitched!
+        assert len(edited["scenes"][0]["takes"]) == act1_takes_before
+        assert len(act2["takes"]) == act2_takes_before + 1
+        assert edited["master_video_url"]
+        assert edited["qa_report"]["passed"] is True
+        assert edited["qa_report"]["banger_score"] >= 86
+
