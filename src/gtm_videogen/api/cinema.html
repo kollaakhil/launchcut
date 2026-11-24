@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Launch Cut Cinema Studio — From One Line &amp; Taste to a Coherent Film</title>
+  <meta name="description" content="Direct a 1–3 minute coherent narrative film or brand story from a single-line idea and your personal taste, powered by a 3-layer JSON state machine and Start/End frame continuity." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-canvas: hsl(24, 12%, 7%);
+      --bg-surface: hsl(24, 10%, 11%);
+      --bg-elevated: hsl(24, 9%, 15%);
+      --bg-inset: hsl(24, 14%, 5%);
+      --border-subtle: hsla(36, 20%, 82%, 0.09);
+      --border-strong: hsla(36, 24%, 84%, 0.18);
+      --text-primary: hsl(38, 28%, 93%);
+      --text-secondary: hsl(34, 12%, 68%);
+      --text-muted: hsl(30, 8%, 48%);
+      --accent-amber: hsl(35, 78%, 56%);
+      --accent-amber-hover: hsl(35, 84%, 63%);
+      --accent-amber-soft: hsla(35, 78%, 56%, 0.13);
+      --status-ok: hsl(150, 38%, 50%);
+      --status-warn: hsl(38, 82%, 58%);
+      --status-err: hsl(6, 68%, 58%);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+      min-height: 100vh;
+      padding-bottom: 96px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Header */
+    header.studio-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+      background: hsla(24, 12%, 7%, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      letter-spacing: 0.01em;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    nav.stage-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-surface);
+      padding: 4px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .stage-tab {
+      background: transparent;
+      color: var(--text-secondary);
+      border: none;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.16s ease, color 0.16s ease;
+    }
+
+    .stage-tab:hover:not(:disabled) {
+      color: var(--text-primary);
+      background: hsla(36, 20%, 85%, 0.05);
+    }
+
+    .stage-tab.active {
+      background: var(--bg-elevated);
+      color: var(--accent-amber);
+      font-weight: 600;
+    }
+
+    .stage-tab:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Buttons & Inputs */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 15px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: hsl(24, 9%, 19%);
+      border-color: hsla(36, 28%, 85%, 0.3);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent-amber);
+      color: hsl(24, 20%, 8%);
+      border-color: var(--accent-amber);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-amber-hover);
+      border-color: var(--accent-amber-hover);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    /* Live Progress Banner */
+    .progress-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 24px;
+      background: hsl(32, 24%, 12%);
+      border-bottom: 1px solid hsla(35, 78%, 56%, 0.25);
+      font-size: 13px;
+    }
+
+    .progress-banner.visible {
+      display: flex;
+    }
+
+    .progress-track {
+      flex: 1;
+      max-width: 340px;
+      height: 5px;
+      background: var(--bg-inset);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-amber);
+      width: 0%;
+      transition: width 0.35s ease;
+    }
+
+    /* Main Container */
+    main.studio-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+
+    .stage-panel {
+      display: none;
+    }
+
+    .stage-panel.active {
+      display: block;
+    }
+
+    .hero-header {
+      max-width: 780px;
+      margin-bottom: 24px;
+    }
+
+    .hero-header h1 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1.12;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+
+    .hero-header p {
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    /* Stage 1: Idea & Taste Intake */
+    .intake-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .logline-textarea {
+      width: 100%;
+      min-height: 88px;
+      padding: 14px 16px;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .logline-textarea:focus,
+    .text-input:focus,
+    .select-input:focus,
+    .json-editor-area:focus {
+      outline: none;
+      border-color: var(--accent-amber);
+    }
+
+    .intake-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .inline-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .select-input,
+    .text-input {
+      background: var(--bg-inset);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 7px 11px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+    }
+
+    .mode-pill-group {
+      display: inline-flex;
+      background: var(--bg-inset);
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .mode-pill {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 5px 11px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mode-pill.active {
+      background: var(--bg-elevated);
+      color: var(--accent-amber);
+    }
+
+    /* Mood World Cards */
+    .section-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .section-label h2 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text-primary);
+    }
+
+    .section-label span {
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    .mood-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .mood-card {
+      position: relative;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.16s ease, border-color 0.16s ease;
+    }
+
+    .mood-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-strong);
+    }
+
+    .mood-card.selected {
+      border-color: var(--accent-amber);
+      background: hsl(28, 14%, 13%);
+    }
+
+    .mood-thumb {
+      width: 100%;
+      height: 118px;
+      object-fit: cover;
+      display: block;
+      background: var(--bg-inset);
+    }
+
+    .mood-body {
+      padding: 11px 13px;
+    }
+
+    .mood-title {
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .mood-tagline {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .swatch-row {
+      display: flex;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .swatch-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Optional Fine-Tune Drawer */
+    details.tune-drawer {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+    }
+
+    details.tune-drawer summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-secondary);
+      user-select: none;
+    }
+
+    .tune-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 18px;
+      margin-top: 16px;
+    }
+
+    .dial-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .dial-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-amber);
+    }
+
+    /* Stage 2: Treatments & WorldVault */
+    .treatments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .treatment-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .treatment-card.selected {
+      border-color: var(--accent-amber);
+    }
+
+    .treatment-look {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: var(--bg-inset);
+    }
+
+    .treatment-content {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .treatment-title {
+      font-family: var(--font-serif);
+      font-size: 23px;
+      line-height: 1.2;
+    }
+
+    .meta-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .meta-tag.amber {
+      background: var(--accent-amber-soft);
+      color: var(--accent-amber);
+    }
+
+    .meta-tag.ok {
+      background: hsla(150, 38%, 50%, 0.14);
+      color: var(--status-ok);
+    }
+
+    /* Vault Grid */
+    .vault-section {
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .vault-columns {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .entity-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 15px;
+    }
+
+    .entity-card img.sheet-preview {
+      width: 100%;
+      height: 138px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      background: var(--bg-inset);
+    }
+
+    .wall-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .wall-pair img {
+      width: 100%;
+      height: 96px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      background: var(--bg-inset);
+    }
+
+    /* Tension Spine Strip */
+    .spine-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+      margin: 16px 0 24px;
+    }
+
+    .spine-node {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 13px;
+    }
+
+    /* Stage 3: Leica Reel & Shots */
+    .player-split {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 960px) {
+      .player-split {
+        grid-template-columns: 1fr;
+      }
+      header.studio-topbar {
+        flex-wrap: wrap;
+      }
+    }
+
+    .video-stage-box {
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .video-stage-box video {
+      width: 100%;
+      max-height: 440px;
+      display: block;
+      background: #000;
+    }
+
+    .scene-block {
+      margin-bottom: 28px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+    }
+
+    .scene-block-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 16px;
+    }
+
+    .shots-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
+    }
+
+    .shot-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .keyframe-bridge {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kf-slot {
+      background: var(--bg-inset);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .kf-slot img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+    }
+
+    .kf-caption {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      padding: 4px 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .dialogue-quote {
+      background: var(--bg-inset);
+      border-left: 2px solid var(--accent-amber);
+      padding: 7px 10px;
+      border-radius: 0 4px 4px 0;
+      font-size: 12.5px;
+      color: var(--text-primary);
+    }
+
+    /* Sticky Producer Taste Bar */
+    .producer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 45;
+      background: hsla(24, 11%, 9%, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-strong);
+      padding: 10px 24px;
+      display: none;
+    }
+
+    .producer-bar.visible {
+      display: block;
+    }
+
+    .producer-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chip-scroll {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .taste-chip {
+      white-space: nowrap;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border-radius: 99px;
+      padding: 5px 11px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.14s ease, color 0.14s ease;
+    }
+
+    .taste-chip:hover {
+      border-color: var(--accent-amber);
+      color: var(--text-primary);
+    }
+
+    .director-note-form {
+      flex: 1;
+      min-width: 260px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .director-note-form input {
+      flex: 1;
+    }
+
+    /* 2-Way Live JSON Inspector Slide-Over Drawer */
+    .json-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.62);
+      display: none;
+      justify-content: flex-end;
+    }
+
+    .json-drawer-backdrop.open {
+      display: flex;
+    }
+
+    .json-drawer {
+      width: min(680px, 96vw);
+      height: 100%;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-strong);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 12px;
+    }
+
+    .json-editor-area {
+      flex: 1;
+      width: 100%;
+      background: var(--bg-inset);
+      color: hsl(38, 35%, 88%);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.5;
+      resize: none;
+    }
+
+    .toast-msg {
+      position: fixed;
+      top: 68px;
+      right: 24px;
+      z-index: 80;
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-amber);
+      color: var(--text-primary);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="studio-topbar">
+    <div class="brand-cluster">
+      <a href="/cinema" class="brand-mark" id="cinema-brand-link">Launch Cut Cinema</a>
+      <span class="brand-sub">Story &amp; Continuity Studio</span>
+    </div>
+
+    <nav class="stage-tabs" aria-label="Film Studio Departments">
+      <button type="button" class="stage-tab active" id="tab-stage-1" onclick="switchStage(1)">01 · Idea &amp; Taste</button>
+      <button type="button" class="stage-tab" id="tab-stage-2" onclick="switchStage(2)" disabled>02 · Treatments &amp; Vault</button>
+      <button type="button" class="stage-tab" id="tab-stage-3" onclick="switchStage(3)" disabled>03 · Leica Reel &amp; Shots</button>
+      <button type="button" class="stage-tab" id="tab-stage-4" onclick="switchStage(4)" disabled>04 · Screening Room</button>
+    </nav>
+
+    <div class="topbar-actions">
+      <select id="saved-projects-select" class="select-input" aria-label="Load Saved Film" onchange="loadSelectedProject(this.value)">
+        <option value="">Recent Films...</option>
+      </select>
+      <button type="button" class="btn btn-ghost btn-sm" id="open-master-json-btn" onclick="openJsonInspector('project')" disabled>{ } Master JSON</button>
+      <a href="/" class="btn btn-ghost btn-sm" id="switch-to-stitch-link">Quick Stitch &rarr;</a>
+    </div>
+  </header>
+
+  <div class="progress-banner" id="live-progress-banner" role="status">
+    <div>
+      <strong id="progress-stage-label">Working...</strong>
+      <span id="progress-status-msg" style="color: var(--text-secondary); margin-left: 10px;"></span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <div class="toast-msg" id="studio-toast"></div>
+
+  <main class="studio-shell">
+    <!-- STAGE 1: IDEA & TASTE -->
+    <section class="stage-panel active" id="panel-stage-1">
+      <div class="hero-header">
+        <h1>Bring one line and your taste. We bring the film crew.</h1>
+        <p>Describe a story, feeling, or product moment in plain English. Launch Cut builds a consistent Character &amp; Location Vault, times dialogue first, locks Start &amp; End frames, and mixes a real cinema soundstage.</p>
+      </div>
+
+      <div class="intake-card">
+        <textarea
+          id="idea-input"
+          class="logline-textarea"
+          placeholder="e.g. At 2 AM in a rain-soaked coastal observatory, an acoustic engineer about to shut down her dead array hears an impossible warm harmonic answering from the storm..."
+        ></textarea>
+
+        <div class="intake-toolbar">
+          <div class="inline-controls">
+            <div class="mode-pill-group" role="group" aria-label="Direction Mode">
+              <button type="button" class="mode-pill active" id="mode-guided-btn" onclick="setWorkflowMode('guided')">Guided Checkpoints</button>
+              <button type="button" class="mode-pill" id="mode-autopilot-btn" onclick="setWorkflowMode('autopilot')">1-Click Autopilot</button>
+            </div>
+
+            <select id="duration-select" class="select-input" aria-label="Target Runtime">
+              <option value="60">1 Min Short (60s)</option>
+              <option value="90" selected>1.5 Min Cinema Short (90s)</option>
+              <option value="120">2 Min Short Film (120s)</option>
+              <option value="180">3 Min Narrative Film (180s)</option>
+            </select>
+
+            <select id="aspect-select" class="select-input" aria-label="Aspect Ratio">
+              <option value="16:9" selected>16:9 Widescreen</option>
+              <option value="9:16">9:16 Vertical Cinema</option>
+              <option value="1:1">1:1 Square Frame</option>
+            </select>
+
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;">
+              <input type="checkbox" id="offline-mock-toggle" />
+              $0 Instant Draft Mode
+            </label>
+          </div>
+
+          <button type="button" class="btn btn-primary" id="develop-film-btn" onclick="createFilmProject()">
+            Develop Treatments &amp; Look-Tests &rarr;
+          </button>
+        </div>
+      </div>
+
+      <div class="section-label">
+        <h2>Pick 1–2 Visual Mood Worlds (Optional)</h2>
+        <span id="taste-memory-hint">Your Taste Memory adapts automatically as you direct</span>
+      </div>
+      <div class="mood-grid" id="mood-cards-container"></div>
+
+      <details class="tune-drawer" id="optional-tune-drawer">
+        <summary>Optional: Vibe Note, Story Archetype, Brand Assets &amp; Budget Cap</summary>
+        <div class="tune-grid">
+          <div>
+            <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Plain-English Vibe Note</label>
+            <input type="text" id="vibe-note-input" class="text-input" style="width:100%;" placeholder="e.g. Late-night Tokyo rain, quiet tension, zero cheesy narration" />
+            <label style="display:block; font-size:12px; color:var(--text-secondary); margin:12px 0 6px;">Story Engine</label>
+            <select id="archetype-select" class="select-input" style="width:100%;"></select>
+          </div>
+
+          <div>
+            <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Optional Brand / Product Name &amp; URL</label>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+              <input type="text" id="brand-name-input" class="text-input" style="flex:1;" placeholder="Brand or Hero Object (optional)" />
+              <input type="url" id="source-url-input" class="text-input" style="flex:1;" placeholder="https://... (optional)" />
+            </div>
+            <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Reference Photos (Character / Product / Mood — up to 4)</label>
+            <input type="file" id="ref-images-input" accept="image/*" multiple class="text-input" style="width:100%;" onchange="handleRefFiles(this.files)" />
+          </div>
+
+          <div>
+            <div class="dial-group" style="margin-bottom:10px;">
+              <label><span>Intimate</span><span>Camera Scale</span><span>Grand</span></label>
+              <input type="range" id="dial-scale" min="0" max="1" step="0.05" value="0.35" />
+            </div>
+            <div class="dial-group" style="margin-bottom:10px;">
+              <label><span>Slow-Burn</span><span>Edit Pacing</span><span>Kinetic</span></label>
+              <input type="range" id="dial-pacing" min="0" max="1" step="0.05" value="0.45" />
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
+              <select id="video-model-select" class="select-input" style="flex:1;" aria-label="Video Engine"></select>
+              <input type="number" id="budget-cap-input" class="text-input" style="width:92px;" value="15" min="1" max="200" title="USD Budget Cap" />
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- STAGE 2: TREATMENTS & WORLD VAULT -->
+    <section class="stage-panel" id="panel-stage-2">
+      <div class="section-label">
+        <h2>Director Treatments &amp; Visual Look-Tests</h2>
+        <span>React visually — select a direction to compile the WorldVault &amp; Master JSON Script</span>
+      </div>
+      <div class="treatments-grid" id="treatments-container"></div>
+
+      <div id="vault-and-spine-wrapper" style="display:none;">
+        <div class="vault-section">
+          <div class="section-label">
+            <h2>Causal Story Spine (<code style="color:var(--accent-amber);">THEREFORE / BUT</code>) &amp; Tension Curve</h2>
+            <span id="story-rubric-badge"></span>
+          </div>
+          <div class="spine-strip" id="scene-spine-container"></div>
+
+          <div class="section-label" style="margin-top: 24px;">
+            <h2>Production Vault (Locked Characters, Dual-Wall Sets &amp; Stateful Props)</h2>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('vault')">Edit Vault JSON</button>
+              <button type="button" class="btn btn-primary btn-sm" id="build-animatic-btn" onclick="triggerBuildAnimatic()">
+                Build Start/End Keyframes &amp; Voiced Leica Reel &rarr;
+              </button>
+            </div>
+          </div>
+          <div class="vault-columns" id="vault-entities-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 3: VOICED LEICA REEL & SHOT-BY-SHOT START/END BOARD -->
+    <section class="stage-panel" id="panel-stage-3">
+      <div class="player-split">
+        <div class="video-stage-box">
+          <video id="leica-reel-video" controls playsinline></video>
+        </div>
+        <div class="entity-card" style="display:flex; flex-direction:column; justify-content:space-between; gap:14px;">
+          <div>
+            <span class="meta-tag amber">Pre-Shoot Continuity Gate</span>
+            <h2 style="font-family:var(--font-serif); font-size:28px; margin:8px 0 6px;" id="leica-film-title">Voiced Storyboard Reel</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px;" id="leica-summary-text">
+              Watch the full film's pacing, real character voices, J/L-cuts, and Start &rarr; End keyframe blocking before rolling video cameras.
+            </p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+              <span>Actual Pre-Vis Spend:</span>
+              <strong id="previs-actual-usd">$0.00</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+              <span>Est. Full Cinema Shoot:</span>
+              <strong id="est-shoot-usd">$0.00</strong>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+              <button type="button" class="btn btn-ghost" style="flex:1;" onclick="triggerBuildAnimatic(true)">Rebuild Reel</button>
+              <button type="button" class="btn btn-primary" style="flex:1.4;" id="greenlight-shoot-btn" onclick="triggerProduceFilm()">
+                Greenlight &amp; Shoot Film &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scenes-shots-board"></div>
+    </section>
+
+    <!-- STAGE 4: SCREENING ROOM & SOUNDSTAGE -->
+    <section class="stage-panel" id="panel-stage-4">
+      <div class="player-split">
+        <div class="video-stage-box">
+          <video id="master-film-video" controls playsinline></video>
+        </div>
+        <div class="entity-card" style="display:flex; flex-direction:column; justify-content:space-between; gap:14px;">
+          <div>
+            <span class="meta-tag ok" id="qa-score-pill">Master Soundstage (-14 LUFS)</span>
+            <h2 style="font-family:var(--font-serif); font-size:28px; margin:8px 0 6px;" id="screening-title">Master Cut</h2>
+            <p style="color:var(--text-secondary); font-size:13px;" id="screening-status-copy">
+              Mixed with Walter Murch J/L-cuts, continuous room tone, ducked chamber score, and selective close-up lip-sync.
+            </p>
+
+            <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px;">
+              <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
+                <input type="checkbox" id="fin-letterbox" checked onchange="saveFinishingFlag()" />
+                2.39:1 Cinema Scope
+              </label>
+              <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
+                <input type="checkbox" id="fin-grain" checked onchange="saveFinishingFlag()" />
+                35mm Organic Grain
+              </label>
+              <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
+                <input type="checkbox" id="fin-subtitles" onchange="saveFinishingFlag()" />
+                Festival Subtitles
+              </label>
+              <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
+                <input type="checkbox" id="fin-lipsync" checked onchange="saveFinishingFlag()" />
+                Close-Up Lip-Sync
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-ghost" style="flex:1;" onclick="triggerRemasterCut()">Re-Mix Soundstage (&lt;5s)</button>
+            <a id="download-master-btn" href="#" download class="btn btn-primary" style="flex:1.2;">Download Master MP4</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">
+        <h2>Shot Takes &amp; Surgical Reshoots</h2>
+        <span>Reshoot any individual shot without re-rendering the rest of your movie</span>
+      </div>
+      <div class="shots-list" id="screening-takes-grid"></div>
+    </section>
+  </main>
+
+  <!-- STICKY PRODUCER TASTE & PLAIN-ENGLISH RIPPLE BAR -->
+  <aside class="producer-bar" id="producer-taste-bar" aria-label="Direct by Taste">
+    <div class="producer-inner">
+      <div class="chip-scroll" id="reaction-chips-row"></div>
+      <form class="director-note-form" onsubmit="submitPlainEnglishNote(event)">
+        <input
+          type="text"
+          id="plain-english-note-input"
+          class="text-input"
+          placeholder="Direct in plain English (e.g. 'Give Elena a crimson trench coat' or 'Make Scene 2 darker &amp; slower')..."
+        />
+        <button type="submit" class="btn btn-sm btn-primary" id="apply-note-btn">Apply Direction</button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- 2-WAY LIVE JSON INSPECTOR DRAWER -->
+  <div class="json-drawer-backdrop" id="json-drawer-backdrop" onclick="if(event.target===this)closeJsonInspector()">
+    <div class="json-drawer" role="dialog" aria-label="Live Master JSON Inspector">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong id="json-drawer-title" style="font-size:15px;">Shot Master JSON Inspector</strong>
+          <div id="json-drawer-sub" style="font-size:12px; color:var(--text-muted);">2-Way Synced with WorldVault &amp; Diffusion Compilers</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="btn btn-ghost btn-sm" id="toggle-hydrated-btn" onclick="toggleHydratedView()">View Hydrated Model Prompt</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeJsonInspector()">Close</button>
+        </div>
+      </div>
+      <textarea id="json-editor-textarea" class="json-editor-area" spellcheck="false"></textarea>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <span id="json-gate-feedback" style="font-size:12px; color:var(--text-secondary);">Schema validated via Pydantic v2</span>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="saveJsonInspector(true)">Save &amp; Auto-Fix Timing</button>
+          <button type="button" class="btn btn-primary btn-sm" id="save-json-btn" onclick="saveJsonInspector(false)">Save JSON Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      catalog: null,
+      project: null,
+      stage: 1,
+      workflowMode: 'guided',
+      selectedMoods: ['cinema_a24'],
+      uploadedRefB64: [],
+      pollTimer: null,
+      inspectorMode: 'project', // 'project' | 'vault' | 'shot'
+      inspectorShotId: null,
+      showingHydrated: false,
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById('studio-toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.display = 'none'; }, 3600);
+    }
+
+    function isMockSelected() {
+      return document.getElementById('offline-mock-toggle').checked;
+    }
+
+    async function apiFetch(path, opts = {}) {
+      const headers = Object.assign({ 'Content-Type': 'application/json', 'X-Actor-Id': 'studio_director' }, opts.headers || {});
+      const res = await fetch(path, Object.assign({}, opts, { headers }));
+      if (!res.ok) {
+        let detail = res.statusText;
+        try {
+          const errJson = await res.json();
+          detail = errJson.detail || JSON.stringify(errJson);
+        } catch (_) {}
+        throw new Error(detail);
+      }
+      return res.json();
+    }
+
+    async function initStudio() {
+      try {
+        const cat = await apiFetch('/api/cinema/catalog');
+        state.catalog = cat;
+        if (!cat.live_keys_configured) {
+          document.getElementById('offline-mock-toggle').checked = true;
+        }
+        renderMoodCatalog(cat.moods, cat.taste_profile);
+        renderArchetypesAndModels(cat);
+        renderReactionChips(cat.reaction_chips);
+        await refreshProjectsList();
+      } catch (err) {
+        showToast('Failed to load catalog: ' + err.message);
+      }
+    }
+
+    function renderMoodCatalog(moods, profile) {
+      const container = document.getElementById('mood-cards-container');
+      if (profile && profile.reactions_count > 0) {
+        document.getElementById('taste-memory-hint').textContent =
+          `Taste Memory active (${profile.reactions_count} preferences learned)`;
+      }
+      container.innerHTML = moods.map(m => {
+        const sel = state.selectedMoods.includes(m.id) ? 'selected' : '';
+        const swatches = (m.palette_hex || []).map(c =>
+          `<span class="swatch-dot" style="background:${c}"></span>`
+        ).join('');
+        return `
+          <button type="button" class="mood-card ${sel}" onclick="toggleMood('${m.id}')" id="mood-card-${m.id}">
+            <img class="mood-thumb" src="${m.gallery_image}" alt="${m.label}" loading="lazy" />
+            <div class="mood-body">
+              <div class="mood-title">
+                <span>${m.label}</span>
+              </div>
+              <p class="mood-tagline">${m.tagline}</p>
+              <div class="swatch-row">${swatches}</div>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function toggleMood(moodId) {
+      const idx = state.selectedMoods.indexOf(moodId);
+      if (idx >= 0) {
+        if (state.selectedMoods.length > 1) state.selectedMoods.splice(idx, 1);
+      } else {
+        state.selectedMoods = [moodId, ...state.selectedMoods.slice(0, 1)];
+        const m = (state.catalog?.moods || []).find(x => x.id === moodId);
+        if (m && m.dials) {
+          document.getElementById('dial-scale').value = m.dials.scale;
+          document.getElementById('dial-pacing').value = m.dials.pacing;
+        }
+      }
+      renderMoodCatalog(state.catalog.moods, state.catalog.taste_profile);
+    }
+
+    function renderArchetypesAndModels(cat) {
+      const archSel = document.getElementById('archetype-select');
+      archSel.innerHTML = (cat.archetypes || []).map(a =>
+        `<option value="${a.id}">${a.label} — ${a.description}</option>`
+      ).join('');
+
+      const vidSel = document.getElementById('video-model-select');
+      vidSel.innerHTML = (cat.video_models || []).map(m =>
+        `<option value="${m.id}">${m.label}</option>`
+      ).join('');
+    }
+
+    function renderReactionChips(chips) {
+      const row = document.getElementById('reaction-chips-row');
+      row.innerHTML = (chips || []).map(ch =>
+        `<button type="button" class="taste-chip" onclick="sendTasteChip('${ch.id}', '${ch.polarity}')">${ch.label}</button>`
+      ).join('');
+    }
+
+    function setWorkflowMode(mode) {
+      state.workflowMode = mode;
+      document.getElementById('mode-guided-btn').classList.toggle('active', mode === 'guided');
+      document.getElementById('mode-autopilot-btn').classList.toggle('active', mode === 'autopilot');
+      document.getElementById('develop-film-btn').innerHTML =
+        mode === 'autopilot'
+          ? '1-Click Autopilot: Produce Full Film &rarr;'
+          : 'Develop Treatments &amp; Look-Tests &rarr;';
+    }
+
+    function handleRefFiles(fileList) {
+      state.uploadedRefB64 = [];
+      Array.from(fileList || []).slice(0, 4).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => { if (e.target?.result) state.uploadedRefB64.push(e.target.result); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function refreshProjectsList() {
+      const data = await apiFetch('/api/cinema/projects');
+      const sel = document.getElementById('saved-projects-select');
+      const opts = ['<option value="">Recent Films...</option>'];
+      (data.projects || []).forEach(p => {
+        opts.push(`<option value="${p.project_id}">${p.title} (${p.total_duration_sec}s · ${p.status})</option>`);
+      });
+      sel.innerHTML = opts.join('');
+    }
+
+    async function loadSelectedProject(pid) {
+      if (!pid) return;
+      const proj = await apiFetch(`/api/cinema/projects/${pid}`);
+      applyProjectState(proj, true);
+    }
+
+    function switchStage(n) {
+      state.stage = n;
+      [1, 2, 3, 4].forEach(i => {
+        document.getElementById(`tab-stage-${i}`).classList.toggle('active', i === n);
+        document.getElementById(`panel-stage-${i}`).classList.toggle('active', i === n);
+      });
+      document.getElementById('producer-taste-bar').classList.toggle('visible', n >= 2 && !!state.project);
+    }
+
+    function updateProgressBanner(proj) {
+      const banner = document.getElementById('live-progress-banner');
+      const busyStates = new Set(['compiling', 'building_animatic', 'shooting', 'mixing']);
+      const isBusy = busyStates.has(proj.status);
+      banner.classList.toggle('visible', isBusy);
+      if (isBusy) {
+        document.getElementById('progress-stage-label').textContent = proj.progress_stage || 'Studio Crew Working...';
+        document.getElementById('progress-status-msg').textContent = proj.status_message || '';
+        document.getElementById('progress-bar-fill').style.width = `${proj.progress_pct || 15}%`;
+        startPolling(proj.project_id);
+      } else {
+        stopPolling();
+      }
+    }
+
+    function startPolling(pid) {
+      if (state.pollTimer) return;
+      state.pollTimer = setInterval(async () => {
+        try {
+          const proj = await apiFetch(`/api/cinema/projects/${pid}`);
+          const prevStatus = state.project ? state.project.status : '';
+          applyProjectState(proj, prevStatus !== proj.status);
+        } catch (_) {}
+      }, 2200);
+    }
+
+    function stopPolling() {
+      if (state.pollTimer) {
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
+      }
+    }
+
+    function applyProjectState(proj, autoJump = false) {
+      state.project = proj;
+      document.getElementById('open-master-json-btn').disabled = false;
+      document.getElementById('tab-stage-2').disabled = false;
+      const hasScenes = (proj.scenes || []).length > 0;
+      document.getElementById('tab-stage-3').disabled = !hasScenes;
+      const hasAnyTake = (proj.scenes || []).some(sc => (sc.shots || []).some(sh => (sh.takes || []).length > 0));
+      document.getElementById('tab-stage-4').disabled = !(proj.master_video_url || hasAnyTake);
+
+      updateProgressBanner(proj);
+      renderStage2(proj);
+      renderStage3(proj);
+      renderStage4(proj);
+
+      if (autoJump) {
+        if (proj.status === 'done' && proj.master_video_url) switchStage(4);
+        else if (proj.status === 'animatic_ready' && proj.leica_reel_url) switchStage(3);
+        else if (proj.status === 'script_ready' || proj.status === 'treatments_ready') switchStage(2);
+      }
+    }
+
+    async function createFilmProject() {
+      const idea = document.getElementById('idea-input').value.trim();
+      if (idea.length < 4) {
+        showToast('Enter a 1-line film idea first.');
+        return;
+      }
+      const btn = document.getElementById('develop-film-btn');
+      btn.disabled = true;
+      btn.textContent = 'Assembling Showrunner & Look-Tests...';
+      try {
+        const proj = await apiFetch('/api/cinema/projects', {
+          method: 'POST',
+          body: JSON.stringify({
+            idea,
+            aspect_ratio: document.getElementById('aspect-select').value,
+            target_duration_sec: parseInt(document.getElementById('duration-select').value, 10),
+            workflow_mode: state.workflowMode,
+            mood_presets: state.selectedMoods,
+            story_archetype: document.getElementById('archetype-select').value || 'auto',
+            user_vibe_note: document.getElementById('vibe-note-input').value.trim(),
+            dials: {
+              scale: parseFloat(document.getElementById('dial-scale').value),
+              pacing: parseFloat(document.getElementById('dial-pacing').value),
+              mood_contrast: 0.6,
+              dialogue_density: 0.45,
+            },
+            brand_name: document.getElementById('brand-name-input').value.trim() || null,
+            source_url: document.getElementById('source-url-input').value.trim() || null,
+            reference_images_b64: state.uploadedRefB64,
+            video_model_id: document.getElementById('video-model-select').value || 'auto',
+            budget_cap_usd: parseFloat(document.getElementById('budget-cap-input').value || '15'),
+            mock: isMockSelected(),
+          }),
+        });
+        await refreshProjectsList();
+        applyProjectState(proj, true);
+      } catch (err) {
+        showToast('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        setWorkflowMode(state.workflowMode);
+      }
+    }
+
+    function renderStage2(proj) {
+      const tGrid = document.getElementById('treatments-container');
+      tGrid.innerHTML = (proj.treatments || []).map(tr => {
+        const isSel = tr.treatment_id === proj.selected_treatment_id;
+        const swatches = (tr.palette_hex || []).map(c =>
+          `<span class="swatch-dot" style="background:${c}"></span>`
+        ).join('');
+        return `
+          <article class="treatment-card ${isSel ? 'selected' : ''}">
+            ${tr.look_test_url ? `<img class="treatment-look" src="${tr.look_test_url}" alt="${tr.title}" />` : ''}
+            <div class="treatment-content">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="meta-tag">${tr.archetype.replace(/_/g, ' ')}</span>
+                <span class="meta-tag amber">Rubric ${tr.rubric_score}/10</span>
+              </div>
+              <h3 class="treatment-title">${tr.title}</h3>
+              <p style="font-size:13px; color:var(--text-primary);">${tr.logline_hook}</p>
+              <p style="font-size:12px; color:var(--text-secondary); flex:1;">${tr.story_arc_summary}</p>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <div class="swatch-row" style="margin:0;">${swatches}</div>
+                <button type="button" class="btn ${isSel ? 'btn-primary' : ''} btn-sm" onclick="compileFromTreatment('${tr.treatment_id}')">
+                  ${(proj.scenes || []).length && isSel ? 'Re-Compile Script' : 'Select &amp; Build Script &rarr;'}
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      const wrapper = document.getElementById('vault-and-spine-wrapper');
+      if (!(proj.scenes || []).length) {
+        wrapper.style.display = 'none';
+        return;
+      }
+      wrapper.style.display = 'block';
+
+      if (proj.story_rubric) {
+        document.getElementById('story-rubric-badge').textContent =
+          `Story Rubric ${proj.story_rubric.overall_score}/10 · ${proj.scenes.length} Scenes · ${proj.shot_count} Shots (${proj.total_duration_sec}s)`;
+      }
+
+      document.getElementById('scene-spine-container').innerHTML = proj.scenes.map(sc => `
+        <div class="spine-node">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span class="meta-tag amber">${sc.causal_link_from_prev.toUpperCase()}</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">Tension ${sc.tension_level}/10 · ${sc.duration_sec}s</span>
+          </div>
+          <strong style="display:block; font-size:13.5px; margin-bottom:4px;">${sc.title}</strong>
+          <p style="font-size:12px; color:var(--text-secondary);">${sc.dramatic_turn}</p>
+        </div>
+      `).join('');
+
+      const vCards = [];
+      (proj.vault?.characters || []).forEach(ch => {
+        vCards.push(`
+          <div class="entity-card">
+            ${ch.turnaround_url ? `<img class="sheet-preview" src="${ch.turnaround_url}" alt="${ch.name}" />` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${ch.name}</strong>
+              <span class="meta-tag">${ch.id} · ${ch.voice_casting?.voice_name || 'Voice'}</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${ch.identity_lock}</p>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;">Wardrobe: ${ch.wardrobe_lock}</p>
+          </div>
+        `);
+      });
+      (proj.vault?.locations || []).forEach(loc => {
+        vCards.push(`
+          <div class="entity-card">
+            ${(loc.primary_wall_url || loc.reverse_wall_url) ? `
+              <div class="wall-pair">
+                ${loc.primary_wall_url ? `<img src="${loc.primary_wall_url}" title="A-Side Primary Wall" alt="Wall A" />` : '<div></div>'}
+                ${loc.reverse_wall_url ? `<img src="${loc.reverse_wall_url}" title="B-Side 180° Reverse Wall" alt="Wall B" />` : '<div></div>'}
+              </div>
+            ` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${loc.name}</strong>
+              <span class="meta-tag">${loc.id} · Dual-Wall</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;"><strong>A-Wall:</strong> ${loc.cardinal_zones.A_north_primary}</p>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;"><strong>B-Reverse:</strong> ${loc.cardinal_zones.B_south_reverse}</p>
+          </div>
+        `);
+      });
+      (proj.vault?.props || []).forEach(pr => {
+        const statesTxt = Object.keys(pr.states || {}).join(' -> ');
+        vCards.push(`
+          <div class="entity-card">
+            ${pr.turnaround_url ? `<img class="sheet-preview" src="${pr.turnaround_url}" alt="${pr.name}" />` : ''}
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${pr.name}</strong>
+              <span class="meta-tag">${pr.id}</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${pr.geometry_and_scale}</p>
+            <p style="font-size:12px; color:var(--accent-amber); margin-top:4px;">States: ${statesTxt}</p>
+          </div>
+        `);
+      });
+      document.getElementById('vault-entities-container').innerHTML = vCards.join('');
+    }
+
+    async function compileFromTreatment(treatmentId) {
+      if (!state.project) return;
+      showToast('Compiling WorldVault, Parallel Scene JSON & Table-Read Voices...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/compile`, {
+          method: 'POST',
+          body: JSON.stringify({ treatment_id: treatmentId, mock: isMockSelected(), wait: false }),
+        });
+        applyProjectState(proj, false);
+      } catch (err) {
+        showToast('Compile failed: ' + err.message);
+      }
+    }
+
+    async function triggerBuildAnimatic(forceVault = false) {
+      if (!state.project) return;
+      showToast('Generating Vault Turnarounds, Start/End Keyframes & Voiced Leica Reel...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/animatic`, {
+          method: 'POST',
+          body: JSON.stringify({ force_vault: !!forceVault, mock: isMockSelected(), wait: false }),
+        });
+        applyProjectState(proj, false);
+        switchStage(3);
+      } catch (err) {
+        showToast('Animatic error: ' + err.message);
+      }
+    }
+
+    function renderStage3(proj) {
+      document.getElementById('leica-film-title').textContent = `${proj.title} · Leica Reel`;
+      document.getElementById('previs-actual-usd').textContent = `$${(proj.actual_usd || 0).toFixed(2)}`;
+      document.getElementById('est-shoot-usd').textContent = `$${(proj.estimated_shoot_usd || 0).toFixed(2)}`;
+
+      const vid = document.getElementById('leica-reel-video');
+      if (proj.leica_reel_url && vid.getAttribute('data-src') !== proj.leica_reel_url) {
+        vid.src = proj.leica_reel_url;
+        vid.setAttribute('data-src', proj.leica_reel_url);
+      }
+
+      const board = document.getElementById('scenes-shots-board');
+      board.innerHTML = (proj.scenes || []).map(sc => {
+        const shotsHtml = (sc.shots || []).map(sh => {
+          const dlgHtml = sh.dialogue
+            ? `<div class="dialogue-quote"><strong>${sh.dialogue.speaker_id}</strong> (${sh.dialogue.delivery_mode.replace(/_/g, ' ')} · ${sh.dialogue.actual_speech_sec || '?'}s): "${sh.dialogue.line}"</div>`
+            : '';
+          const qaBadge = sh.continuity_qa_score
+            ? `<span class="meta-tag ok">Continuity ${sh.continuity_qa_score}/10</span>`
+            : `<span class="meta-tag">${sh.anchor_strategy.replace(/_/g, ' ')}</span>`;
+          return `
+            <div class="shot-card" id="shot-card-${sh.shot_id}">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <strong>${sh.shot_id} · ${sh.shot_scale.replace(/_/g, ' ')} (${sh.duration_sec}s)</strong>
+                ${qaBadge}
+              </div>
+
+              <div class="keyframe-bridge">
+                <div class="kf-slot">
+                  ${sh.start_keyframe_media_url ? `<img src="${sh.start_keyframe_media_url}" alt="Start Frame" />` : '<div style="aspect-ratio:16/9;"></div>'}
+                  <div class="kf-caption">Start Frame · ${sh.camera.lens_mm}mm</div>
+                </div>
+                <span style="color:var(--accent-amber); font-weight:700;">&rarr;</span>
+                <div class="kf-slot">
+                  ${sh.end_keyframe_media_url ? `<img src="${sh.end_keyframe_media_url}" alt="End Frame" />` : '<div style="aspect-ratio:16/9;"></div>'}
+                  <div class="kf-caption">End Frame · ${sh.camera.facing_wall_zone.split('_')[0]}-Wall</div>
+                </div>
+              </div>
+
+              <p style="font-size:12px; color:var(--text-secondary);">
+                <strong>Motion:</strong> ${(sh.motion_delta || []).map(m => m.action).join(' &rarr; ')}
+              </p>
+              ${dlgHtml}
+
+              <div style="display:flex; justify-content:space-between; gap:6px; margin-top:auto; padding-top:6px;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="regenShotFrames('${sh.shot_id}')">Re-Roll Stills</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="heartShot('${sh.shot_id}')">${sh.hearted ? '♥ Hearted' : '♡ Love Shot'}</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${sh.shot_id}')">{ } Shot JSON</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="scene-block">
+            <div class="scene-block-header">
+              <div>
+                <span class="meta-tag amber">${sc.causal_link_from_prev.toUpperCase()}</span>
+                <strong style="font-size:16px; margin-left:8px;">${sc.title}</strong>
+                <span style="color:var(--text-muted); font-size:12.5px; margin-left:8px;">${sc.slugline}</span>
+              </div>
+              <span style="font-size:12.5px; color:var(--text-secondary);">Tension ${sc.tension_level}/10 · ${sc.duration_sec}s</span>
+            </div>
+            <div class="shots-list">${shotsHtml}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function regenShotFrames(shotId) {
+      if (!state.project) return;
+      const note = prompt('Optional visual tweak note for ' + shotId + ' (leave blank to re-seed):', '');
+      if (note === null) return;
+      showToast(`Regenerating Start & End keyframes for ${shotId}...`);
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/shots/${shotId}/keyframes`, {
+          method: 'POST',
+          body: JSON.stringify({ which: 'both', tweak_note: note || null, mock: isMockSelected() }),
+        });
+        applyProjectState(proj, false);
+      } catch (err) {
+        showToast('Keyframe error: ' + err.message);
+      }
+    }
+
+    async function heartShot(shotId) {
+      if (!state.project) return;
+      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
+        method: 'POST',
+        body: JSON.stringify({ note_or_chip: 'love_this', target_type: 'shot', target_id: shotId, polarity: 'love', mock: isMockSelected() }),
+      });
+      applyProjectState(proj, false);
+      showToast(`Saved ♥ on ${shotId} to your Taste Memory.`);
+    }
+
+    async function triggerProduceFilm() {
+      if (!state.project) return;
+      showToast('Rolling Principal Photography, Lip-Sync & Cinema Soundstage...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/produce`, {
+          method: 'POST',
+          body: JSON.stringify({ only_missing_takes: true, mock: isMockSelected(), wait: false }),
+        });
+        applyProjectState(proj, false);
+        switchStage(4);
+      } catch (err) {
+        showToast('Shoot failed: ' + err.message);
+      }
+    }
+
+    function renderStage4(proj) {
+      document.getElementById('screening-title').textContent = proj.title;
+      document.getElementById('fin-letterbox').checked = !!proj.cinema_letterbox;
+      document.getElementById('fin-grain').checked = !!proj.film_grain;
+      document.getElementById('fin-subtitles').checked = !!proj.enable_subtitles;
+      document.getElementById('fin-lipsync').checked = !!proj.enable_lipsync;
+
+      if (proj.qa_report && proj.qa_report.overall_score) {
+        document.getElementById('qa-score-pill').textContent =
+          `QA ${proj.qa_report.overall_score}/10 · Total Spend $${(proj.actual_usd || 0).toFixed(2)}`;
+      }
+
+      const mVid = document.getElementById('master-film-video');
+      const dlBtn = document.getElementById('download-master-btn');
+      if (proj.master_video_url) {
+        if (mVid.getAttribute('data-src') !== proj.master_video_url) {
+          mVid.src = proj.master_video_url;
+          mVid.setAttribute('data-src', proj.master_video_url);
+        }
+        dlBtn.href = proj.master_video_url;
+      }
+
+      const allShots = [];
+      (proj.scenes || []).forEach(sc => (sc.shots || []).forEach(sh => allShots.push(sh)));
+      document.getElementById('screening-takes-grid').innerHTML = allShots.map(sh => {
+        const takesCount = (sh.takes || []).length;
+        return `
+          <div class="shot-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${sh.shot_id} · ${sh.shot_scale.replace(/_/g, ' ')}</strong>
+              <span class="meta-tag">${takesCount} Take(s)</span>
+            </div>
+            ${sh.winning_clip_url
+              ? `<video src="${sh.winning_clip_url}" controls playsinline style="width:100%; border-radius:6px; background:#000;"></video>`
+              : `<div style="padding:22px; text-align:center; color:var(--text-muted); background:var(--bg-inset); border-radius:6px;">Not shot yet</div>`
+            }
+            <div style="display:flex; justify-content:space-between; gap:8px;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${sh.shot_id}')">{ } Edit JSON</button>
+              <button type="button" class="btn btn-sm" onclick="reshootSingleShot('${sh.shot_id}')">Shoot New Take</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function reshootSingleShot(shotId) {
+      if (!state.project) return;
+      showToast(`Shooting new take for ${shotId}...`);
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/shots/${shotId}/shoot`, {
+          method: 'POST',
+          body: JSON.stringify({ mock: isMockSelected() }),
+        });
+        applyProjectState(proj, false);
+        showToast(`New take ready for ${shotId}. Click Re-Mix Soundstage to update master.`);
+      } catch (err) {
+        showToast('Reshoot failed: ' + err.message);
+      }
+    }
+
+    async function saveFinishingFlag() {
+      if (!state.project) return;
+      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          cinema_letterbox: document.getElementById('fin-letterbox').checked,
+          film_grain: document.getElementById('fin-grain').checked,
+          enable_subtitles: document.getElementById('fin-subtitles').checked,
+          enable_lipsync: document.getElementById('fin-lipsync').checked,
+        }),
+      });
+      state.project = proj;
+    }
+
+    async function triggerRemasterCut() {
+      if (!state.project) return;
+      showToast('Re-mixing Walter Murch J/L-cuts & mastering to -14 LUFS...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/remaster`, {
+          method: 'POST',
+          body: JSON.stringify({ mock: isMockSelected() }),
+        });
+        applyProjectState(proj, false);
+        showToast('Master Cut updated.');
+      } catch (err) {
+        showToast('Remaster failed: ' + err.message);
+      }
+    }
+
+    async function sendTasteChip(chipId, polarity) {
+      if (!state.project) return;
+      showToast('Translating taste signal across Vault & Shot JSON...');
+      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
+        method: 'POST',
+        body: JSON.stringify({
+          note_or_chip: chipId,
+          target_type: 'project',
+          polarity: polarity || 'adjust',
+          mock: isMockSelected(),
+        }),
+      });
+      applyProjectState(proj, false);
+      showToast(proj.status_message);
+    }
+
+    async function submitPlainEnglishNote(ev) {
+      ev.preventDefault();
+      if (!state.project) return;
+      const inp = document.getElementById('plain-english-note-input');
+      const txt = inp.value.trim();
+      if (!txt) return;
+      inp.value = '';
+      showToast('Rippling direction across WorldVault & Shots...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
+          method: 'POST',
+          body: JSON.stringify({
+            note_or_chip: txt,
+            target_type: 'project',
+            polarity: 'adjust',
+            mock: isMockSelected(),
+          }),
+        });
+        applyProjectState(proj, false);
+        showToast(proj.status_message);
+      } catch (err) {
+        showToast('Direction error: ' + err.message);
+      }
+    }
+
+    // 2-Way Live JSON Inspector
+    function findClientShot(shotId) {
+      if (!state.project) return null;
+      for (const sc of (state.project.scenes || [])) {
+        for (const sh of (sc.shots || [])) {
+          if (sh.shot_id === shotId) return sh;
+        }
+      }
+      return null;
+    }
+
+    function openJsonInspector(mode, shotId = null) {
+      if (!state.project) return;
+      state.inspectorMode = mode;
+      state.inspectorShotId = shotId;
+      state.showingHydrated = false;
+      const area = document.getElementById('json-editor-textarea');
+      const hydBtn = document.getElementById('toggle-hydrated-btn');
+      const saveBtn = document.getElementById('save-json-btn');
+      area.readOnly = false;
+      saveBtn.disabled = false;
+
+      if (mode === 'shot' && shotId) {
+        const sh = findClientShot(shotId);
+        if (!sh) return;
+        document.getElementById('json-drawer-title').textContent = `Shot JSON · ${shotId}`;
+        hydBtn.style.display = 'inline-flex';
+        hydBtn.textContent = 'View Hydrated Model Prompt';
+        const cleanCopy = Object.assign({}, sh);
+        delete cleanCopy.hydrated_prompt_json;
+        area.value = JSON.stringify(cleanCopy, null, 2);
+      } else if (mode === 'vault') {
+        document.getElementById('json-drawer-title').textContent = 'WorldVault JSON (Characters, Dual-Wall Sets & Props)';
+        hydBtn.style.display = 'none';
+        area.value = JSON.stringify(state.project.vault, null, 2);
+      } else {
+        document.getElementById('json-drawer-title').textContent = 'Full Film Master JSON (Vault + Scenes + Shots)';
+        hydBtn.style.display = 'none';
+        area.value = JSON.stringify({ vault: state.project.vault, scenes: state.project.scenes }, null, 2);
+      }
+      document.getElementById('json-drawer-backdrop').classList.add('open');
+    }
+
+    function toggleHydratedView() {
+      if (state.inspectorMode !== 'shot' || !state.inspectorShotId) return;
+      const sh = findClientShot(state.inspectorShotId);
+      if (!sh) return;
+      state.showingHydrated = !state.showingHydrated;
+      const area = document.getElementById('json-editor-textarea');
+      const saveBtn = document.getElementById('save-json-btn');
+      const hydBtn = document.getElementById('toggle-hydrated-btn');
+
+      if (state.showingHydrated) {
+        area.value = JSON.stringify(sh.hydrated_prompt_json || {}, null, 2);
+        area.readOnly = true;
+        saveBtn.disabled = true;
+        hydBtn.textContent = 'Back to Editable Shot JSON';
+      } else {
+        const cleanCopy = Object.assign({}, sh);
+        delete cleanCopy.hydrated_prompt_json;
+        area.value = JSON.stringify(cleanCopy, null, 2);
+        area.readOnly = false;
+        saveBtn.disabled = false;
+        hydBtn.textContent = 'View Hydrated Model Prompt';
+      }
+    }
+
+    function closeJsonInspector() {
+      document.getElementById('json-drawer-backdrop').classList.remove('open');
+    }
+
+    async function saveJsonInspector(autofix = false) {
+      if (!state.project || state.showingHydrated) return;
+      const raw = document.getElementById('json-editor-textarea').value;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        document.getElementById('json-gate-feedback').textContent = 'JSON Syntax Error: ' + err.message;
+        return;
+      }
+
+      const payload = { autofix_gate: !!autofix, resynth_dialogue: !!autofix, mock: isMockSelected() };
+      if (state.inspectorMode === 'shot') {
+        payload.shot_patch = parsed;
+      } else if (state.inspectorMode === 'vault') {
+        payload.vault = parsed;
+      } else {
+        if (parsed.vault) payload.vault = parsed.vault;
+        if (parsed.scenes) payload.scenes = parsed.scenes;
+      }
+
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        applyProjectState(proj, false);
+        document.getElementById('json-gate-feedback').textContent =
+          `Saved · Script Gate: ${proj.script_gate.total_issues} issue(s)`;
+        showToast('Master JSON saved & synced across Studio.');
+        if (!autofix) closeJsonInspector();
+      } catch (err) {
+        document.getElementById('json-gate-feedback').textContent = 'Validation Error: ' + err.message;
+      }
+    }
+
+    initStudio();
+  </script>
+</body>
+</html>

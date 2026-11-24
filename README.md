@@ -173,11 +173,27 @@ For cloud hosting (Railway, Render, Google Cloud Run, Fly.io), point your servic
 
 ---
 
+## Launch Cut Cinema Studio (`/cinema` — 1–3 Minute Coherent Films)
+
+Launch Cut includes **Cinema Studio** (`/cinema` + `/api/cinema`), designed around **"You bring the taste, Launch Cut brings the film crew"**:
+
+- **Show, Don't Ask Taste Translator (`rules/cinema_taste.py`)**: Enter a 1-line idea, optionally tap visual Mood Worlds or attach reference/brand photos, and react to **3 Director Treatments** with real **Look-Test Keyframes** and 1-click Producer Taste Chips (`♥ Love this`, `Less commercial / more real`, `Warmer & more intimate`, `Build more tension`) persisted into `DirectorTasteProfile`.
+- **3-Layer Master JSON State Machine (`models/cinema_project.py` & `models/cinema_compiler.py`)**:
+  - **Layer 1 (`WorldVault`)**: Characters with 3-panel turnaround crops & distinct locked voices, Locations with **Dual-Wall A/B Set Plates** (solving 180° reverse-angle drift), and Stateful Hero Props.
+  - **Layer 2 (`CinemaScene`)**: Mandatory `THEREFORE / BUT` causal story spine, Tension Curve (`1–10`), Pixar Color Script, and Scene Entry → Exit states compiled in parallel per scene.
+  - **Layer 3 (`CinemaShot`)**: Explicit spatial blocking (`foreground`/`midground`/`background`), textures, props, camera, `start_frame` → `motion_delta` → `end_frame`, deterministic entity hydration, and a **2-Way Live JSON Inspector**.
+- **Pixar "Table Read First" + Voiced Leica Reel + Smart 3-Mode Start/End Continuity**: Synthesizes character TTS *first* to size shot durations cleanly, builds a watchable **Voiced Leica Reel Animatic** with Vision Continuity QA, applies Smart FLF2V + multi-angle `@Elements` + silence-padded **Close-Up Lip-Sync**, and masters Walter Murch J/L-cuts, room tone, and ducked score in `<8 MB` RAM via `media/cinema_audio_mixer.py`.
+
+---
+
 ## Testing
 
 ```bash
 # Run the full offline test suite
 uv run pytest -v
+
+# Run Cinema Studio (3-Layer JSON, Dual Continuity, Lip-Sync Stem & PCM Soundstage) tests
+uv run pytest tests/test_cinema_studio.py -v
 
 # Run API, 6-step HITL Studio & Media tests
 uv run pytest tests/test_api_cli.py tests/test_studio_hitl.py tests/test_media_ffmpeg_qa.py -v

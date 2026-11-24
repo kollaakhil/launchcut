@@ -489,6 +489,7 @@ class VideoProvider:
         negative_prompt: str | None = None,
         generate_audio: bool = True,
         element_image_urls: list[str] | None = None,
+        element_bundles: list[dict[str, Any]] | None = None,
         cancel: CancellationToken | None = None,
     ) -> RenderedClip:
         """Submit any declarative VideoModelSpec from ModelRegistryStore dynamically."""
@@ -507,6 +508,7 @@ class VideoProvider:
             negative_prompt=negative_prompt,
             generate_audio=generate_audio,
             element_image_urls=element_image_urls,
+            element_bundles=element_bundles,
         )
         width, height = ASPECT_DIMENSIONS[aspect]
 

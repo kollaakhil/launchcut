@@ -102,8 +102,12 @@ def create_app(
     from gtm_videogen.api.stitch_routes import stitch_router
 
     application.include_router(stitch_router)
+    from gtm_videogen.api.cinema_routes import cinema_router
+
+    application.include_router(cinema_router)
 
     stitch_html_path = Path(__file__).with_name("stitch.html")
+    cinema_html_path = Path(__file__).with_name("cinema.html")
 
     @application.get("/", include_in_schema=False)
     async def stitch_index() -> HTMLResponse:
@@ -113,6 +117,15 @@ def create_app(
                 headers={"Cache-Control": "no-cache"},
             )
         return HTMLResponse("<h1>Stitch Studio API</h1><p>Open <a href='/docs'>/docs</a>.</p>")
+
+    @application.get("/cinema", include_in_schema=False)
+    async def cinema_index() -> HTMLResponse:
+        if cinema_html_path.is_file():
+            return HTMLResponse(
+                cinema_html_path.read_text(encoding="utf-8"),
+                headers={"Cache-Control": "no-cache"},
+            )
+        return HTMLResponse("<h1>Launch Cut Cinema Studio</h1><p>Open <a href='/docs'>/docs</a>.</p>")
 
     return application
 

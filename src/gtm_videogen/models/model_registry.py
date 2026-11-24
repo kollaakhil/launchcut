@@ -460,6 +460,7 @@ def build_registry_fal_payload(
     negative_prompt: str | None = None,
     generate_audio: bool = False,
     element_image_urls: list[str] | None = None,
+    element_bundles: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Build (endpoint_slug, payload_dict) dynamically from VideoModelSpec capabilities."""
     has_start = bool(spec.supports_start_frame and _is_image_ref(start_image))
@@ -500,10 +501,30 @@ def build_registry_fal_payload(
         )
         payload["aspect_ratio"] = chosen_aspect
 
-    if spec.supports_elements and element_image_urls:
-        valid_els = [u for u in element_image_urls if _is_image_ref(u)][:3]
-        if valid_els:
-            payload["elements"] = [{"frontal_image_url": u} for u in valid_els]
+    if spec.supports_elements:
+        if element_bundles:
+            built_els: list[dict[str, Any]] = []
+            for b in element_bundles[:3]:
+                frontal = b.get("frontal_image_url")
+                if not _is_image_ref(frontal):
+                    continue
+                refs = [
+                    r for r in (b.get("reference_image_urls") or []) if _is_image_ref(r)
+                ][:3]
+                built_els.append(
+                    {
+                        "frontal_image_url": frontal,
+                        "reference_image_urls": refs or [frontal],
+                    }
+                )
+            if built_els:
+                payload["elements"] = built_els
+        elif element_image_urls:
+            valid_els = [u for u in element_image_urls if _is_image_ref(u)][:3]
+            if valid_els:
+                payload["elements"] = [
+                    {"frontal_image_url": u, "reference_image_urls": [u]} for u in valid_els
+                ]
 
     return endpoint, payload
 
