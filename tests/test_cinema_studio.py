@@ -632,3 +632,168 @@ def test_cinema_security_validation_uploads_reshoots_and_wardrobe_ripple(tmp_pat
     bad_range = client.get(rem["master_video_url"], headers={"Range": "bytes=999999999-9999999999"})
     assert bad_range.status_code == 416
 
+
+def test_title_extraction_and_lenient_llm_shot_normalizer() -> None:
+    from gtm_videogen.agents.cinema_writers_room import (
+        _extract_subject_noun,
+        _normalize_llm_shot_dict,
+    )
+    from gtm_videogen.models.cinema_project import FrameStateSpec
+
+    idea = (
+        "Title: The Brass Bell\n"
+        "Genre: Mass Action / Drama\n"
+        "Logline: When a ruthless local gang tries to shut down a quiet, rain-drenched tea stall, "
+        "they learn the hard way why the old man behind the counter never leaves his town."
+    )
+    assert _extract_subject_noun(idea) == "The Brass Bell"
+
+    vault = WorldVault(
+        characters=[
+            CharacterAsset(
+                id="CHAR_PROTAG",
+                name="Velayudham",
+                identity_lock="60yo South Indian tea stall owner",
+                wardrobe_lock="faded cotton shirt and lungi",
+            )
+        ],
+        locations=[
+            LocationAsset(
+                id="LOC_1",
+                name="Velayudham Tea Stall",
+                cardinal_zones=CardinalZones(
+                    A_north_primary="steaming copper samovar and wooden counter",
+                    B_south_reverse="rain-drenched street and flickering streetlights",
+                ),
+            )
+        ],
+        props=[
+            PropAsset(
+                id="PROP_HERO",
+                name="Brass Bell",
+                states={"still": "hanging silent", "ringing": "vibrating sharply"},
+            )
+        ],
+    )
+    fb_shot = CinemaShot(
+        shot_id="SC_01_SH01",
+        scene_id="SC_01",
+        location_id="LOC_1",
+        duration_sec=6,
+        start_frame=FrameStateSpec(composition="fallback start frame"),
+        end_frame=FrameStateSpec(composition="fallback end frame"),
+    )
+    scene = CinemaScene(
+        scene_id="SC_01",
+        scene_number=1,
+        title="Monsoon Tea",
+        slugline="INT. TEA STALL - NIGHT",
+        location_id="LOC_1",
+        shots=[fb_shot],
+    )
+
+    raw_llm_shot = {
+        "shot_id": "SC_01_SH01",
+        "shot_scale": "MCU",
+        "duration_sec": "7",
+        "camera": {
+            "lens_mm": "65mm",
+            "facing_wall_zone": "A",
+            "movement": "slow push-in through monsoon rain",
+        },
+        "start_frame": "Velayudham wipes a brass tumbler behind the steaming tea stall counter.",
+        "end_frame": "Velayudham stops and looks up as headlights cut across the wet street.",
+        "motion_delta": [
+            "0-2s: Steam curls over the copper samovar",
+            "2-5s: He sets the tumbler down calmly",
+        ],
+        "dialogue": {
+            "speaker_id": "CHAR_PROTAG",
+            "line": "Tea is fresh. Leave the machetes outside.",
+            "delivery_mode": "close_up",
+        },
+        "active_entities": ["CHAR_PROTAG", "PROP_HERO"],
+    }
+    shot = _normalize_llm_shot_dict(raw_llm_shot, fb_shot, scene, vault, 1)
+    assert shot.shot_scale == "medium_close_up"
+    assert shot.camera.lens_mm == 65
+    assert shot.camera.facing_wall_zone == "A_north_primary"
+    assert shot.duration_sec == 7
+    assert shot.dialogue is not None
+    assert shot.dialogue.delivery_mode == "on_screen_speaking"
+    assert "Tea is fresh" in shot.dialogue.line
+    assert len(shot.motion_delta) == 2
+
+
+def test_quick_storyboard_one_click_guided(tmp_path: Path) -> None:
+    client = _make_client(tmp_path)
+    r = client.post(
+        "/api/cinema/projects",
+        json={
+            "idea": "Title: The Brass Bell\nA quiet rain-drenched South Indian tea stall owner confronts a local gang.",
+            "target_duration_sec": 35,
+            "workflow_mode": "guided",
+            "quick_storyboard": True,
+            "mood_presets": ["cinema_noir"],
+            "mock": True,
+            "wait": True,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "animatic_ready"
+    assert "The Brass Bell" in body["title"]
+    assert body["leica_reel_url"] is not None
+    assert len(body["scenes"]) >= 3
+    assert body["vault"]["characters"][0]["frontal_url"] is not None
+    assert body["scenes"][0]["shots"][0]["start_keyframe_media_url"] is not None
+
+
+@pytest.mark.asyncio
+async def test_partial_render_resilience_preserves_completed_shots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from gtm_videogen.agents import cinema_producer
+    from gtm_videogen.agents.cinema_writers_room import (
+        compile_cinema_master_script,
+        pitch_cinema_treatments,
+    )
+    from gtm_videogen.core.config import Settings
+
+    settings = Settings(data_dir=tmp_path / "data")
+    pdir = tmp_path / "proj"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    project = await pitch_cinema_treatments(
+        idea="Title: Rain Tea\nA tea stall owner faces down local thugs in a monsoon.",
+        target_duration_sec=24,
+        project_id="cin_partial_test",
+        media_dir=pdir,
+        settings=settings,
+        mock=True,
+    )
+    await compile_cinema_master_script(project, pdir, settings=settings, mock=True)
+    # Trim to 1 scene (3 shots) so the partial-render E2E test runs in seconds
+    project.scenes = project.scenes[:1]
+    await cinema_producer.generate_vault_references(project, pdir, settings=settings, mock=True)
+    await cinema_producer.build_leica_reel_animatic(project, pdir, settings=settings, mock=True)
+
+    orig_render = cinema_producer.render_cinema_shot_take
+    call_count = {"n": 0}
+
+    async def _flaky_render(proj, shot_id, project_dir, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise RuntimeError("HTTP 403 Exhausted balance")
+        return await orig_render(proj, shot_id, project_dir, **kwargs)
+
+    monkeypatch.setattr(cinema_producer, "render_cinema_shot_take", _flaky_render)
+
+    await cinema_producer.shoot_and_mix_cinema_film(project, pdir, settings=settings, mock=True)
+
+    assert project.status == "done"
+    assert project.master_video_path is not None
+    assert Path(project.master_video_path).is_file()
+    assert "1 shot(s) skipped" in project.status_message
+
+

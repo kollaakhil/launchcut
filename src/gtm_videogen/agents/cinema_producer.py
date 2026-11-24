@@ -1502,6 +1502,8 @@ async def shoot_and_mix_cinema_film(
     completed_count = 0
     sem = asyncio.Semaphore(3)
 
+    failed_shots: list[str] = []
+
     async def _shoot_one(sh: CinemaShot, prev_clip: Path | None = None) -> None:
         nonlocal completed_count
         win_tk = sh.winning_take()
@@ -1509,16 +1511,20 @@ async def shoot_and_mix_cinema_film(
             completed_count += 1
             return
         async with sem:
-            await render_cinema_shot_take(
-                project,
-                sh.shot_id,
-                project_dir,
-                conserve_budget=conserve,
-                prev_rendered_clip_path=prev_clip,
-                settings=resolved,
-                mock=mock,
-                cancel=cancel,
-            )
+            try:
+                await render_cinema_shot_take(
+                    project,
+                    sh.shot_id,
+                    project_dir,
+                    conserve_budget=conserve,
+                    prev_rendered_clip_path=prev_clip,
+                    settings=resolved,
+                    mock=mock,
+                    cancel=cancel,
+                )
+            except Exception as exc:
+                failed_shots.append(f"{sh.shot_id}: {str(exc)[:90]}")
+                return
             completed_count += 1
             pct = 74 + int(16 * completed_count / total_n)
             await _report(
@@ -1547,6 +1553,15 @@ async def shoot_and_mix_cinema_film(
             )
             await _shoot_one(sh, prev_clip=prev_p)
 
+    # If at least 1 shot succeeded, still assemble & master so rendered footage is never wasted!
+    has_any_clip = any(
+        sh.winning_take() is not None and Path(sh.winning_take().clip_path).is_file()  # type: ignore[union-attr]
+        for sh in all_shots
+    )
+    if not has_any_clip:
+        err_detail = failed_shots[0] if failed_shots else "All shots failed to render."
+        raise RuntimeError(err_detail)
+
     await remaster_cinema_cut(
         project,
         project_dir,
@@ -1555,6 +1570,11 @@ async def shoot_and_mix_cinema_film(
         on_progress=on_progress,
         cancel=cancel,
     )
+    if failed_shots:
+        project.status_message = (
+            f"Master Cut assembled ({completed_count}/{total_n} shots). "
+            f"{len(failed_shots)} shot(s) skipped: {failed_shots[0]}"
+        )
     return project
 
 

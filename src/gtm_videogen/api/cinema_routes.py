@@ -212,6 +212,7 @@ class CreateCinemaProjectRequest(BaseModel):
     video_model_id: str = "auto"
     llm_model_id: str = ""
     budget_cap_usd: float = Field(default=15.0, ge=0.0, le=250.0)
+    quick_storyboard: bool = False
     mock: bool = False
     wait: bool = False
 
@@ -425,6 +426,56 @@ async def create_cinema_project(
                     _ACTIVE_CINEMA_TASKS.pop(pid, None)
 
             _ACTIVE_CINEMA_TASKS[pid] = asyncio.create_task(_bg_autopilot())
+    elif body.quick_storyboard:
+        async def _run_quick_storyboard() -> None:
+            await compile_cinema_master_script(
+                project,
+                pdir,
+                actor_id=actor,
+                taste_store=t_store,
+                settings=services.settings,
+                mock=body.mock,
+                on_progress=lambda p: store.save(p),
+            )
+            store.save(project)
+            await generate_vault_references(
+                project,
+                pdir,
+                settings=services.settings,
+                mock=body.mock,
+                on_progress=lambda p: store.save(p),
+            )
+            store.save(project)
+            await build_leica_reel_animatic(
+                project,
+                pdir,
+                settings=services.settings,
+                mock=body.mock,
+                on_progress=lambda p: store.save(p),
+            )
+            store.save(project)
+
+        if body.wait:
+            await _run_quick_storyboard()
+        else:
+            project.status = "compiling"
+            project.progress_pct = 15
+            project.progress_stage = "Writing Script & Storyboard"
+            project.status_message = "Compiling scenes, cast Vault & voiced storyboard preview..."
+            store.save(project)
+
+            async def _bg_quick_storyboard() -> None:
+                try:
+                    await _run_quick_storyboard()
+                except Exception as exc:
+                    project.status = "failed"
+                    project.error = str(exc)
+                    project.status_message = f"Storyboard build failed: {exc}"
+                    store.save(project)
+                finally:
+                    _ACTIVE_CINEMA_TASKS.pop(pid, None)
+
+            _ACTIVE_CINEMA_TASKS[pid] = asyncio.create_task(_bg_quick_storyboard())
 
     return _serialize_cinema_project(project, store, reg, settings=services.settings)
 

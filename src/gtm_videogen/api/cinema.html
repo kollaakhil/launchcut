@@ -392,14 +392,22 @@
     }
 
     .mood-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
-      gap: 14px;
-      margin-bottom: 22px;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 2px 0 8px;
+      margin-bottom: 18px;
+    }
+
+    .mood-grid::-webkit-scrollbar {
+      display: none;
     }
 
     .mood-card {
       position: relative;
+      flex: 0 0 184px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
@@ -421,19 +429,19 @@
 
     .mood-thumb {
       width: 100%;
-      height: 118px;
+      height: 74px;
       object-fit: cover;
       display: block;
       background: var(--bg-inset);
     }
 
     .mood-body {
-      padding: 11px 13px;
+      padding: 8px 10px;
     }
 
     .mood-title {
       font-weight: 600;
-      font-size: 13.5px;
+      font-size: 12.5px;
       color: var(--text-primary);
       display: flex;
       align-items: center;
@@ -442,16 +450,20 @@
     }
 
     .mood-tagline {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-secondary);
-      margin-top: 4px;
-      line-height: 1.4;
+      margin-top: 3px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .swatch-row {
       display: flex;
-      gap: 5px;
-      margin-top: 8px;
+      gap: 4px;
+      margin-top: 6px;
     }
 
     .swatch-dot {
@@ -953,21 +965,11 @@
       .logline-textarea {
         font-size: 16px;
       }
-      .mood-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+      .mood-card {
+        flex: 0 0 154px;
       }
       .mood-thumb {
-        height: 86px;
-      }
-      .mood-body {
-        padding: 9px 10px;
-      }
-      .mood-tagline {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+        height: 66px;
       }
       .producer-bar {
         padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
@@ -1020,11 +1022,10 @@
       <span class="brand-sub">Story &amp; Continuity Studio</span>
     </div>
 
-    <nav class="stage-tabs" aria-label="Film Studio Departments">
-      <button type="button" class="stage-tab active" id="tab-stage-1" onclick="switchStage(1)">01 · Idea &amp; Taste</button>
-      <button type="button" class="stage-tab" id="tab-stage-2" onclick="switchStage(2)" disabled>02 · Treatments &amp; Vault</button>
-      <button type="button" class="stage-tab" id="tab-stage-3" onclick="switchStage(3)" disabled>03 · Leica Reel &amp; Shots</button>
-      <button type="button" class="stage-tab" id="tab-stage-4" onclick="switchStage(4)" disabled>04 · Screening Room</button>
+    <nav class="stage-tabs" aria-label="Film Studio Steps">
+      <button type="button" class="stage-tab active" id="tab-stage-1" onclick="switchStage(1)">1 · Idea</button>
+      <button type="button" class="stage-tab" id="tab-stage-2" onclick="switchStage(2)" disabled>2 · Storyboard &amp; Cast</button>
+      <button type="button" class="stage-tab" id="tab-stage-3" onclick="switchStage(3)" disabled>3 · Watch &amp; Export</button>
     </nav>
 
     <div class="topbar-actions">
@@ -1049,64 +1050,64 @@
   <div class="toast-msg" id="studio-toast"></div>
 
   <main class="studio-shell">
-    <!-- STAGE 1: IDEA & TASTE -->
+    <!-- STEP 1: IDEA & MOOD -->
     <section class="stage-panel active" id="panel-stage-1">
       <div class="hero-header">
         <h1>Bring one line and your taste. We bring the film crew.</h1>
-        <p>Describe a story, feeling, or product moment in plain English. Launch Cut builds a consistent Character &amp; Location Vault, times dialogue first, locks Start &amp; End frames, and mixes a real cinema soundstage.</p>
+        <p>Write a story, scene, or brand film idea in plain English. We build your cast, sets, voiced storyboard, and final movie.</p>
       </div>
 
       <div class="intake-card">
         <textarea
           id="idea-input"
           class="logline-textarea"
-          placeholder="e.g. At 2 AM in a rain-soaked coastal observatory, an acoustic engineer about to shut down her dead array hears an impossible warm harmonic answering from the storm..."
+          placeholder="e.g. When a ruthless local gang tries to shut down a quiet, rain-drenched South Indian tea stall, they learn the hard way why the old man behind the counter never leaves his town..."
         ></textarea>
 
         <div class="intake-toolbar">
           <div class="inline-controls">
             <div class="mode-pill-group" role="group" aria-label="Direction Mode">
-              <button type="button" class="mode-pill active" id="mode-guided-btn" onclick="setWorkflowMode('guided')">Guided</button>
-              <button type="button" class="mode-pill" id="mode-autopilot-btn" onclick="setWorkflowMode('autopilot')">1-Click Autopilot</button>
+              <button type="button" class="mode-pill active" id="mode-guided-btn" onclick="setWorkflowMode('guided')">Storyboard First</button>
+              <button type="button" class="mode-pill" id="mode-autopilot-btn" onclick="setWorkflowMode('autopilot')">1-Click Movie</button>
             </div>
 
             <select id="duration-select" class="select-input" aria-label="Target Runtime">
-              <option value="60">1 Min Short (60s)</option>
-              <option value="90" selected>1.5 Min Cinema Short (90s)</option>
-              <option value="120">2 Min Short Film (120s)</option>
-              <option value="180">3 Min Narrative Film (180s)</option>
+              <option value="60">1 Min (60s)</option>
+              <option value="90" selected>1.5 Min (90s)</option>
+              <option value="120">2 Min (120s)</option>
+              <option value="180">3 Min (180s)</option>
             </select>
 
             <select id="aspect-select" class="select-input" aria-label="Aspect Ratio">
-              <option value="16:9" selected>16:9 Widescreen</option>
-              <option value="9:16">9:16 Vertical Cinema</option>
-              <option value="1:1">1:1 Square Frame</option>
+              <option value="16:9" selected>16:9 Wide</option>
+              <option value="9:16">9:16 Vertical</option>
+              <option value="1:1">1:1 Square</option>
             </select>
 
             <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;">
               <input type="checkbox" id="offline-mock-toggle" />
-              $0 Instant Draft
+              $0 Draft
             </label>
           </div>
 
           <button type="button" class="btn btn-primary" id="develop-film-btn" onclick="createFilmProject()">
-            Develop Treatments &amp; Look-Tests &rarr;
+            Create Storyboard &rarr;
           </button>
         </div>
       </div>
 
       <div class="section-label">
-        <h2>Pick 1–2 Visual Mood Worlds (Optional)</h2>
-        <span id="taste-memory-hint">Your Taste Memory adapts automatically as you direct</span>
+        <h2>Visual Mood (Optional)</h2>
+        <span id="taste-memory-hint">Pick 1–2 moods to guide lighting &amp; lens</span>
       </div>
       <div class="mood-grid" id="mood-cards-container"></div>
 
       <details class="tune-drawer" id="optional-tune-drawer">
-        <summary>Optional: Vibe Note, Story Archetype, Brand Assets &amp; Budget Cap</summary>
+        <summary>More options (Vibe note, Reference photos, Video engine &amp; Budget)</summary>
         <div class="tune-grid">
           <div>
             <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Plain-English Vibe Note</label>
-            <input type="text" id="vibe-note-input" class="text-input" style="width:100%;" placeholder="e.g. Late-night Tokyo rain, quiet tension, zero cheesy narration" />
+            <input type="text" id="vibe-note-input" class="text-input" style="width:100%;" placeholder="e.g. Monsoon night, warm tungsten lamps, gritty handheld" />
             <label style="display:block; font-size:12px; color:var(--text-secondary); margin:12px 0 6px;">Story Engine</label>
             <select id="archetype-select" class="select-input" style="width:100%;"></select>
           </div>
@@ -1139,74 +1140,58 @@
       </details>
     </section>
 
-    <!-- STAGE 2: TREATMENTS & WORLD VAULT -->
+    <!-- STEP 2: STORYBOARD, VOICED PREVIEW & CAST VAULT -->
     <section class="stage-panel" id="panel-stage-2">
-      <div class="section-label">
-        <h2>Director Treatments &amp; Visual Look-Tests</h2>
-        <span>React visually — select a direction to compile the WorldVault &amp; Master JSON Script</span>
-      </div>
-      <div class="treatments-grid" id="treatments-container"></div>
-
-      <div id="vault-and-spine-wrapper" style="display:none;">
-        <div class="vault-section">
-          <div class="section-label">
-            <h2>Causal Story Spine (<code style="color:var(--accent-amber);">THEREFORE / BUT</code>) &amp; Tension Curve</h2>
-            <span id="story-rubric-badge"></span>
-          </div>
-          <div class="spine-strip" id="scene-spine-container"></div>
-
-          <div class="section-label" style="margin-top: 24px;">
-            <h2>Production Vault (Locked Characters, Dual-Wall Sets &amp; Stateful Props)</h2>
-            <div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:flex-end;">
-              <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('vault')">Edit Vault JSON</button>
-              <button type="button" class="btn btn-primary btn-sm" id="build-animatic-btn" onclick="triggerBuildAnimatic()">
-                Build Start/End Keyframes &amp; Voiced Leica Reel &rarr;
-              </button>
-            </div>
-          </div>
-          <div class="vault-columns" id="vault-entities-container"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- STAGE 3: VOICED LEICA REEL & SHOT-BY-SHOT START/END BOARD -->
-    <section class="stage-panel" id="panel-stage-3">
       <div class="player-split">
         <div class="video-stage-box">
           <video id="leica-reel-video" controls playsinline></video>
         </div>
         <div class="entity-card" style="display:flex; flex-direction:column; justify-content:space-between; gap:14px;">
           <div>
-            <span class="meta-tag amber">Pre-Shoot Continuity Gate</span>
-            <h2 style="font-family:var(--font-serif); font-size:28px; margin:8px 0 6px;" id="leica-film-title">Voiced Storyboard Reel</h2>
+            <span class="meta-tag amber" id="story-rubric-badge">Voiced Storyboard Preview</span>
+            <h2 style="font-family:var(--font-serif); font-size:28px; margin:8px 0 6px;" id="leica-film-title">Voiced Storyboard</h2>
             <p style="color:var(--text-secondary); font-size:13.5px;" id="leica-summary-text">
-              Watch the full film's pacing, real character voices, J/L-cuts, and Start &rarr; End keyframe blocking before rolling video cameras.
+              Review your voiced pacing, cast, and Start &rarr; End frames. Tweak any shot or type a note below before shooting.
             </p>
           </div>
           <div style="display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
-              <span>Actual Pre-Vis Spend:</span>
+              <span>Pre-Vis Spend:</span>
               <strong id="previs-actual-usd">$0.00</strong>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
-              <span>Est. Full Cinema Shoot:</span>
+              <span>Est. Full Shoot:</span>
               <strong id="est-shoot-usd">$0.00</strong>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">
-              <button type="button" class="btn btn-ghost" style="flex:1 1 120px;" onclick="triggerBuildAnimatic(true)">Rebuild Reel</button>
+              <button type="button" class="btn btn-ghost" style="flex:1 1 120px;" id="build-animatic-btn" onclick="triggerBuildAnimatic(true)">Rebuild Preview</button>
               <button type="button" class="btn btn-primary" style="flex:1.4 1 170px;" id="greenlight-shoot-btn" onclick="triggerProduceFilm()">
-                Greenlight &amp; Shoot Film &rarr;
+                Shoot Full Movie &rarr;
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      <details class="tune-drawer" id="vault-drawer" style="margin-bottom: 14px;">
+        <summary>Cast, Sets &amp; Props Vault (<span id="vault-counts-label">0 items</span>)</summary>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('vault')">Edit Vault JSON</button>
+        </div>
+        <div class="vault-columns" id="vault-entities-container"></div>
+      </details>
+
+      <details class="tune-drawer" id="angles-drawer" style="margin-bottom: 22px;">
+        <summary>Story Spine &amp; Alternate Story Angles (3 Treatments)</summary>
+        <div class="spine-strip" id="scene-spine-container" style="margin-top:14px;"></div>
+        <div class="treatments-grid" id="treatments-container" style="margin-top:14px; margin-bottom:0;"></div>
+      </details>
+
       <div id="scenes-shots-board"></div>
     </section>
 
-    <!-- STAGE 4: SCREENING ROOM & SOUNDSTAGE -->
-    <section class="stage-panel" id="panel-stage-4">
+    <!-- STEP 3: WATCH & EXPORT -->
+    <section class="stage-panel" id="panel-stage-3">
       <div class="player-split">
         <div class="video-stage-box">
           <video id="master-film-video" controls playsinline></video>
@@ -1216,7 +1201,7 @@
             <span class="meta-tag ok" id="qa-score-pill">Master Soundstage (-14 LUFS)</span>
             <h2 style="font-family:var(--font-serif); font-size:28px; margin:8px 0 6px;" id="screening-title">Master Cut</h2>
             <p style="color:var(--text-secondary); font-size:13px;" id="screening-status-copy">
-              Mixed with Walter Murch J/L-cuts, continuous room tone, ducked chamber score, and selective close-up lip-sync.
+              Mixed with J/L-cuts, room tone, ducked score, and close-up lip-sync.
             </p>
 
             <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; font-size:13px;">
@@ -1226,11 +1211,11 @@
               </label>
               <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
                 <input type="checkbox" id="fin-grain" checked onchange="saveFinishingFlag()" />
-                35mm Organic Grain
+                35mm Film Grain
               </label>
               <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
                 <input type="checkbox" id="fin-subtitles" onchange="saveFinishingFlag()" />
-                Festival Subtitles
+                Subtitles
               </label>
               <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
                 <input type="checkbox" id="fin-lipsync" checked onchange="saveFinishingFlag()" />
@@ -1240,15 +1225,15 @@
           </div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-ghost" style="flex:1 1 140px;" onclick="triggerRemasterCut()">Re-Mix Soundstage (&lt;5s)</button>
-            <a id="download-master-btn" href="#" download class="btn btn-primary" style="flex:1.2 1 160px;">Download Master MP4</a>
+            <button type="button" class="btn btn-ghost" style="flex:1 1 130px;" onclick="triggerRemasterCut()">Re-Mix (&lt;5s)</button>
+            <a id="download-master-btn" href="#" download class="btn btn-primary" style="flex:1.2 1 160px;">Download MP4</a>
           </div>
         </div>
       </div>
 
       <div class="section-label">
-        <h2>Shot Takes &amp; Surgical Reshoots</h2>
-        <span>Reshoot any individual shot without re-rendering the rest of your movie</span>
+        <h2>Shot Takes &amp; Individual Reshoots</h2>
+        <span>Reshoot any single shot without re-rendering your whole movie</span>
       </div>
       <div class="shots-list" id="screening-takes-grid"></div>
     </section>
@@ -1437,8 +1422,8 @@
       document.getElementById('mode-autopilot-btn').classList.toggle('active', mode === 'autopilot');
       document.getElementById('develop-film-btn').innerHTML =
         mode === 'autopilot'
-          ? '1-Click Autopilot: Produce Full Film &rarr;'
-          : 'Develop Treatments &amp; Look-Tests &rarr;';
+          ? 'Produce Full Movie &rarr;'
+          : 'Create Storyboard &rarr;';
     }
 
     function handleRefFiles(fileList) {
@@ -1475,12 +1460,13 @@
     }
 
     function switchStage(n) {
-      state.stage = n;
-      [1, 2, 3, 4].forEach(i => {
-        document.getElementById(`tab-stage-${i}`).classList.toggle('active', i === n);
-        document.getElementById(`panel-stage-${i}`).classList.toggle('active', i === n);
+      const clamped = Math.max(1, Math.min(3, n));
+      state.stage = clamped;
+      [1, 2, 3].forEach(i => {
+        document.getElementById(`tab-stage-${i}`).classList.toggle('active', i === clamped);
+        document.getElementById(`panel-stage-${i}`).classList.toggle('active', i === clamped);
       });
-      document.getElementById('producer-taste-bar').classList.toggle('visible', n >= 2 && !!state.project);
+      document.getElementById('producer-taste-bar').classList.toggle('visible', clamped >= 2 && !!state.project);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1531,20 +1517,17 @@
       state.project = proj;
       document.getElementById('open-master-json-btn').disabled = false;
       document.getElementById('tab-stage-2').disabled = false;
-      const hasScenes = (proj.scenes || []).length > 0;
-      document.getElementById('tab-stage-3').disabled = !hasScenes;
       const hasAnyTake = (proj.scenes || []).some(sc => (sc.shots || []).some(sh => (sh.takes || []).length > 0));
-      document.getElementById('tab-stage-4').disabled = !(proj.master_video_url || hasAnyTake);
+      document.getElementById('tab-stage-3').disabled = !(proj.master_video_url || hasAnyTake);
 
       updateProgressBanner(proj);
       renderStage2(proj);
       renderStage3(proj);
-      renderStage4(proj);
 
       if (autoJump) {
-        if (proj.status === 'done' && proj.master_video_url) switchStage(4);
-        else if (proj.status === 'animatic_ready' && proj.leica_reel_url) switchStage(3);
-        else if (proj.status === 'script_ready' || proj.status === 'treatments_ready') switchStage(2);
+        if (proj.status === 'done' && proj.master_video_url) switchStage(3);
+        else if ((proj.status === 'shooting' || proj.status === 'mixing') && (proj.master_video_url || hasAnyTake)) switchStage(3);
+        else switchStage(2);
       }
     }
 
@@ -1556,7 +1539,7 @@
       }
       const btn = document.getElementById('develop-film-btn');
       btn.disabled = true;
-      btn.textContent = 'Assembling Showrunner & Look-Tests...';
+      btn.textContent = state.workflowMode === 'autopilot' ? 'Starting 1-Click Movie...' : 'Building Script & Storyboard...';
       try {
         const proj = await apiFetch('/api/cinema/projects', {
           method: 'POST',
@@ -1565,6 +1548,7 @@
             aspect_ratio: document.getElementById('aspect-select').value,
             target_duration_sec: parseInt(document.getElementById('duration-select').value, 10),
             workflow_mode: state.workflowMode,
+            quick_storyboard: state.workflowMode === 'guided',
             mood_presets: state.selectedMoods,
             story_archetype: document.getElementById('archetype-select').value || 'auto',
             user_vibe_note: document.getElementById('vibe-note-input').value.trim(),
@@ -1593,59 +1577,32 @@
     }
 
     function renderStage2(proj) {
-      const tGrid = document.getElementById('treatments-container');
-      tGrid.innerHTML = (proj.treatments || []).map(tr => {
-        const isSel = tr.treatment_id === proj.selected_treatment_id;
-        const swatches = (tr.palette_hex || []).map(c =>
-          `<span class="swatch-dot" style="background:${esc(c)}"></span>`
-        ).join('');
-        return `
-          <article class="treatment-card ${isSel ? 'selected' : ''}">
-            ${tr.look_test_url ? `<img class="treatment-look" src="${esc(tr.look_test_url)}" alt="${esc(tr.title)}" />` : ''}
-            <div class="treatment-content">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <span class="meta-tag">${esc(tr.archetype.replace(/_/g, ' '))}</span>
-                <span class="meta-tag amber">Rubric ${esc(tr.rubric_score)}/10</span>
-              </div>
-              <h3 class="treatment-title">${esc(tr.title)}</h3>
-              <p style="font-size:13px; color:var(--text-primary);">${esc(tr.logline_hook)}</p>
-              <p style="font-size:12px; color:var(--text-secondary); flex:1;">${esc(tr.story_arc_summary)}</p>
-              <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-top:8px;">
-                <div class="swatch-row" style="margin:0;">${swatches}</div>
-                <button type="button" class="btn ${isSel ? 'btn-primary' : ''} btn-sm" onclick="compileFromTreatment('${esc(tr.treatment_id)}')">
-                  ${(proj.scenes || []).length && isSel ? 'Re-Compile Script' : 'Select &amp; Build Script &rarr;'}
-                </button>
-              </div>
-            </div>
-          </article>
-        `;
-      }).join('');
+      document.getElementById('leica-film-title').textContent = proj.title || 'Voiced Storyboard';
+      document.getElementById('previs-actual-usd').textContent = `$${(proj.actual_usd || 0).toFixed(2)}`;
+      document.getElementById('est-shoot-usd').textContent = `$${(proj.estimated_shoot_usd || 0).toFixed(2)}`;
 
-      const wrapper = document.getElementById('vault-and-spine-wrapper');
-      if (!(proj.scenes || []).length) {
-        wrapper.style.display = 'none';
-        return;
-      }
-      wrapper.style.display = 'block';
-
-      if (proj.story_rubric) {
+      if (proj.story_rubric && (proj.scenes || []).length) {
         document.getElementById('story-rubric-badge').textContent =
-          `Story Rubric ${proj.story_rubric.overall_score}/10 · ${proj.scenes.length} Scenes · ${proj.shot_count} Shots (${proj.total_duration_sec}s)`;
+          `${proj.scenes.length} Scenes · ${proj.shot_count} Shots (${proj.total_duration_sec}s) · Story ${proj.story_rubric.overall_score}/10`;
+      } else {
+        document.getElementById('story-rubric-badge').textContent = 'Voiced Storyboard Preview';
       }
 
-      document.getElementById('scene-spine-container').innerHTML = proj.scenes.map(sc => `
-        <div class="spine-node">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span class="meta-tag amber">${esc(sc.causal_link_from_prev.toUpperCase())}</span>
-            <span style="font-size:11.5px; color:var(--text-muted);">Tension ${esc(sc.tension_level)}/10 · ${esc(sc.duration_sec)}s</span>
-          </div>
-          <strong style="display:block; font-size:13.5px; margin-bottom:4px;">${esc(sc.title)}</strong>
-          <p style="font-size:12px; color:var(--text-secondary);">${esc(sc.dramatic_turn)}</p>
-        </div>
-      `).join('');
+      const vid = document.getElementById('leica-reel-video');
+      if (proj.leica_reel_url && vid.getAttribute('data-src') !== proj.leica_reel_url) {
+        vid.src = proj.leica_reel_url;
+        vid.setAttribute('data-src', proj.leica_reel_url);
+      }
+
+      // Render Vault (Cast, Sets, Props)
+      const chars = proj.vault?.characters || [];
+      const locs = proj.vault?.locations || [];
+      const props = proj.vault?.props || [];
+      document.getElementById('vault-counts-label').textContent =
+        `${chars.length} cast · ${locs.length} sets · ${props.length} props`;
 
       const vCards = [];
-      (proj.vault?.characters || []).forEach(ch => {
+      chars.forEach(ch => {
         vCards.push(`
           <div class="entity-card">
             ${ch.turnaround_url ? `<img class="sheet-preview" src="${esc(ch.turnaround_url)}" alt="${esc(ch.name)}" />` : ''}
@@ -1658,7 +1615,7 @@
           </div>
         `);
       });
-      (proj.vault?.locations || []).forEach(loc => {
+      locs.forEach(loc => {
         vCards.push(`
           <div class="entity-card">
             ${(loc.primary_wall_url || loc.reverse_wall_url) ? `
@@ -1676,7 +1633,7 @@
           </div>
         `);
       });
-      (proj.vault?.props || []).forEach(pr => {
+      props.forEach(pr => {
         const statesTxt = Object.keys(pr.states || {}).join(' -> ');
         vCards.push(`
           <div class="entity-card">
@@ -1691,48 +1648,48 @@
         `);
       });
       document.getElementById('vault-entities-container').innerHTML = vCards.join('');
-    }
 
-    async function compileFromTreatment(treatmentId) {
-      if (!state.project) return;
-      showToast('Compiling WorldVault, Parallel Scene JSON & Table-Read Voices...');
-      try {
-        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/compile`, {
-          method: 'POST',
-          body: JSON.stringify({ treatment_id: treatmentId, mock: isMockSelected(), wait: false }),
-        });
-        applyProjectState(proj, false);
-      } catch (err) {
-        showToast('Compile failed: ' + err.message);
-      }
-    }
+      // Render Story Spine & Alternate Treatments inside collapsible drawer
+      document.getElementById('scene-spine-container').innerHTML = (proj.scenes || []).map(sc => `
+        <div class="spine-node">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span class="meta-tag amber">${esc(sc.causal_link_from_prev.toUpperCase())}</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">Tension ${esc(sc.tension_level)}/10 · ${esc(sc.duration_sec)}s</span>
+          </div>
+          <strong style="display:block; font-size:13.5px; margin-bottom:4px;">${esc(sc.title)}</strong>
+          <p style="font-size:12px; color:var(--text-secondary);">${esc(sc.dramatic_turn)}</p>
+        </div>
+      `).join('');
 
-    async function triggerBuildAnimatic(forceVault = false) {
-      if (!state.project) return;
-      showToast('Generating Vault Turnarounds, Start/End Keyframes & Voiced Leica Reel...');
-      try {
-        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/animatic`, {
-          method: 'POST',
-          body: JSON.stringify({ force_vault: !!forceVault, mock: isMockSelected(), wait: false }),
-        });
-        applyProjectState(proj, false);
-        switchStage(3);
-      } catch (err) {
-        showToast('Animatic error: ' + err.message);
-      }
-    }
+      const tGrid = document.getElementById('treatments-container');
+      tGrid.innerHTML = (proj.treatments || []).map(tr => {
+        const isSel = tr.treatment_id === proj.selected_treatment_id;
+        const swatches = (tr.palette_hex || []).map(c =>
+          `<span class="swatch-dot" style="background:${esc(c)}"></span>`
+        ).join('');
+        return `
+          <article class="treatment-card ${isSel ? 'selected' : ''}">
+            ${tr.look_test_url ? `<img class="treatment-look" src="${esc(tr.look_test_url)}" alt="${esc(tr.title)}" />` : ''}
+            <div class="treatment-content">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <span class="meta-tag">${esc(tr.archetype.replace(/_/g, ' '))}</span>
+                <span class="meta-tag amber">Score ${esc(tr.rubric_score)}/10</span>
+              </div>
+              <h3 class="treatment-title">${esc(tr.title)}</h3>
+              <p style="font-size:13px; color:var(--text-primary);">${esc(tr.logline_hook)}</p>
+              <p style="font-size:12px; color:var(--text-secondary); flex:1;">${esc(tr.story_arc_summary)}</p>
+              <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-top:8px;">
+                <div class="swatch-row" style="margin:0;">${swatches}</div>
+                <button type="button" class="btn ${isSel ? 'btn-primary' : ''} btn-sm" onclick="compileFromTreatment('${esc(tr.treatment_id)}')">
+                  ${isSel ? 'Current Angle (Rebuild)' : 'Switch to This Angle &rarr;'}
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
 
-    function renderStage3(proj) {
-      document.getElementById('leica-film-title').textContent = `${proj.title} · Leica Reel`;
-      document.getElementById('previs-actual-usd').textContent = `$${(proj.actual_usd || 0).toFixed(2)}`;
-      document.getElementById('est-shoot-usd').textContent = `$${(proj.estimated_shoot_usd || 0).toFixed(2)}`;
-
-      const vid = document.getElementById('leica-reel-video');
-      if (proj.leica_reel_url && vid.getAttribute('data-src') !== proj.leica_reel_url) {
-        vid.src = proj.leica_reel_url;
-        vid.setAttribute('data-src', proj.leica_reel_url);
-      }
-
+      // Render Shot-by-Shot Storyboard
       const board = document.getElementById('scenes-shots-board');
       board.innerHTML = (proj.scenes || []).map(sc => {
         const shotsHtml = (sc.shots || []).map(sh => {
@@ -1763,7 +1720,7 @@
               </div>
 
               <p style="font-size:12px; color:var(--text-secondary);">
-                <strong>Motion:</strong> ${motionSummary}
+                <strong>Action:</strong> ${motionSummary}
               </p>
               ${dlgHtml}
 
@@ -1790,6 +1747,34 @@
           </div>
         `;
       }).join('');
+    }
+
+    async function compileFromTreatment(treatmentId) {
+      if (!state.project) return;
+      showToast('Switching story angle & recompiling script...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/compile`, {
+          method: 'POST',
+          body: JSON.stringify({ treatment_id: treatmentId, mock: isMockSelected(), wait: false }),
+        });
+        applyProjectState(proj, false);
+      } catch (err) {
+        showToast('Compile failed: ' + err.message);
+      }
+    }
+
+    async function triggerBuildAnimatic(forceVault = false) {
+      if (!state.project) return;
+      showToast('Rebuilding Start/End frames & voiced storyboard preview...');
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/animatic`, {
+          method: 'POST',
+          body: JSON.stringify({ force_vault: !!forceVault, mock: isMockSelected(), wait: false }),
+        });
+        applyProjectState(proj, false);
+      } catch (err) {
+        showToast('Animatic error: ' + err.message);
+      }
     }
 
     function openTweakModal(shotId) {
@@ -1838,21 +1823,21 @@
 
     async function triggerProduceFilm() {
       if (!state.project) return;
-      showToast('Rolling Principal Photography, Lip-Sync & Cinema Soundstage...');
+      showToast('Shooting movie clips, lip-sync & cinema soundstage...');
       try {
         const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/produce`, {
           method: 'POST',
           body: JSON.stringify({ only_missing_takes: true, mock: isMockSelected(), wait: false }),
         });
         applyProjectState(proj, false);
-        switchStage(4);
+        switchStage(3);
       } catch (err) {
         showToast('Shoot failed: ' + err.message);
       }
     }
 
-    function renderStage4(proj) {
-      document.getElementById('screening-title').textContent = proj.title;
+    function renderStage3(proj) {
+      document.getElementById('screening-title').textContent = proj.title || 'Master Cut';
       document.getElementById('fin-letterbox').checked = !!proj.cinema_letterbox;
       document.getElementById('fin-grain').checked = !!proj.film_grain;
       document.getElementById('fin-subtitles').checked = !!proj.enable_subtitles;
@@ -1860,7 +1845,14 @@
 
       if (proj.qa_report && proj.qa_report.overall_score) {
         document.getElementById('qa-score-pill').textContent =
-          `QA ${proj.qa_report.overall_score}/10 · Total Spend $${(proj.actual_usd || 0).toFixed(2)}`;
+          `QA ${proj.qa_report.overall_score}/10 · Spend $${(proj.actual_usd || 0).toFixed(2)}`;
+      }
+      if (proj.status_message && proj.status_message.includes('skipped')) {
+        document.getElementById('screening-status-copy').textContent =
+          `${proj.status_message} — you can reshoot any missing shot below.`;
+      } else {
+        document.getElementById('screening-status-copy').textContent =
+          'Mixed with J/L-cuts, room tone, ducked score, and close-up lip-sync.';
       }
 
       const mVid = document.getElementById('master-film-video');

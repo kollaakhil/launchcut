@@ -88,8 +88,13 @@ from gtm_videogen.rules.voice_casting import VOICE_CATALOG
 def _extract_subject_noun(idea: str, brand_name: str | None = None) -> str:
     if brand_name and brand_name.strip():
         return brand_name.strip()
+    m_title = re.search(r"(?im)^\s*title\s*:\s*([^\n\r]{2,72})", idea or "")
+    if m_title:
+        return m_title.group(1).strip().strip("\"'")
+    # Strip leading metadata labels like "Genre: ..." or "Logline:"
+    cleaned = re.sub(r"(?im)^\s*(genre|logline|setting|premise|idea)\s*:\s*", "", idea or "")
     words = [
-        w.strip(".,!?:;\"'()") for w in idea.strip().split() if len(w.strip(".,!?:;\"'()")) >= 3
+        w.strip(".,!?:;\"'()") for w in cleaned.strip().split() if len(w.strip(".,!?:;\"'()")) >= 3
     ]
     stop = {
         "the",
@@ -110,9 +115,12 @@ def _extract_subject_noun(idea: str, brand_name: str | None = None) -> str:
         "movie",
         "story",
         "short",
+        "title",
+        "genre",
+        "logline",
     }
     picked = [w for w in words if w.lower() not in stop][:4]
-    return " ".join(picked).title() if picked else "The Signal"
+    return " ".join(picked).title() if picked else "Untitled Film"
 
 
 def _cast_distinct_voices(count: int = 3) -> list[CharacterVoiceCasting]:
@@ -796,40 +804,41 @@ def _deterministic_scene_shots(
         ),
     ]
 
+    prop_label = hero_prop.name if hero_prop else "this"
     dialogue_bank: dict[int, list[tuple[str, str, str]]] = {
         1: [
             (
                 protag_id,
-                "Six months of dead frequencies. Pack the bench—we're done.",
+                f"Quiet tonight. Leave {prop_label} where it sits.",
                 "off_screen_reaction",
             ),
-            (protag_id, "Wait. Listen to the glass.", "on_screen_speaking"),
+            (protag_id, "Wait. Don't move.", "on_screen_speaking"),
         ],
         2: [
             (
                 ally_id,
-                "If you push the gain past threshold, the core shatters.",
+                "You know what happens if we cross that line.",
                 "over_the_shoulder",
             ),
             (
                 protag_id,
-                "It isn't interference. Something is pacing the storm.",
+                "Then watch closely.",
                 "on_screen_speaking",
             ),
         ],
         3: [
-            (protag_id, "Kill the automated loop. I'm tuning it by hand.", "on_screen_speaking"),
-            (ally_id, "The harmonic just locked. Zero drift.", "off_screen_reaction"),
+            (protag_id, "Enough talk. We settle this right here.", "on_screen_speaking"),
+            (ally_id, "Nobody expected that.", "off_screen_reaction"),
         ],
         4: [
             (
                 ally_id,
-                "We built it in the dark... I didn't think it would feel this quiet.",
+                "After everything tonight... you still aren't leaving.",
                 "off_screen_reaction",
             ),
             (
                 protag_id,
-                "Every clear signal starts as noise someone refused to ignore.",
+                "This place has stood longer than any of them.",
                 "on_screen_speaking",
             ),
         ],
@@ -982,6 +991,250 @@ def _deterministic_scene_shots(
     return shots
 
 
+_SHOT_SCALE_ALIASES: dict[str, ShotScale] = {
+    "extreme_wide": "extreme_wide",
+    "ews": "extreme_wide",
+    "wide": "wide",
+    "ws": "wide",
+    "establishing": "wide",
+    "medium_wide": "medium_wide",
+    "mws": "medium_wide",
+    "medium": "medium",
+    "ms": "medium",
+    "medium_close_up": "medium_close_up",
+    "mcu": "medium_close_up",
+    "close_up": "close_up",
+    "closeup": "close_up",
+    "cu": "close_up",
+    "extreme_close_up": "extreme_close_up_insert",
+    "extreme_close_up_insert": "extreme_close_up_insert",
+    "ecu": "extreme_close_up_insert",
+    "insert": "extreme_close_up_insert",
+    "macro": "extreme_close_up_insert",
+    "over_the_shoulder": "over_the_shoulder",
+    "ots": "over_the_shoulder",
+}
+
+
+def _normalize_llm_shot_dict(
+    raw: dict[str, Any],
+    fb: CinemaShot,
+    scene: CinemaScene,
+    vault: WorldVault,
+    idx: int,
+) -> CinemaShot:
+    """Coerce flexible LLM JSON shot dicts into strict `CinemaShot` without discarding story content."""
+    valid_char_ids = [c.id for c in vault.characters]
+    valid_prop_ids = [p.id for p in vault.props]
+
+    # Duration
+    raw_dur = raw.get("duration_sec", raw.get("duration", fb.duration_sec))
+    try:
+        dur_int = int(round(float(re.sub(r"[^0-9.]", "", str(raw_dur)) or fb.duration_sec)))
+    except Exception:
+        dur_int = fb.duration_sec
+    dur_int = max(4, min(12, dur_int))
+
+    # Shot scale
+    raw_scale = re.sub(r"[\s-]+", "_", str(raw.get("shot_scale") or fb.shot_scale).strip().lower())
+    shot_scale: ShotScale = _SHOT_SCALE_ALIASES.get(raw_scale, fb.shot_scale)
+
+    # Characters
+    raw_chars = raw.get("characters_in_shot")
+    chars_in_shot: list[str] = []
+    if isinstance(raw_chars, list):
+        for item in raw_chars:
+            cid = str(item).strip()
+            if cid in valid_char_ids:
+                chars_in_shot.append(cid)
+            else:
+                matched = vault.get_character(cid)
+                if matched:
+                    chars_in_shot.append(matched.id)
+    if not chars_in_shot and shot_scale != "extreme_close_up_insert":
+        chars_in_shot = list(fb.characters_in_shot)
+
+    # Camera
+    raw_cam = raw.get("camera")
+    cam_dict = fb.camera.model_dump()
+    if isinstance(raw_cam, dict):
+        if raw_cam.get("facing_wall_zone") in (
+            "A_north_primary",
+            "B_south_reverse",
+            "west_side",
+            "east_side",
+        ):
+            cam_dict["facing_wall_zone"] = raw_cam["facing_wall_zone"]
+        if raw_cam.get("lens_mm") is not None:
+            digits = re.sub(r"[^0-9]", "", str(raw_cam["lens_mm"]))
+            if digits:
+                cam_dict["lens_mm"] = max(14, min(200, int(digits)))
+        for k in ("t_stop", "angle", "movement", "eyeline_vector"):
+            if raw_cam.get(k):
+                cam_dict[k] = str(raw_cam[k])[:160]
+    elif isinstance(raw_cam, str) and raw_cam.strip():
+        cam_dict["movement"] = raw_cam.strip()[:160]
+
+    # Spatial zones
+    raw_sp = raw.get("spatial_zones")
+    sp_dict = fb.spatial_zones.model_dump()
+    if isinstance(raw_sp, dict):
+        for k in ("foreground", "midground", "background"):
+            if raw_sp.get(k):
+                sp_dict[k] = str(raw_sp[k])[:280]
+
+    # Textures
+    raw_tex = raw.get("textures_and_atmosphere") or raw.get("textures")
+    textures = (
+        [str(t).strip() for t in raw_tex if str(t).strip()][:5]
+        if isinstance(raw_tex, list) and raw_tex
+        else list(fb.textures_and_atmosphere)
+    )
+
+    # Start & End Frames
+    def _coerce_frame(val: Any, fallback_f: FrameStateSpec) -> FrameStateSpec:
+        if isinstance(val, str) and len(val.strip()) >= 4:
+            return fallback_f.model_copy(update={"composition": val.strip()[:420]})
+        if isinstance(val, dict):
+            comp = str(
+                val.get("composition") or val.get("description") or val.get("scene") or fallback_f.composition
+            ).strip()
+            if len(comp) < 4:
+                comp = fallback_f.composition
+            return FrameStateSpec(
+                composition=comp[:420],
+                character_pose=str(val.get("character_pose") or val.get("pose") or fallback_f.character_pose)[:220],
+                focal_plane=str(val.get("focal_plane") or fallback_f.focal_plane)[:180],
+                prop_states=fallback_f.prop_states,
+            )
+        return fallback_f
+
+    start_frame = _coerce_frame(raw.get("start_frame"), fb.start_frame)
+    end_frame = _coerce_frame(raw.get("end_frame"), fb.end_frame)
+
+    # Motion Delta
+    raw_md = raw.get("motion_delta") or raw.get("timeline")
+    motion_beats: list[MotionDeltaBeat] = []
+    if isinstance(raw_md, list):
+        for b_idx, item in enumerate(raw_md[:4]):
+            if isinstance(item, dict):
+                act = str(item.get("action") or item.get("description") or "").strip()
+                if len(act) >= 3:
+                    win = str(
+                        item.get("window")
+                        or item.get("time")
+                        or f"{b_idx * (dur_int / max(1, len(raw_md))):.1f}-{(b_idx + 1) * (dur_int / max(1, len(raw_md))):.1f}s"
+                    )
+                    motion_beats.append(
+                        MotionDeltaBeat(
+                            window=win,
+                            action=act[:320],
+                            camera_delta=str(item.get("camera_delta") or item.get("camera") or "")[:140],
+                        )
+                    )
+            elif isinstance(item, str) and len(item.strip()) >= 3:
+                motion_beats.append(
+                    MotionDeltaBeat(window=f"{b_idx * 2}-{(b_idx + 1) * 2}s", action=item.strip()[:320])
+                )
+    if not motion_beats:
+        motion_beats = list(fb.motion_delta)
+
+    # Dialogue (strictly honor null / empty when silent shot!)
+    dlg: DialogueCueSpec | None = None
+    if "dialogue" in raw:
+        raw_dlg = raw.get("dialogue")
+        if isinstance(raw_dlg, dict):
+            line_txt = str(raw_dlg.get("line") or raw_dlg.get("text") or "").strip()
+            if line_txt:
+                spk_raw = str(raw_dlg.get("speaker_id") or raw_dlg.get("speaker") or (valid_char_ids[0] if valid_char_ids else "NARRATOR")).strip()
+                matched_spk = vault.get_character(spk_raw)
+                spk_id = matched_spk.id if matched_spk else (valid_char_ids[0] if valid_char_ids else spk_raw)
+                mode_raw = str(raw_dlg.get("delivery_mode") or "on_screen_speaking").strip().lower()
+                if mode_raw not in (
+                    "on_screen_speaking",
+                    "off_screen_reaction",
+                    "over_the_shoulder",
+                    "narrator_voiceover",
+                ):
+                    mode_raw = "on_screen_speaking" if shot_scale in ("close_up", "medium_close_up") else "off_screen_reaction"
+                dlg = DialogueCueSpec(
+                    speaker_id=spk_id,
+                    line=line_txt[:220],
+                    delivery_mode=mode_raw,  # type: ignore[arg-type]
+                    emotion=str(raw_dlg.get("emotion") or "grounded cinema realism")[:120],
+                    pre_pause_sec=max(0.2, min(2.0, float(raw_dlg.get("pre_pause_sec") or 0.5))),
+                )
+    else:
+        dlg = fb.dialogue
+
+    # Foley / Sound stems
+    foley_txt = str(raw.get("foley_prompt") or "")
+    raw_stems = raw.get("sound_stems")
+    if isinstance(raw_stems, dict) and raw_stems.get("foley_prompt"):
+        foley_txt = str(raw_stems["foley_prompt"])
+    sound_stems = ShotSoundStems(
+        foley_prompt=(foley_txt or fb.sound_stems.foley_prompt)[:240],
+        j_cut_lead_sec=0.35 if (idx == 0 and scene.scene_number > 1) else 0.0,
+        l_cut_trail_sec=0.40 if dlg is not None else 0.0,
+    )
+
+    # Lighting
+    raw_light = raw.get("lighting")
+    light_obj = fb.lighting
+    if isinstance(raw_light, dict):
+        light_obj = ShotLightingSpec(
+            key=str(raw_light.get("key") or fb.lighting.key)[:220],
+            fill_and_rim=str(raw_light.get("fill_and_rim") or fb.lighting.fill_and_rim)[:220],
+            palette_hex=list(scene.color_palette_hex),
+        )
+
+    # Props
+    props_list = list(fb.props_in_shot)
+    raw_props = raw.get("props_in_shot")
+    if isinstance(raw_props, list) and raw_props:
+        built_p: list[ShotPropInstance] = []
+        for rp in raw_props[:3]:
+            if isinstance(rp, dict) and rp.get("prop_id"):
+                pid = str(rp["prop_id"]).strip()
+                if pid in valid_prop_ids:
+                    built_p.append(
+                        ShotPropInstance(
+                            prop_id=pid,
+                            state=str(rp.get("state") or "default"),
+                            screen_zone=str(rp.get("screen_zone") or "foreground"),
+                            interaction=str(rp.get("interaction") or ""),
+                        )
+                    )
+        if built_p:
+            props_list = built_p
+
+    sh = CinemaShot(
+        shot_id=f"{scene.scene_id}_SH{idx + 1:02d}",
+        scene_id=scene.scene_id,
+        index_in_scene=idx,
+        duration_sec=dur_int,
+        render_engine="ai_cinema",
+        shot_scale=shot_scale,
+        coverage_role=str(raw.get("coverage_role") or fb.coverage_role)[:64],
+        anchor_strategy="start_and_end_locked",
+        characters_in_shot=chars_in_shot,
+        camera=ShotCameraSpec.model_validate(cam_dict),
+        spatial_zones=SpatialZonesSpec.model_validate(sp_dict),
+        textures_and_atmosphere=textures,
+        props_in_shot=props_list,
+        lighting=light_obj,
+        start_frame=start_frame,
+        motion_delta=motion_beats,
+        end_frame=end_frame,
+        dialogue=dlg,
+        sound_stems=sound_stems,
+        title_card_headline=fb.title_card_headline,
+        title_card_subline=fb.title_card_subline,
+    )
+    sh.anchor_strategy = choose_smart_anchor_strategy(sh)  # type: ignore[assignment]
+    return sh
+
+
 async def _compile_single_scene_llm(
     scene: CinemaScene,
     vault: WorldVault,
@@ -991,7 +1244,7 @@ async def _compile_single_scene_llm(
     settings: Settings,
     cancel: CancellationToken | None = None,
 ) -> list[CinemaShot]:
-    """Compile 3-6 rich `CinemaShot` JSONs for ONE scene with full LLM attention budget."""
+    """Compile 3-5 rich `CinemaShot` JSONs for ONE scene with explicit schema & lenient coercion."""
     fallback_shots = _deterministic_scene_shots(
         scene, vault, project, is_final_scene=is_final_scene
     )
@@ -1003,60 +1256,68 @@ async def _compile_single_scene_llm(
     prop_summary = [{"id": p.id, "name": p.name, "states": p.states} for p in vault.props]
 
     sys_prompt = (
-        "You are a Master Cinematographer and Script Supervisor. "
-        "Compile 3 to 5 cinema shots in strict JSON for ONE scene of a film. "
-        "Rules:\n"
-        "1. Reference characters, locations, and props by their exact Vault IDs (e.g. CHAR_PROTAG, PROP_HERO) inside compositions and lists.\n"
-        "2. Alternate shot_scale across shots ('wide', 'medium', 'medium_close_up', 'close_up', 'extreme_close_up_insert', 'over_the_shoulder').\n"
-        "3. Use facing_wall_zone='A_north_primary' for primary angles and 'B_south_reverse' for 180-deg reverse reaction angles.\n"
-        "4. Every shot MUST specify spatial_zones (foreground, midground, background), textures_and_atmosphere, start_frame, motion_delta, and end_frame.\n"
-        "5. Strictly ZERO readable signs/words inside ai_cinema frames. Keep dialogue sparse, natural, and subtextual.\n"
-        'Return JSON: {"shots": [CinemaShot-compatible dicts]}'
+        "You are a Master Film Director & Cinematographer. "
+        "Write 3 to 4 vivid, culturally authentic cinema shots in strict JSON for ONE scene of this EXACT movie. "
+        "NEVER invent unrelated sci-fi dialogue or settings; stay 100% faithful to the Film Idea, Characters, Location, and Props.\n"
+        "Return ONLY valid JSON matching this EXACT structure:\n"
+        '{"shots": [{\n'
+        '  "duration_sec": 6,\n'
+        '  "shot_scale": "wide" | "medium" | "medium_close_up" | "close_up" | "extreme_close_up_insert" | "over_the_shoulder",\n'
+        '  "coverage_role": "establishing" | "prop_insert" | "confrontation" | "reaction",\n'
+        '  "characters_in_shot": ["CHAR_PROTAG"],\n'
+        '  "camera": {"facing_wall_zone": "A_north_primary" | "B_south_reverse", "lens_mm": 50, "angle": "low-angle eye-level", "movement": "slow push-in", "eyeline_vector": "looking_screen_right"},\n'
+        '  "spatial_zones": {"foreground": "...", "midground": "...", "background": "..."},\n'
+        '  "textures_and_atmosphere": ["rain-slicked brass", "rising tea steam"],\n'
+        '  "start_frame": {"composition": "exact opening still image using Vault IDs", "character_pose": "...", "focal_plane": "..."},\n'
+        '  "motion_delta": [{"window": "0.0-3.0s", "action": "concrete physical action"}, {"window": "3.0-6.0s", "action": "..."}],\n'
+        '  "end_frame": {"composition": "exact closing still image", "character_pose": "...", "focal_plane": "..."},\n'
+        '  "dialogue": null OR {"speaker_id": "CHAR_PROTAG", "line": "short punchy natural line matching setting", "delivery_mode": "on_screen_speaking" | "off_screen_reaction" | "over_the_shoulder", "emotion": "..."},\n'
+        '  "foley_prompt": "concrete physical sound effects"\n'
+        "}]}"
     )
     usr_prompt = (
-        f"Film Idea: {project.idea}\n"
-        f"Craft Rules: {vault.taste_signature.compiled_craft_rules.model_dump_json()}\n"
+        f"Film Title: {project.title}\n"
+        f"Film Idea (STAY 100% FAITHFUL TO THIS): {project.idea}\n"
         f"Characters: {char_summary}\n"
         f"Location: {loc.model_dump_json() if loc else scene.location_id}\n"
         f"Props: {prop_summary}\n"
-        f"Scene {scene.scene_number} ({scene.slugline}):\n"
-        f"  Causal Link: {scene.causal_link_from_prev.upper()} -> {scene.dramatic_turn}\n"
+        f"Scene {scene.scene_number} — {scene.title} ({scene.slugline}):\n"
+        f"  Story Turn ({scene.causal_link_from_prev.upper()}): {scene.dramatic_turn}\n"
         f"  Emotional Shift: {scene.emotional_shift} (Tension {scene.tension_level}/10)\n"
-        f"  Target Scene Duration: {scene.target_duration_sec}s\n"
-        f"  Entry State: {scene.scene_entry_state.model_dump_json()}\n"
-        f"  Exit State: {scene.scene_exit_state.model_dump_json()}"
+        f"  Target Duration: {scene.target_duration_sec}s"
     )
     doc = await _call_openrouter_json(
         system_prompt=sys_prompt,
         user_prompt=usr_prompt,
         settings=settings,
         llm_model_id=project.llm_model_id,
-        max_tokens=3600,
-        temperature=0.62,
+        max_tokens=4200,
+        temperature=0.65,
         cancel=cancel,
     )
     raw_shots = doc.get("shots") if isinstance(doc, dict) else None
     if not isinstance(raw_shots, list) or len(raw_shots) < 2:
+        # One clean retry with slightly lower temperature before falling back
+        doc = await _call_openrouter_json(
+            system_prompt=sys_prompt,
+            user_prompt=usr_prompt,
+            settings=settings,
+            llm_model_id=project.llm_model_id,
+            max_tokens=4200,
+            temperature=0.45,
+            cancel=cancel,
+        )
+        raw_shots = doc.get("shots") if isinstance(doc, dict) else None
+    if not isinstance(raw_shots, list) or len(raw_shots) < 2:
         return fallback_shots
 
     parsed: list[CinemaShot] = []
-    for idx, raw in enumerate(raw_shots[:6]):
+    for idx, raw in enumerate(raw_shots[:5]):
         if not isinstance(raw, dict):
             continue
         fb = fallback_shots[min(idx, len(fallback_shots) - 1)]
         try:
-            merged = {
-                **fb.model_dump(),
-                **raw,
-                "shot_id": f"{scene.scene_id}_SH{idx + 1:02d}",
-                "scene_id": scene.scene_id,
-                "index_in_scene": idx,
-            }
-            sh = CinemaShot.model_validate(merged)
-            sh.anchor_strategy = choose_smart_anchor_strategy(
-                sh, is_chained_from_prev=(sh.anchor_strategy == "chained_from_prev_to_end")
-            )  # type: ignore[assignment]
-            parsed.append(sh)
+            parsed.append(_normalize_llm_shot_dict(raw, fb, scene, vault, idx))
         except Exception:
             parsed.append(
                 fb.model_copy(
@@ -1230,7 +1491,7 @@ async def compile_cinema_master_script(
             user_prompt=usr_p,
             settings=resolved,
             llm_model_id=project.llm_model_id,
-            max_tokens=3200,
+            max_tokens=4500,
             temperature=0.65,
             cancel=cancel,
         )
@@ -1326,6 +1587,31 @@ async def compile_cinema_master_script(
                     ]
 
             raw_scenes = doc.get("scenes")
+            if not isinstance(raw_scenes, list) or len(raw_scenes) < 2:
+                # Dedicated focused Scene Spine call so scenes ALWAYS match the user's real Vault & Idea
+                sc_doc = await _call_openrouter_json(
+                    system_prompt=(
+                        f"Break this movie into {len(scenes)} gripping causal scenes. "
+                        "Every scene after Scene 1 MUST use causal_link_from_prev='but' or 'therefore'. "
+                        'Return JSON: {"scenes": [{"title": str, "slugline": str, "location_id": str, '
+                        '"causal_link_from_prev": "opening_hook"|"but"|"therefore", '
+                        '"dramatic_turn": str, "emotional_shift": str, "tension_level": int}]}'
+                    ),
+                    user_prompt=(
+                        f"Title: {project.title}\nIdea: {project.idea}\n"
+                        f"Characters: {[{'id': c.id, 'name': c.name} for c in vault.characters]}\n"
+                        f"Locations: {[{'id': loc_i.id, 'name': loc_i.name} for loc_i in vault.locations]}\n"
+                        f"Prop: {vault.props[0].name if vault.props else 'None'}"
+                    ),
+                    settings=resolved,
+                    llm_model_id=project.llm_model_id,
+                    max_tokens=2000,
+                    temperature=0.6,
+                    cancel=cancel,
+                )
+                if isinstance(sc_doc, dict) and isinstance(sc_doc.get("scenes"), list):
+                    raw_scenes = sc_doc["scenes"]
+
             if isinstance(raw_scenes, list) and len(raw_scenes) >= 2:
                 valid_loc_ids = {loc_item.id for loc_item in vault.locations}
                 p_keys = list(vault.props[0].states.keys()) if vault.props else ["default"]
