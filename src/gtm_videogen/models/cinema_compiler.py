@@ -725,7 +725,6 @@ def validate_cinema_project(
     known_chars = {c.id for c in project.vault.characters}
 
     # 1. Scene causality & prop state continuity check
-    running_prop_states: dict[str, str] = {p.id: p.default_state for p in project.vault.props}
     for s_idx, sc in enumerate(project.scenes):
         if s_idx > 0 and sc.causal_link_from_prev not in ("but", "therefore", "meanwhile"):
             issues.append(
@@ -744,20 +743,19 @@ def validate_cinema_project(
                         "message": f"Prop {pid} state '{st_key}' is not defined in WorldVault ({list(known_props[pid].states)}).",
                     }
                 )
-        running_prop_states.update(sc.scene_exit_state.prop_states)
 
         # Shot-scale monotony check inside scene
-        scales = [sh.shot_scale for sh in sc.shots if sh.render_engine == "ai_cinema"]
-        for i in range(2, len(scales)):
+        ai_shots = [sh for sh in sc.shots if sh.render_engine == "ai_cinema"]
+        for i in range(2, len(ai_shots)):
             if (
-                scales[i] == scales[i - 1] == scales[i - 2]
+                ai_shots[i].shot_scale == ai_shots[i - 1].shot_scale == ai_shots[i - 2].shot_scale
                 and project.vault.taste_signature.dials.pacing >= 0.25
             ):
                 issues.append(
                     {
-                        "scope": sc.shots[i].shot_id,
+                        "scope": ai_shots[i].shot_id,
                         "code": "monotonous_shot_scale",
-                        "message": f"3 consecutive shots use '{scales[i]}' framing — vary shot scale (e.g. insert or close-up) for cinema rhythm.",
+                        "message": f"3 consecutive shots use '{ai_shots[i].shot_scale}' framing — vary shot scale (e.g. insert or close-up) for cinema rhythm.",
                     }
                 )
 

@@ -365,19 +365,9 @@ def compile_taste_signature(
         max_wpm=max_wpm,
     )
 
-    resolved_arch: StoryArchetype = story_archetype
-    if (
-        resolved_arch == "auto"
-        and taste_profile
-        and taste_profile.preferred_archetypes
-        and taste_profile.reactions_count >= 3
-    ):
-        # Keep 'auto' on signature unless user explicitly picked one; pitcher uses profile weights
-        resolved_arch = "auto"
-
     return TasteSignature(
         mood_presets=chosen_moods,
-        story_archetype=resolved_arch,
+        story_archetype=story_archetype,
         user_vibe_note=user_vibe_note.strip(),
         dials=tuned_dials,
         compiled_craft_rules=craft,

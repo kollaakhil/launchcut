@@ -618,7 +618,7 @@ def _build_deterministic_vault_and_spine(
             [pal[0], pal[1], "#A8B8C8"],
         ),
         (
-            "The Quiet赌 / Decisive Adjustment",
+            "The Decisive Adjustment",
             "therefore",
             "THEREFORE Elena abandons the automated rig and calibrates the core by bare hand, locking the pure harmonic state.",
             "high tension -> hushed awe",

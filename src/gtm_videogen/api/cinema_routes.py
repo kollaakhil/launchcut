@@ -63,6 +63,12 @@ cinema_router = APIRouter(prefix="/api/cinema", tags=["cinema"])
 
 _SAFE_SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _ACTIVE_CINEMA_TASKS: dict[str, asyncio.Task[Any]] = {}
+_MAX_IMAGE_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB cap
+
+
+def _is_project_busy(project_id: str) -> bool:
+    task = _ACTIVE_CINEMA_TASKS.get(project_id)
+    return task is not None and not task.done()
 
 
 def _get_cinema_store(services: ServicesDep) -> CinemaProjectStore:
@@ -94,9 +100,14 @@ def _decode_data_url_image(data_url: str) -> tuple[bytes, str]:
             ext = ".webp"
         raw = b64
     try:
-        return base64.b64decode(raw, validate=False), ext
+        decoded = base64.b64decode(raw, validate=False)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid image payload: {exc}") from exc
+    if not decoded:
+        raise HTTPException(status_code=400, detail="Empty image payload")
+    if len(decoded) > _MAX_IMAGE_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Reference image exceeds 15 MB limit")
+    return decoded, ext
 
 
 def _serialize_cinema_project(
@@ -444,6 +455,9 @@ async def compile_project_script(
         raise HTTPException(status_code=404, detail="Cinema project not found")
     pdir = store.project_dir(project_id)
 
+    if not body.wait and _is_project_busy(project_id):
+        return _serialize_cinema_project(project, store, reg, settings=services.settings)
+
     if body.wait:
         await compile_cinema_master_script(
             project,
@@ -608,6 +622,9 @@ async def build_project_animatic(
         raise HTTPException(status_code=404, detail="Cinema project not found")
     pdir = store.project_dir(project_id)
 
+    if not body.wait and _is_project_busy(project_id):
+        return _serialize_cinema_project(project, store, reg, settings=services.settings)
+
     if body.wait:
         await build_leica_reel_animatic(
             project,
@@ -736,6 +753,9 @@ async def produce_cinema_film(
     if project is None:
         raise HTTPException(status_code=404, detail="Cinema project not found")
     pdir = store.project_dir(project_id)
+
+    if not body.wait and _is_project_busy(project_id):
+        return _serialize_cinema_project(project, store, reg, settings=services.settings)
 
     if body.wait:
         await shoot_and_mix_cinema_film(

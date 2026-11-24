@@ -434,12 +434,10 @@ async def generate_vault_references(
         if cancel is not None:
             cancel.raise_if_cancelled()
         if (
-            not force
-            and loc.primary_wall_plate_path
-            and Path(loc.primary_wall_plate_path).is_file()
+            force
+            or not loc.primary_wall_plate_path
+            or not Path(loc.primary_wall_plate_path).is_file()
         ):
-            pass
-        else:
             plate_a = vault_dir / f"{loc.id}_wall_A.jpg"
             _, url_a, cost_a = await _generate_conditioned_still(
                 prompt=compile_location_wall_prompt(loc, project.vault, reverse=False),
@@ -1504,13 +1502,10 @@ async def shoot_and_mix_cinema_film(
     completed_count = 0
     sem = asyncio.Semaphore(3)
 
-    async def _shoot_idx(idx: int, sh: CinemaShot, prev_clip: Path | None = None) -> None:
+    async def _shoot_one(sh: CinemaShot, prev_clip: Path | None = None) -> None:
         nonlocal completed_count
-        if (
-            only_missing_takes
-            and sh.winning_take() is not None
-            and Path(sh.winning_take().clip_path).is_file()
-        ):  # type: ignore[union-attr]
+        win_tk = sh.winning_take()
+        if only_missing_takes and win_tk is not None and Path(win_tk.clip_path).is_file():
             completed_count += 1
             return
         async with sem:
@@ -1534,8 +1529,8 @@ async def shoot_and_mix_cinema_film(
 
     # Shoot independent shots concurrently first
     indep = [
-        _shoot_idx(i, sh)
-        for i, sh in enumerate(all_shots)
+        _shoot_one(sh)
+        for sh in all_shots
         if sh.anchor_strategy != "chained_from_prev_to_end"
     ]
     if indep:
@@ -1550,7 +1545,7 @@ async def shoot_and_mix_cinema_film(
                 if (prev_win and Path(prev_win.clip_path).is_file())
                 else None
             )
-            await _shoot_idx(i, sh, prev_clip=prev_p)
+            await _shoot_one(sh, prev_clip=prev_p)
 
     await remaster_cinema_cut(
         project,

@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#141210" />
   <title>Launch Cut Cinema Studio — From One Line &amp; Taste to a Coherent Film</title>
   <meta name="description" content="Direct a 1–3 minute coherent narrative film or brand story from a single-line idea and your personal taste, powered by a 3-layer JSON state machine and Start/End frame continuity." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,6 +38,12 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
     }
 
     body {
@@ -45,8 +52,8 @@
       font-family: var(--font-sans);
       font-size: 14px;
       line-height: 1.55;
-      min-height: 100vh;
-      padding-bottom: 96px;
+      min-height: 100dvh;
+      padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
       -webkit-font-smoothing: antialiased;
     }
 
@@ -58,17 +65,19 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
       padding: 12px 24px;
-      background: hsla(24, 12%, 7%, 0.92);
+      background: hsla(24, 12%, 7%, 0.94);
       backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-subtle);
     }
 
     .brand-cluster {
       display: flex;
       align-items: baseline;
-      gap: 12px;
+      gap: 10px;
+      min-width: 0;
     }
 
     .brand-mark {
@@ -77,13 +86,15 @@
       letter-spacing: 0.01em;
       color: var(--text-primary);
       text-decoration: none;
+      white-space: nowrap;
     }
 
     .brand-sub {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--text-muted);
       letter-spacing: 0.04em;
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     nav.stage-tabs {
@@ -94,6 +105,15 @@
       padding: 4px;
       border-radius: var(--radius-md);
       border: 1px solid var(--border-subtle);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      max-width: 100%;
+    }
+
+    nav.stage-tabs::-webkit-scrollbar,
+    .chip-scroll::-webkit-scrollbar {
+      display: none;
     }
 
     .stage-tab {
@@ -105,6 +125,8 @@
       font-family: var(--font-sans);
       font-size: 12.5px;
       font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
       cursor: pointer;
       transition: background 0.16s ease, color 0.16s ease;
     }
@@ -128,7 +150,8 @@
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
     /* Buttons & Inputs */
@@ -137,7 +160,7 @@
       align-items: center;
       justify-content: center;
       gap: 7px;
-      padding: 8px 15px;
+      padding: 9px 15px;
       border-radius: var(--radius-sm);
       font-family: var(--font-sans);
       font-size: 13px;
@@ -147,6 +170,8 @@
       color: var(--text-primary);
       cursor: pointer;
       text-decoration: none;
+      white-space: nowrap;
+      touch-action: manipulation;
       transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
     }
 
@@ -183,16 +208,17 @@
     }
 
     .btn-sm {
-      padding: 5px 10px;
+      padding: 6px 11px;
       font-size: 12px;
     }
 
-    /* Live Progress Banner */
+    /* Live Progress & Error Banners */
     .progress-banner {
       display: none;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
       padding: 10px 24px;
       background: hsl(32, 24%, 12%);
       border-bottom: 1px solid hsla(35, 78%, 56%, 0.25);
@@ -203,8 +229,14 @@
       display: flex;
     }
 
+    .progress-banner.error {
+      background: hsl(6, 32%, 14%);
+      border-bottom-color: hsla(6, 68%, 58%, 0.35);
+    }
+
     .progress-track {
       flex: 1;
+      min-width: 140px;
       max-width: 340px;
       height: 5px;
       background: var(--bg-inset);
@@ -236,13 +268,13 @@
 
     .hero-header {
       max-width: 780px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
 
     .hero-header h1 {
       font-family: var(--font-serif);
       font-weight: 400;
-      font-size: 40px;
+      font-size: clamp(28px, 5vw, 42px);
       line-height: 1.12;
       letter-spacing: -0.01em;
       margin-bottom: 8px;
@@ -250,7 +282,7 @@
 
     .hero-header p {
       color: var(--text-secondary);
-      font-size: 15px;
+      font-size: 14.5px;
     }
 
     /* Stage 1: Idea & Taste Intake */
@@ -258,13 +290,13 @@
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
-      padding: 24px;
+      padding: 22px;
       margin-bottom: 24px;
     }
 
     .logline-textarea {
       width: 100%;
-      min-height: 88px;
+      min-height: 92px;
       padding: 14px 16px;
       background: var(--bg-inset);
       border: 1px solid var(--border-strong);
@@ -289,8 +321,8 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
-      margin-top: 16px;
+      gap: 12px;
+      margin-top: 14px;
     }
 
     .inline-controls {
@@ -306,9 +338,10 @@
       color: var(--text-primary);
       border: 1px solid var(--border-strong);
       border-radius: var(--radius-sm);
-      padding: 7px 11px;
+      padding: 8px 11px;
       font-family: var(--font-sans);
       font-size: 13px;
+      max-width: 100%;
     }
 
     .mode-pill-group {
@@ -323,11 +356,12 @@
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      padding: 5px 11px;
+      padding: 6px 11px;
       border-radius: 4px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .mode-pill.active {
@@ -338,8 +372,10 @@
     /* Mood World Cards */
     .section-label {
       display: flex;
+      flex-wrap: wrap;
       align-items: baseline;
       justify-content: space-between;
+      gap: 8px;
       margin-bottom: 12px;
     }
 
@@ -357,7 +393,7 @@
 
     .mood-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
       gap: 14px;
       margin-bottom: 22px;
     }
@@ -443,7 +479,7 @@
 
     .tune-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
       gap: 18px;
       margin-top: 16px;
     }
@@ -464,7 +500,7 @@
     /* Stage 2: Treatments & WorldVault */
     .treatments-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
       gap: 18px;
       margin-bottom: 28px;
     }
@@ -534,7 +570,7 @@
 
     .vault-columns {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
       gap: 16px;
       margin-top: 14px;
     }
@@ -544,6 +580,7 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       padding: 15px;
+      min-width: 0;
     }
 
     .entity-card img.sheet-preview {
@@ -573,7 +610,7 @@
     /* Tension Spine Strip */
     .spine-strip {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
       gap: 12px;
       margin: 16px 0 24px;
     }
@@ -593,15 +630,6 @@
       margin-bottom: 28px;
     }
 
-    @media (max-width: 960px) {
-      .player-split {
-        grid-template-columns: 1fr;
-      }
-      header.studio-topbar {
-        flex-wrap: wrap;
-      }
-    }
-
     .video-stage-box {
       background: var(--bg-inset);
       border: 1px solid var(--border-subtle);
@@ -617,7 +645,7 @@
     }
 
     .scene-block {
-      margin-bottom: 28px;
+      margin-bottom: 26px;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
@@ -637,7 +665,7 @@
 
     .shots-list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
       gap: 16px;
     }
 
@@ -649,6 +677,16 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      min-width: 0;
+    }
+
+    .shot-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 6px;
     }
 
     .keyframe-bridge {
@@ -663,6 +701,7 @@
       border-radius: var(--radius-sm);
       overflow: hidden;
       border: 1px solid var(--border-subtle);
+      min-width: 0;
     }
 
     .kf-slot img {
@@ -678,6 +717,9 @@
       padding: 4px 7px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .dialogue-quote {
@@ -687,6 +729,7 @@
       border-radius: 0 4px 4px 0;
       font-size: 12.5px;
       color: var(--text-primary);
+      overflow-wrap: break-word;
     }
 
     /* Sticky Producer Taste Bar */
@@ -696,10 +739,11 @@
       left: 0;
       right: 0;
       z-index: 45;
-      background: hsla(24, 11%, 9%, 0.95);
+      background: hsla(24, 11%, 9%, 0.96);
       backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-top: 1px solid var(--border-strong);
-      padding: 10px 24px;
+      padding: 10px 24px calc(10px + env(safe-area-inset-bottom, 0px));
       display: none;
     }
 
@@ -721,18 +765,23 @@
       align-items: center;
       gap: 6px;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      max-width: 100%;
       padding-bottom: 2px;
     }
 
     .taste-chip {
       white-space: nowrap;
+      flex-shrink: 0;
       border: 1px solid var(--border-strong);
       background: var(--bg-surface);
       color: var(--text-secondary);
       border-radius: 99px;
-      padding: 5px 11px;
+      padding: 6px 12px;
       font-size: 12px;
       cursor: pointer;
+      touch-action: manipulation;
       transition: border-color 0.14s ease, color 0.14s ease;
     }
 
@@ -743,16 +792,43 @@
 
     .director-note-form {
       flex: 1;
-      min-width: 260px;
+      min-width: 240px;
       display: flex;
       gap: 8px;
     }
 
     .director-note-form input {
       flex: 1;
+      min-width: 0;
     }
 
-    /* 2-Way Live JSON Inspector Slide-Over Drawer */
+    /* 2-Way Live JSON Inspector Slide-Over Drawer & Tweak Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(460px, 100%);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     .json-drawer-backdrop {
       position: fixed;
       inset: 0;
@@ -767,13 +843,13 @@
     }
 
     .json-drawer {
-      width: min(680px, 96vw);
-      height: 100%;
+      width: min(680px, 100vw);
+      height: 100dvh;
       background: var(--bg-surface);
       border-left: 1px solid var(--border-strong);
       display: flex;
       flex-direction: column;
-      padding: 20px;
+      padding: 18px 20px calc(18px + env(safe-area-inset-bottom, 0px));
       gap: 12px;
     }
 
@@ -793,8 +869,10 @@
 
     .toast-msg {
       position: fixed;
-      top: 68px;
-      right: 24px;
+      top: 72px;
+      right: 16px;
+      left: auto;
+      max-width: calc(100vw - 32px);
       z-index: 80;
       background: var(--bg-elevated);
       border: 1px solid var(--accent-amber);
@@ -803,6 +881,135 @@
       border-radius: var(--radius-sm);
       font-size: 13px;
       display: none;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Tablet Breakpoint */
+    @media (max-width: 960px) {
+      header.studio-topbar {
+        flex-wrap: wrap;
+        padding: 10px 16px;
+        gap: 10px;
+      }
+      nav.stage-tabs {
+        order: 3;
+        width: 100%;
+      }
+      .player-split {
+        grid-template-columns: 1fr;
+      }
+      main.studio-shell {
+        padding: 20px 16px 40px;
+      }
+    }
+
+    /* Phone Breakpoint (320px - 640px) */
+    @media (max-width: 640px) {
+      body {
+        padding-bottom: calc(155px + env(safe-area-inset-bottom, 0px));
+      }
+      .brand-sub {
+        display: none;
+      }
+      .brand-mark {
+        font-size: 21px;
+      }
+      .topbar-actions {
+        gap: 6px;
+      }
+      #saved-projects-select {
+        max-width: 125px;
+        font-size: 13px;
+        padding: 6px 8px;
+      }
+      .intake-card,
+      .scene-block {
+        padding: 14px;
+      }
+      .intake-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .inline-controls {
+        width: 100%;
+      }
+      .inline-controls .select-input,
+      .mode-pill-group {
+        flex: 1 1 140px;
+      }
+      .mode-pill-group .mode-pill {
+        flex: 1;
+        min-height: 36px;
+      }
+      #develop-film-btn,
+      #greenlight-shoot-btn,
+      #build-animatic-btn {
+        width: 100%;
+        min-height: 44px;
+      }
+      /* Prevent iOS Safari zoom on input focus */
+      .text-input,
+      .select-input,
+      .logline-textarea {
+        font-size: 16px;
+      }
+      .mood-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .mood-thumb {
+        height: 86px;
+      }
+      .mood-body {
+        padding: 9px 10px;
+      }
+      .mood-tagline {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .producer-bar {
+        padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+      }
+      .director-note-form {
+        min-width: 100%;
+      }
+      .director-note-form .btn {
+        min-height: 42px;
+      }
+      .json-drawer-backdrop {
+        align-items: flex-end;
+      }
+      .json-drawer {
+        width: 100vw;
+        height: 92dvh;
+        border-left: none;
+        border-top: 1px solid var(--border-strong);
+        border-radius: 16px 16px 0 0;
+        padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+      }
+      .toast-msg {
+        left: 12px;
+        right: 12px;
+        top: 64px;
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .keyframe-bridge {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .kf-arrow {
+        text-align: center;
+        transform: rotate(90deg);
+      }
+      .shot-actions .btn {
+        flex: 1 1 auto;
+        min-height: 38px;
+      }
     }
   </style>
 </head>
@@ -824,17 +1031,17 @@
       <select id="saved-projects-select" class="select-input" aria-label="Load Saved Film" onchange="loadSelectedProject(this.value)">
         <option value="">Recent Films...</option>
       </select>
-      <button type="button" class="btn btn-ghost btn-sm" id="open-master-json-btn" onclick="openJsonInspector('project')" disabled>{ } Master JSON</button>
-      <a href="/" class="btn btn-ghost btn-sm" id="switch-to-stitch-link">Quick Stitch &rarr;</a>
+      <button type="button" class="btn btn-ghost btn-sm" id="open-master-json-btn" onclick="openJsonInspector('project')" disabled>{ } JSON</button>
+      <a href="/" class="btn btn-ghost btn-sm" id="switch-to-stitch-link">Quick Stitch</a>
     </div>
   </header>
 
   <div class="progress-banner" id="live-progress-banner" role="status">
-    <div>
+    <div style="min-width: 0;">
       <strong id="progress-stage-label">Working...</strong>
-      <span id="progress-status-msg" style="color: var(--text-secondary); margin-left: 10px;"></span>
+      <span id="progress-status-msg" style="color: var(--text-secondary); margin-left: 8px;"></span>
     </div>
-    <div class="progress-track">
+    <div class="progress-track" id="progress-track-wrap">
       <div class="progress-fill" id="progress-bar-fill"></div>
     </div>
   </div>
@@ -859,7 +1066,7 @@
         <div class="intake-toolbar">
           <div class="inline-controls">
             <div class="mode-pill-group" role="group" aria-label="Direction Mode">
-              <button type="button" class="mode-pill active" id="mode-guided-btn" onclick="setWorkflowMode('guided')">Guided Checkpoints</button>
+              <button type="button" class="mode-pill active" id="mode-guided-btn" onclick="setWorkflowMode('guided')">Guided</button>
               <button type="button" class="mode-pill" id="mode-autopilot-btn" onclick="setWorkflowMode('autopilot')">1-Click Autopilot</button>
             </div>
 
@@ -878,7 +1085,7 @@
 
             <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;">
               <input type="checkbox" id="offline-mock-toggle" />
-              $0 Instant Draft Mode
+              $0 Instant Draft
             </label>
           </div>
 
@@ -906,9 +1113,9 @@
 
           <div>
             <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Optional Brand / Product Name &amp; URL</label>
-            <div style="display:flex; gap:8px; margin-bottom:10px;">
-              <input type="text" id="brand-name-input" class="text-input" style="flex:1;" placeholder="Brand or Hero Object (optional)" />
-              <input type="url" id="source-url-input" class="text-input" style="flex:1;" placeholder="https://... (optional)" />
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+              <input type="text" id="brand-name-input" class="text-input" style="flex:1 1 130px;" placeholder="Brand or Hero Object" />
+              <input type="url" id="source-url-input" class="text-input" style="flex:1 1 130px;" placeholder="https://... (optional)" />
             </div>
             <label style="display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;">Reference Photos (Character / Product / Mood — up to 4)</label>
             <input type="file" id="ref-images-input" accept="image/*" multiple class="text-input" style="width:100%;" onchange="handleRefFiles(this.files)" />
@@ -923,8 +1130,8 @@
               <label><span>Slow-Burn</span><span>Edit Pacing</span><span>Kinetic</span></label>
               <input type="range" id="dial-pacing" min="0" max="1" step="0.05" value="0.45" />
             </div>
-            <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
-              <select id="video-model-select" class="select-input" style="flex:1;" aria-label="Video Engine"></select>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;">
+              <select id="video-model-select" class="select-input" style="flex:1 1 150px;" aria-label="Video Engine"></select>
               <input type="number" id="budget-cap-input" class="text-input" style="width:92px;" value="15" min="1" max="200" title="USD Budget Cap" />
             </div>
           </div>
@@ -950,7 +1157,7 @@
 
           <div class="section-label" style="margin-top: 24px;">
             <h2>Production Vault (Locked Characters, Dual-Wall Sets &amp; Stateful Props)</h2>
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:flex-end;">
               <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('vault')">Edit Vault JSON</button>
               <button type="button" class="btn btn-primary btn-sm" id="build-animatic-btn" onclick="triggerBuildAnimatic()">
                 Build Start/End Keyframes &amp; Voiced Leica Reel &rarr;
@@ -985,9 +1192,9 @@
               <span>Est. Full Cinema Shoot:</span>
               <strong id="est-shoot-usd">$0.00</strong>
             </div>
-            <div style="display:flex; gap:8px; margin-top:6px;">
-              <button type="button" class="btn btn-ghost" style="flex:1;" onclick="triggerBuildAnimatic(true)">Rebuild Reel</button>
-              <button type="button" class="btn btn-primary" style="flex:1.4;" id="greenlight-shoot-btn" onclick="triggerProduceFilm()">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">
+              <button type="button" class="btn btn-ghost" style="flex:1 1 120px;" onclick="triggerBuildAnimatic(true)">Rebuild Reel</button>
+              <button type="button" class="btn btn-primary" style="flex:1.4 1 170px;" id="greenlight-shoot-btn" onclick="triggerProduceFilm()">
                 Greenlight &amp; Shoot Film &rarr;
               </button>
             </div>
@@ -1012,7 +1219,7 @@
               Mixed with Walter Murch J/L-cuts, continuous room tone, ducked chamber score, and selective close-up lip-sync.
             </p>
 
-            <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px;">
+            <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; font-size:13px;">
               <label style="display:flex; align-items:center; gap:7px; cursor:pointer;">
                 <input type="checkbox" id="fin-letterbox" checked onchange="saveFinishingFlag()" />
                 2.39:1 Cinema Scope
@@ -1033,8 +1240,8 @@
           </div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-ghost" style="flex:1;" onclick="triggerRemasterCut()">Re-Mix Soundstage (&lt;5s)</button>
-            <a id="download-master-btn" href="#" download class="btn btn-primary" style="flex:1.2;">Download Master MP4</a>
+            <button type="button" class="btn btn-ghost" style="flex:1 1 140px;" onclick="triggerRemasterCut()">Re-Mix Soundstage (&lt;5s)</button>
+            <a id="download-master-btn" href="#" download class="btn btn-primary" style="flex:1.2 1 160px;">Download Master MP4</a>
           </div>
         </div>
       </div>
@@ -1056,32 +1263,45 @@
           type="text"
           id="plain-english-note-input"
           class="text-input"
-          placeholder="Direct in plain English (e.g. 'Give Elena a crimson trench coat' or 'Make Scene 2 darker &amp; slower')..."
+          placeholder="Direct in plain English (e.g. 'Give Elena a crimson coat' or 'Make Scene 2 darker')..."
         />
-        <button type="submit" class="btn btn-sm btn-primary" id="apply-note-btn">Apply Direction</button>
+        <button type="submit" class="btn btn-sm btn-primary" id="apply-note-btn">Apply</button>
       </form>
     </div>
   </aside>
 
-  <!-- 2-WAY LIVE JSON INSPECTOR DRAWER -->
+  <!-- MOBILE-FRIENDLY KEYFRAME TWEAK MODAL (Replaces window.prompt) -->
+  <div class="modal-backdrop" id="tweak-frame-modal" onclick="if(event.target===this)closeTweakModal()">
+    <div class="modal-card" role="dialog" aria-label="Re-Roll Shot Keyframes">
+      <strong id="tweak-modal-title" style="font-size:15px;">Re-Roll Start &amp; End Stills</strong>
+      <p style="font-size:12.5px; color:var(--text-secondary);">Optional plain-English visual tweak (leave blank to re-seed with locked Vault continuity):</p>
+      <input type="text" id="tweak-note-input" class="text-input" placeholder="e.g. Warmer golden window light, closer framing on eyes" />
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeTweakModal()">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="confirmRegenShotFrames()">Regenerate Stills</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-WAY LIVE JSON INSPECTOR SLIDE-OVER DRAWER -->
   <div class="json-drawer-backdrop" id="json-drawer-backdrop" onclick="if(event.target===this)closeJsonInspector()">
     <div class="json-drawer" role="dialog" aria-label="Live Master JSON Inspector">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px;">
         <div>
           <strong id="json-drawer-title" style="font-size:15px;">Shot Master JSON Inspector</strong>
           <div id="json-drawer-sub" style="font-size:12px; color:var(--text-muted);">2-Way Synced with WorldVault &amp; Diffusion Compilers</div>
         </div>
         <div style="display:flex; gap:6px;">
-          <button type="button" class="btn btn-ghost btn-sm" id="toggle-hydrated-btn" onclick="toggleHydratedView()">View Hydrated Model Prompt</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="toggle-hydrated-btn" onclick="toggleHydratedView()">Hydrated Prompt</button>
           <button type="button" class="btn btn-ghost btn-sm" onclick="closeJsonInspector()">Close</button>
         </div>
       </div>
       <textarea id="json-editor-textarea" class="json-editor-area" spellcheck="false"></textarea>
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
         <span id="json-gate-feedback" style="font-size:12px; color:var(--text-secondary);">Schema validated via Pydantic v2</span>
         <div style="display:flex; gap:8px;">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="saveJsonInspector(true)">Save &amp; Auto-Fix Timing</button>
-          <button type="button" class="btn btn-primary btn-sm" id="save-json-btn" onclick="saveJsonInspector(false)">Save JSON Changes</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="saveJsonInspector(true)">Save &amp; Auto-Fix</button>
+          <button type="button" class="btn btn-primary btn-sm" id="save-json-btn" onclick="saveJsonInspector(false)">Save JSON</button>
         </div>
       </div>
     </div>
@@ -1096,10 +1316,20 @@
       selectedMoods: ['cinema_a24'],
       uploadedRefB64: [],
       pollTimer: null,
-      inspectorMode: 'project', // 'project' | 'vault' | 'shot'
+      inspectorMode: 'project',
       inspectorShotId: null,
       showingHydrated: false,
+      tweakShotId: null,
     };
+
+    function esc(val) {
+      return String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     function showToast(msg) {
       const el = document.getElementById('studio-toast');
@@ -1149,19 +1379,17 @@
         document.getElementById('taste-memory-hint').textContent =
           `Taste Memory active (${profile.reactions_count} preferences learned)`;
       }
-      container.innerHTML = moods.map(m => {
+      container.innerHTML = (moods || []).map(m => {
         const sel = state.selectedMoods.includes(m.id) ? 'selected' : '';
         const swatches = (m.palette_hex || []).map(c =>
-          `<span class="swatch-dot" style="background:${c}"></span>`
+          `<span class="swatch-dot" style="background:${esc(c)}"></span>`
         ).join('');
         return `
-          <button type="button" class="mood-card ${sel}" onclick="toggleMood('${m.id}')" id="mood-card-${m.id}">
-            <img class="mood-thumb" src="${m.gallery_image}" alt="${m.label}" loading="lazy" />
+          <button type="button" class="mood-card ${sel}" onclick="toggleMood('${esc(m.id)}')" id="mood-card-${esc(m.id)}">
+            <img class="mood-thumb" src="${esc(m.gallery_image)}" alt="${esc(m.label)}" loading="lazy" />
             <div class="mood-body">
-              <div class="mood-title">
-                <span>${m.label}</span>
-              </div>
-              <p class="mood-tagline">${m.tagline}</p>
+              <div class="mood-title"><span>${esc(m.label)}</span></div>
+              <p class="mood-tagline">${esc(m.tagline)}</p>
               <div class="swatch-row">${swatches}</div>
             </div>
           </button>
@@ -1187,19 +1415,19 @@
     function renderArchetypesAndModels(cat) {
       const archSel = document.getElementById('archetype-select');
       archSel.innerHTML = (cat.archetypes || []).map(a =>
-        `<option value="${a.id}">${a.label} — ${a.description}</option>`
+        `<option value="${esc(a.id)}">${esc(a.label)} — ${esc(a.description)}</option>`
       ).join('');
 
       const vidSel = document.getElementById('video-model-select');
       vidSel.innerHTML = (cat.video_models || []).map(m =>
-        `<option value="${m.id}">${m.label}</option>`
+        `<option value="${esc(m.id)}">${esc(m.label)}</option>`
       ).join('');
     }
 
     function renderReactionChips(chips) {
       const row = document.getElementById('reaction-chips-row');
       row.innerHTML = (chips || []).map(ch =>
-        `<button type="button" class="taste-chip" onclick="sendTasteChip('${ch.id}', '${ch.polarity}')">${ch.label}</button>`
+        `<button type="button" class="taste-chip" onclick="sendTasteChip('${esc(ch.id)}', '${esc(ch.polarity)}')">${esc(ch.label)}</button>`
       ).join('');
     }
 
@@ -1214,11 +1442,15 @@
     }
 
     function handleRefFiles(fileList) {
+      const files = Array.from(fileList || []).slice(0, 4);
       state.uploadedRefB64 = [];
-      Array.from(fileList || []).slice(0, 4).forEach(file => {
+      Promise.all(files.map(file => new Promise(resolve => {
         const reader = new FileReader();
-        reader.onload = e => { if (e.target?.result) state.uploadedRefB64.push(e.target.result); };
+        reader.onload = e => resolve(e.target?.result || null);
+        reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
+      }))).then(results => {
+        state.uploadedRefB64 = results.filter(Boolean);
       });
     }
 
@@ -1227,15 +1459,19 @@
       const sel = document.getElementById('saved-projects-select');
       const opts = ['<option value="">Recent Films...</option>'];
       (data.projects || []).forEach(p => {
-        opts.push(`<option value="${p.project_id}">${p.title} (${p.total_duration_sec}s · ${p.status})</option>`);
+        opts.push(`<option value="${esc(p.project_id)}">${esc(p.title)} (${esc(p.total_duration_sec)}s · ${esc(p.status)})</option>`);
       });
       sel.innerHTML = opts.join('');
     }
 
     async function loadSelectedProject(pid) {
       if (!pid) return;
-      const proj = await apiFetch(`/api/cinema/projects/${pid}`);
-      applyProjectState(proj, true);
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(pid)}`);
+        applyProjectState(proj, true);
+      } catch (err) {
+        showToast('Could not load film: ' + err.message);
+      }
     }
 
     function switchStage(n) {
@@ -1245,18 +1481,29 @@
         document.getElementById(`panel-stage-${i}`).classList.toggle('active', i === n);
       });
       document.getElementById('producer-taste-bar').classList.toggle('visible', n >= 2 && !!state.project);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function updateProgressBanner(proj) {
       const banner = document.getElementById('live-progress-banner');
+      const track = document.getElementById('progress-track-wrap');
       const busyStates = new Set(['compiling', 'building_animatic', 'shooting', 'mixing']);
       const isBusy = busyStates.has(proj.status);
-      banner.classList.toggle('visible', isBusy);
+      const isFailed = proj.status === 'failed';
+
+      banner.classList.toggle('visible', isBusy || isFailed);
+      banner.classList.toggle('error', isFailed);
+      track.style.display = isBusy ? 'block' : 'none';
+
       if (isBusy) {
         document.getElementById('progress-stage-label').textContent = proj.progress_stage || 'Studio Crew Working...';
         document.getElementById('progress-status-msg').textContent = proj.status_message || '';
         document.getElementById('progress-bar-fill').style.width = `${proj.progress_pct || 15}%`;
         startPolling(proj.project_id);
+      } else if (isFailed) {
+        document.getElementById('progress-stage-label').textContent = 'Production Paused';
+        document.getElementById('progress-status-msg').textContent = proj.error || proj.status_message || 'An error occurred.';
+        stopPolling();
       } else {
         stopPolling();
       }
@@ -1266,7 +1513,7 @@
       if (state.pollTimer) return;
       state.pollTimer = setInterval(async () => {
         try {
-          const proj = await apiFetch(`/api/cinema/projects/${pid}`);
+          const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(pid)}`);
           const prevStatus = state.project ? state.project.status : '';
           applyProjectState(proj, prevStatus !== proj.status);
         } catch (_) {}
@@ -1350,22 +1597,22 @@
       tGrid.innerHTML = (proj.treatments || []).map(tr => {
         const isSel = tr.treatment_id === proj.selected_treatment_id;
         const swatches = (tr.palette_hex || []).map(c =>
-          `<span class="swatch-dot" style="background:${c}"></span>`
+          `<span class="swatch-dot" style="background:${esc(c)}"></span>`
         ).join('');
         return `
           <article class="treatment-card ${isSel ? 'selected' : ''}">
-            ${tr.look_test_url ? `<img class="treatment-look" src="${tr.look_test_url}" alt="${tr.title}" />` : ''}
+            ${tr.look_test_url ? `<img class="treatment-look" src="${esc(tr.look_test_url)}" alt="${esc(tr.title)}" />` : ''}
             <div class="treatment-content">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="meta-tag">${tr.archetype.replace(/_/g, ' ')}</span>
-                <span class="meta-tag amber">Rubric ${tr.rubric_score}/10</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <span class="meta-tag">${esc(tr.archetype.replace(/_/g, ' '))}</span>
+                <span class="meta-tag amber">Rubric ${esc(tr.rubric_score)}/10</span>
               </div>
-              <h3 class="treatment-title">${tr.title}</h3>
-              <p style="font-size:13px; color:var(--text-primary);">${tr.logline_hook}</p>
-              <p style="font-size:12px; color:var(--text-secondary); flex:1;">${tr.story_arc_summary}</p>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <h3 class="treatment-title">${esc(tr.title)}</h3>
+              <p style="font-size:13px; color:var(--text-primary);">${esc(tr.logline_hook)}</p>
+              <p style="font-size:12px; color:var(--text-secondary); flex:1;">${esc(tr.story_arc_summary)}</p>
+              <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-top:8px;">
                 <div class="swatch-row" style="margin:0;">${swatches}</div>
-                <button type="button" class="btn ${isSel ? 'btn-primary' : ''} btn-sm" onclick="compileFromTreatment('${tr.treatment_id}')">
+                <button type="button" class="btn ${isSel ? 'btn-primary' : ''} btn-sm" onclick="compileFromTreatment('${esc(tr.treatment_id)}')">
                   ${(proj.scenes || []).length && isSel ? 'Re-Compile Script' : 'Select &amp; Build Script &rarr;'}
                 </button>
               </div>
@@ -1389,11 +1636,11 @@
       document.getElementById('scene-spine-container').innerHTML = proj.scenes.map(sc => `
         <div class="spine-node">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span class="meta-tag amber">${sc.causal_link_from_prev.toUpperCase()}</span>
-            <span style="font-size:11.5px; color:var(--text-muted);">Tension ${sc.tension_level}/10 · ${sc.duration_sec}s</span>
+            <span class="meta-tag amber">${esc(sc.causal_link_from_prev.toUpperCase())}</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">Tension ${esc(sc.tension_level)}/10 · ${esc(sc.duration_sec)}s</span>
           </div>
-          <strong style="display:block; font-size:13.5px; margin-bottom:4px;">${sc.title}</strong>
-          <p style="font-size:12px; color:var(--text-secondary);">${sc.dramatic_turn}</p>
+          <strong style="display:block; font-size:13.5px; margin-bottom:4px;">${esc(sc.title)}</strong>
+          <p style="font-size:12px; color:var(--text-secondary);">${esc(sc.dramatic_turn)}</p>
         </div>
       `).join('');
 
@@ -1401,13 +1648,13 @@
       (proj.vault?.characters || []).forEach(ch => {
         vCards.push(`
           <div class="entity-card">
-            ${ch.turnaround_url ? `<img class="sheet-preview" src="${ch.turnaround_url}" alt="${ch.name}" />` : ''}
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${ch.name}</strong>
-              <span class="meta-tag">${ch.id} · ${ch.voice_casting?.voice_name || 'Voice'}</span>
+            ${ch.turnaround_url ? `<img class="sheet-preview" src="${esc(ch.turnaround_url)}" alt="${esc(ch.name)}" />` : ''}
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px;">
+              <strong>${esc(ch.name)}</strong>
+              <span class="meta-tag">${esc(ch.id)} · ${esc(ch.voice_casting?.voice_name || 'Voice')}</span>
             </div>
-            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${ch.identity_lock}</p>
-            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;">Wardrobe: ${ch.wardrobe_lock}</p>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${esc(ch.identity_lock)}</p>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;">Wardrobe: ${esc(ch.wardrobe_lock)}</p>
           </div>
         `);
       });
@@ -1416,16 +1663,16 @@
           <div class="entity-card">
             ${(loc.primary_wall_url || loc.reverse_wall_url) ? `
               <div class="wall-pair">
-                ${loc.primary_wall_url ? `<img src="${loc.primary_wall_url}" title="A-Side Primary Wall" alt="Wall A" />` : '<div></div>'}
-                ${loc.reverse_wall_url ? `<img src="${loc.reverse_wall_url}" title="B-Side 180° Reverse Wall" alt="Wall B" />` : '<div></div>'}
+                ${loc.primary_wall_url ? `<img src="${esc(loc.primary_wall_url)}" title="A-Side Primary Wall" alt="Wall A" />` : '<div></div>'}
+                ${loc.reverse_wall_url ? `<img src="${esc(loc.reverse_wall_url)}" title="B-Side 180° Reverse Wall" alt="Wall B" />` : '<div></div>'}
               </div>
             ` : ''}
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${loc.name}</strong>
-              <span class="meta-tag">${loc.id} · Dual-Wall</span>
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px;">
+              <strong>${esc(loc.name)}</strong>
+              <span class="meta-tag">${esc(loc.id)} · Dual-Wall</span>
             </div>
-            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;"><strong>A-Wall:</strong> ${loc.cardinal_zones.A_north_primary}</p>
-            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;"><strong>B-Reverse:</strong> ${loc.cardinal_zones.B_south_reverse}</p>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;"><strong>A-Wall:</strong> ${esc(loc.cardinal_zones.A_north_primary)}</p>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:4px;"><strong>B-Reverse:</strong> ${esc(loc.cardinal_zones.B_south_reverse)}</p>
           </div>
         `);
       });
@@ -1433,13 +1680,13 @@
         const statesTxt = Object.keys(pr.states || {}).join(' -> ');
         vCards.push(`
           <div class="entity-card">
-            ${pr.turnaround_url ? `<img class="sheet-preview" src="${pr.turnaround_url}" alt="${pr.name}" />` : ''}
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${pr.name}</strong>
-              <span class="meta-tag">${pr.id}</span>
+            ${pr.turnaround_url ? `<img class="sheet-preview" src="${esc(pr.turnaround_url)}" alt="${esc(pr.name)}" />` : ''}
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px;">
+              <strong>${esc(pr.name)}</strong>
+              <span class="meta-tag">${esc(pr.id)}</span>
             </div>
-            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${pr.geometry_and_scale}</p>
-            <p style="font-size:12px; color:var(--accent-amber); margin-top:4px;">States: ${statesTxt}</p>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;">${esc(pr.geometry_and_scale)}</p>
+            <p style="font-size:12px; color:var(--accent-amber); margin-top:4px;">States: ${esc(statesTxt)}</p>
           </div>
         `);
       });
@@ -1450,7 +1697,7 @@
       if (!state.project) return;
       showToast('Compiling WorldVault, Parallel Scene JSON & Table-Read Voices...');
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/compile`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/compile`, {
           method: 'POST',
           body: JSON.stringify({ treatment_id: treatmentId, mock: isMockSelected(), wait: false }),
         });
@@ -1464,7 +1711,7 @@
       if (!state.project) return;
       showToast('Generating Vault Turnarounds, Start/End Keyframes & Voiced Leica Reel...');
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/animatic`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/animatic`, {
           method: 'POST',
           body: JSON.stringify({ force_vault: !!forceVault, mock: isMockSelected(), wait: false }),
         });
@@ -1490,39 +1737,40 @@
       board.innerHTML = (proj.scenes || []).map(sc => {
         const shotsHtml = (sc.shots || []).map(sh => {
           const dlgHtml = sh.dialogue
-            ? `<div class="dialogue-quote"><strong>${sh.dialogue.speaker_id}</strong> (${sh.dialogue.delivery_mode.replace(/_/g, ' ')} · ${sh.dialogue.actual_speech_sec || '?'}s): "${sh.dialogue.line}"</div>`
+            ? `<div class="dialogue-quote"><strong>${esc(sh.dialogue.speaker_id)}</strong> (${esc(sh.dialogue.delivery_mode.replace(/_/g, ' '))} · ${esc(sh.dialogue.actual_speech_sec || '?')}s): &ldquo;${esc(sh.dialogue.line)}&rdquo;</div>`
             : '';
           const qaBadge = sh.continuity_qa_score
-            ? `<span class="meta-tag ok">Continuity ${sh.continuity_qa_score}/10</span>`
-            : `<span class="meta-tag">${sh.anchor_strategy.replace(/_/g, ' ')}</span>`;
+            ? `<span class="meta-tag ok">Continuity ${esc(sh.continuity_qa_score)}/10</span>`
+            : `<span class="meta-tag">${esc(sh.anchor_strategy.replace(/_/g, ' '))}</span>`;
+          const motionSummary = (sh.motion_delta || []).map(m => esc(m.action)).join(' &rarr; ');
           return `
-            <div class="shot-card" id="shot-card-${sh.shot_id}">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <strong>${sh.shot_id} · ${sh.shot_scale.replace(/_/g, ' ')} (${sh.duration_sec}s)</strong>
+            <div class="shot-card" id="shot-card-${esc(sh.shot_id)}">
+              <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px;">
+                <strong>${esc(sh.shot_id)} · ${esc(sh.shot_scale.replace(/_/g, ' '))} (${esc(sh.duration_sec)}s)</strong>
                 ${qaBadge}
               </div>
 
               <div class="keyframe-bridge">
                 <div class="kf-slot">
-                  ${sh.start_keyframe_media_url ? `<img src="${sh.start_keyframe_media_url}" alt="Start Frame" />` : '<div style="aspect-ratio:16/9;"></div>'}
-                  <div class="kf-caption">Start Frame · ${sh.camera.lens_mm}mm</div>
+                  ${sh.start_keyframe_media_url ? `<img src="${esc(sh.start_keyframe_media_url)}" alt="Start Frame" loading="lazy" />` : '<div style="aspect-ratio:16/9;"></div>'}
+                  <div class="kf-caption">Start · ${esc(sh.camera.lens_mm)}mm</div>
                 </div>
-                <span style="color:var(--accent-amber); font-weight:700;">&rarr;</span>
+                <span class="kf-arrow" style="color:var(--accent-amber); font-weight:700;">&rarr;</span>
                 <div class="kf-slot">
-                  ${sh.end_keyframe_media_url ? `<img src="${sh.end_keyframe_media_url}" alt="End Frame" />` : '<div style="aspect-ratio:16/9;"></div>'}
-                  <div class="kf-caption">End Frame · ${sh.camera.facing_wall_zone.split('_')[0]}-Wall</div>
+                  ${sh.end_keyframe_media_url ? `<img src="${esc(sh.end_keyframe_media_url)}" alt="End Frame" loading="lazy" />` : '<div style="aspect-ratio:16/9;"></div>'}
+                  <div class="kf-caption">End · ${esc(sh.camera.facing_wall_zone.split('_')[0])}-Wall</div>
                 </div>
               </div>
 
               <p style="font-size:12px; color:var(--text-secondary);">
-                <strong>Motion:</strong> ${(sh.motion_delta || []).map(m => m.action).join(' &rarr; ')}
+                <strong>Motion:</strong> ${motionSummary}
               </p>
               ${dlgHtml}
 
-              <div style="display:flex; justify-content:space-between; gap:6px; margin-top:auto; padding-top:6px;">
-                <button type="button" class="btn btn-ghost btn-sm" onclick="regenShotFrames('${sh.shot_id}')">Re-Roll Stills</button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="heartShot('${sh.shot_id}')">${sh.hearted ? '♥ Hearted' : '♡ Love Shot'}</button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${sh.shot_id}')">{ } Shot JSON</button>
+              <div class="shot-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openTweakModal('${esc(sh.shot_id)}')">Re-Roll Stills</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="heartShot('${esc(sh.shot_id)}')">${sh.hearted ? '♥ Hearted' : '♡ Love'}</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${esc(sh.shot_id)}')">{ } JSON</button>
               </div>
             </div>
           `;
@@ -1532,11 +1780,11 @@
           <div class="scene-block">
             <div class="scene-block-header">
               <div>
-                <span class="meta-tag amber">${sc.causal_link_from_prev.toUpperCase()}</span>
-                <strong style="font-size:16px; margin-left:8px;">${sc.title}</strong>
-                <span style="color:var(--text-muted); font-size:12.5px; margin-left:8px;">${sc.slugline}</span>
+                <span class="meta-tag amber">${esc(sc.causal_link_from_prev.toUpperCase())}</span>
+                <strong style="font-size:16px; margin-left:8px;">${esc(sc.title)}</strong>
+                <span style="color:var(--text-muted); font-size:12.5px; margin-left:8px;">${esc(sc.slugline)}</span>
               </div>
-              <span style="font-size:12.5px; color:var(--text-secondary);">Tension ${sc.tension_level}/10 · ${sc.duration_sec}s</span>
+              <span style="font-size:12.5px; color:var(--text-secondary);">Tension ${esc(sc.tension_level)}/10 · ${esc(sc.duration_sec)}s</span>
             </div>
             <div class="shots-list">${shotsHtml}</div>
           </div>
@@ -1544,13 +1792,27 @@
       }).join('');
     }
 
-    async function regenShotFrames(shotId) {
-      if (!state.project) return;
-      const note = prompt('Optional visual tweak note for ' + shotId + ' (leave blank to re-seed):', '');
-      if (note === null) return;
+    function openTweakModal(shotId) {
+      state.tweakShotId = shotId;
+      document.getElementById('tweak-modal-title').textContent = `Re-Roll Start & End Stills · ${shotId}`;
+      document.getElementById('tweak-note-input').value = '';
+      document.getElementById('tweak-frame-modal').classList.add('open');
+      setTimeout(() => document.getElementById('tweak-note-input').focus(), 40);
+    }
+
+    function closeTweakModal() {
+      document.getElementById('tweak-frame-modal').classList.remove('open');
+      state.tweakShotId = null;
+    }
+
+    async function confirmRegenShotFrames() {
+      if (!state.project || !state.tweakShotId) return;
+      const shotId = state.tweakShotId;
+      const note = document.getElementById('tweak-note-input').value.trim();
+      closeTweakModal();
       showToast(`Regenerating Start & End keyframes for ${shotId}...`);
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/shots/${shotId}/keyframes`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/shots/${encodeURIComponent(shotId)}/keyframes`, {
           method: 'POST',
           body: JSON.stringify({ which: 'both', tweak_note: note || null, mock: isMockSelected() }),
         });
@@ -1562,19 +1824,23 @@
 
     async function heartShot(shotId) {
       if (!state.project) return;
-      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
-        method: 'POST',
-        body: JSON.stringify({ note_or_chip: 'love_this', target_type: 'shot', target_id: shotId, polarity: 'love', mock: isMockSelected() }),
-      });
-      applyProjectState(proj, false);
-      showToast(`Saved ♥ on ${shotId} to your Taste Memory.`);
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/react`, {
+          method: 'POST',
+          body: JSON.stringify({ note_or_chip: 'love_this', target_type: 'shot', target_id: shotId, polarity: 'love', mock: isMockSelected() }),
+        });
+        applyProjectState(proj, false);
+        showToast(`Saved ♥ on ${shotId} to your Taste Memory.`);
+      } catch (err) {
+        showToast('Error: ' + err.message);
+      }
     }
 
     async function triggerProduceFilm() {
       if (!state.project) return;
       showToast('Rolling Principal Photography, Lip-Sync & Cinema Soundstage...');
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/produce`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/produce`, {
           method: 'POST',
           body: JSON.stringify({ only_missing_takes: true, mock: isMockSelected(), wait: false }),
         });
@@ -1613,17 +1879,17 @@
         const takesCount = (sh.takes || []).length;
         return `
           <div class="shot-card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${sh.shot_id} · ${sh.shot_scale.replace(/_/g, ' ')}</strong>
-              <span class="meta-tag">${takesCount} Take(s)</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <strong>${esc(sh.shot_id)} · ${esc(sh.shot_scale.replace(/_/g, ' '))}</strong>
+              <span class="meta-tag">${esc(takesCount)} Take(s)</span>
             </div>
             ${sh.winning_clip_url
-              ? `<video src="${sh.winning_clip_url}" controls playsinline style="width:100%; border-radius:6px; background:#000;"></video>`
+              ? `<video src="${esc(sh.winning_clip_url)}" controls playsinline style="width:100%; border-radius:6px; background:#000;"></video>`
               : `<div style="padding:22px; text-align:center; color:var(--text-muted); background:var(--bg-inset); border-radius:6px;">Not shot yet</div>`
             }
-            <div style="display:flex; justify-content:space-between; gap:8px;">
-              <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${sh.shot_id}')">{ } Edit JSON</button>
-              <button type="button" class="btn btn-sm" onclick="reshootSingleShot('${sh.shot_id}')">Shoot New Take</button>
+            <div class="shot-actions">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openJsonInspector('shot', '${esc(sh.shot_id)}')">{ } Edit JSON</button>
+              <button type="button" class="btn btn-sm" onclick="reshootSingleShot('${esc(sh.shot_id)}')">Shoot New Take</button>
             </div>
           </div>
         `;
@@ -1634,12 +1900,12 @@
       if (!state.project) return;
       showToast(`Shooting new take for ${shotId}...`);
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/shots/${shotId}/shoot`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/shots/${encodeURIComponent(shotId)}/shoot`, {
           method: 'POST',
           body: JSON.stringify({ mock: isMockSelected() }),
         });
         applyProjectState(proj, false);
-        showToast(`New take ready for ${shotId}. Click Re-Mix Soundstage to update master.`);
+        showToast(`New take ready for ${shotId}. Tap Re-Mix Soundstage to update master.`);
       } catch (err) {
         showToast('Reshoot failed: ' + err.message);
       }
@@ -1647,23 +1913,27 @@
 
     async function saveFinishingFlag() {
       if (!state.project) return;
-      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          cinema_letterbox: document.getElementById('fin-letterbox').checked,
-          film_grain: document.getElementById('fin-grain').checked,
-          enable_subtitles: document.getElementById('fin-subtitles').checked,
-          enable_lipsync: document.getElementById('fin-lipsync').checked,
-        }),
-      });
-      state.project = proj;
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            cinema_letterbox: document.getElementById('fin-letterbox').checked,
+            film_grain: document.getElementById('fin-grain').checked,
+            enable_subtitles: document.getElementById('fin-subtitles').checked,
+            enable_lipsync: document.getElementById('fin-lipsync').checked,
+          }),
+        });
+        state.project = proj;
+      } catch (err) {
+        showToast('Could not save finishing flag: ' + err.message);
+      }
     }
 
     async function triggerRemasterCut() {
       if (!state.project) return;
       showToast('Re-mixing Walter Murch J/L-cuts & mastering to -14 LUFS...');
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/remaster`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/remaster`, {
           method: 'POST',
           body: JSON.stringify({ mock: isMockSelected() }),
         });
@@ -1677,17 +1947,21 @@
     async function sendTasteChip(chipId, polarity) {
       if (!state.project) return;
       showToast('Translating taste signal across Vault & Shot JSON...');
-      const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
-        method: 'POST',
-        body: JSON.stringify({
-          note_or_chip: chipId,
-          target_type: 'project',
-          polarity: polarity || 'adjust',
-          mock: isMockSelected(),
-        }),
-      });
-      applyProjectState(proj, false);
-      showToast(proj.status_message);
+      try {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/react`, {
+          method: 'POST',
+          body: JSON.stringify({
+            note_or_chip: chipId,
+            target_type: 'project',
+            polarity: polarity || 'adjust',
+            mock: isMockSelected(),
+          }),
+        });
+        applyProjectState(proj, false);
+        showToast(proj.status_message);
+      } catch (err) {
+        showToast('Direction error: ' + err.message);
+      }
     }
 
     async function submitPlainEnglishNote(ev) {
@@ -1699,7 +1973,7 @@
       inp.value = '';
       showToast('Rippling direction across WorldVault & Shots...');
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}/react`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}/react`, {
           method: 'POST',
           body: JSON.stringify({
             note_or_chip: txt,
@@ -1715,7 +1989,6 @@
       }
     }
 
-    // 2-Way Live JSON Inspector
     function findClientShot(shotId) {
       if (!state.project) return null;
       for (const sc of (state.project.scenes || [])) {
@@ -1742,7 +2015,7 @@
         if (!sh) return;
         document.getElementById('json-drawer-title').textContent = `Shot JSON · ${shotId}`;
         hydBtn.style.display = 'inline-flex';
-        hydBtn.textContent = 'View Hydrated Model Prompt';
+        hydBtn.textContent = 'Hydrated Prompt';
         const cleanCopy = Object.assign({}, sh);
         delete cleanCopy.hydrated_prompt_json;
         area.value = JSON.stringify(cleanCopy, null, 2);
@@ -1771,14 +2044,14 @@
         area.value = JSON.stringify(sh.hydrated_prompt_json || {}, null, 2);
         area.readOnly = true;
         saveBtn.disabled = true;
-        hydBtn.textContent = 'Back to Editable Shot JSON';
+        hydBtn.textContent = 'Editable Shot JSON';
       } else {
         const cleanCopy = Object.assign({}, sh);
         delete cleanCopy.hydrated_prompt_json;
         area.value = JSON.stringify(cleanCopy, null, 2);
         area.readOnly = false;
         saveBtn.disabled = false;
-        hydBtn.textContent = 'View Hydrated Model Prompt';
+        hydBtn.textContent = 'Hydrated Prompt';
       }
     }
 
@@ -1808,7 +2081,7 @@
       }
 
       try {
-        const proj = await apiFetch(`/api/cinema/projects/${state.project.project_id}`, {
+        const proj = await apiFetch(`/api/cinema/projects/${encodeURIComponent(state.project.project_id)}`, {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
