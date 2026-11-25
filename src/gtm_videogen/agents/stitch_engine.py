@@ -253,7 +253,7 @@ async def _call_openrouter_json(
         return await gemini_generate_json(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            model=clean_model,
+            model=clean_model or settings.flagship_model,
             settings=settings,
             cancel=cancel,
         )

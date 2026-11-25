@@ -17,17 +17,17 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GTM_FAST_MODEL
-        value: anthropic/claude-haiku-5.5
+        value: google/gemini-4-neon
       - key: GTM_FLAGSHIP_MODEL
-        value: anthropic/claude-haiku-5.5
+        value: google/gemini-4-neon
       - key: GTM_TEXT_MODEL
-        value: anthropic/claude-haiku-5.5
+        value: google/gemini-4-neon
       - key: GTM_VISION_MODEL
-        value: google/gemini-3.8-flash
+        value: google/gemini-4-neon
       - key: GTM_IMAGE_MODEL
         value: fal-ai/flux/schnell
       - key: GTM_VIDEO_MODEL
-        value: kling/v4/flash/text-to-video
+        value: gemini-omni-1.2-flash
       - key: GTM_VOICE_MODEL
         value: fal-ai/elevenlabs/tts/eleven-v3
       - key: GTM_SFX_MODEL

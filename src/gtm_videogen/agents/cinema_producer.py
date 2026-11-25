@@ -264,14 +264,17 @@ async def _generate_conditioned_still(
         elif not single_anchor and valid_local_uris:
             single_anchor = valid_local_uris[0]
 
-        return await _generate_flux_image(
-            prompt=prompt,
-            aspect=aspect,  # type: ignore[arg-type]
-            out_path=out_path,
-            settings=settings,
-            anchor_url=single_anchor,
-            cancel=cancel,
-        )
+        try:
+            return await _generate_flux_image(
+                prompt=prompt,
+                aspect=aspect,  # type: ignore[arg-type]
+                out_path=out_path,
+                settings=settings,
+                anchor_url=single_anchor,
+                cancel=cancel,
+            )
+        except Exception:
+            pass
 
     # 3. Native Gemini CLI image fallback
     local_anchor = next((p for p in (ref_paths or []) if p and p.is_file()), composite_strip_path)
@@ -1010,6 +1013,7 @@ def _select_shot_video_spec(
     registry: ModelRegistryStore,
     *,
     conserve_budget: bool = False,
+    settings: Settings | None = None,
 ) -> VideoModelSpec:
     override = (shot.video_model_id or "").strip()
     if override and override != "auto":
@@ -1020,12 +1024,18 @@ def _select_shot_video_spec(
     if proj_m != "auto" and not conserve_budget:
         return registry.get_video_model(proj_m)
 
+    # Default Cinema Video Engine: Google Gemini Omni 1.2 Flash ($0.07/s, native audio & 15s clips)
+    # whenever Gemini API is configured; otherwise fall back to the fal.ai Smart Router.
+    resolved = settings or get_settings()
+    if is_gemini_cli_ready(resolved):
+        return registry.get_video_model("gemini-omni-1.2-flash")
+
     if conserve_budget:
         if shot.anchor_strategy in ("start_and_end_locked", "chained_from_prev_to_end"):
             return registry.get_video_model("fal-ai/bytedance/seedance/v1/lite/text-to-video")
         return registry.get_video_model("fal-ai/kling-video/v2.5-turbo/pro/text-to-video")
 
-    # Smart Cinema Router:
+    # Smart Cinema Router (fal.ai fallback):
     # - Shots locking both Start + End OR binding multi-angle @Elements use Kling 3.0 Standard/Pro
     needs_end = shot.anchor_strategy in ("start_and_end_locked", "chained_from_prev_to_end")
     is_hero = shot.index_in_scene == 0 and shot.scene_id == "SC_01"
@@ -1061,12 +1071,13 @@ def estimate_cinema_shoot_usd(
     for sh in project.all_shots():
         if sh.render_engine != "ai_cinema":
             continue
-        spec = _select_shot_video_spec(project, sh, reg)
+        spec = _select_shot_video_spec(project, sh, reg, settings=resolved)
         total += spec.estimate_clip_usd(sh.duration_sec, with_audio=False)
         if (
             project.enable_lipsync
             and sh.dialogue is not None
             and sh.dialogue.delivery_mode == "on_screen_speaking"
+            and resolved.fal_key.strip()
         ):
             total += round(sh.duration_sec * 0.05, 4)
     return round(total, 2)
@@ -1094,7 +1105,9 @@ async def render_cinema_shot_take(
     reg = ModelRegistryStore(resolved.data_dir / "stitch")
     if engine_override:
         shot.video_model_id = engine_override
-    spec = _select_shot_video_spec(project, shot, reg, conserve_budget=conserve_budget)
+    spec = _select_shot_video_spec(
+        project, shot, reg, conserve_budget=conserve_budget, settings=resolved
+    )
 
     has_fal = bool(resolved.fal_key.strip())
     has_gem = is_gemini_cli_ready(resolved)
@@ -1338,18 +1351,22 @@ async def render_cinema_shot_take(
                     if (shot.start_keyframe_path and Path(shot.start_keyframe_path).is_file())
                     else None
                 )
+                gem_model = spec.id if spec.provider == "gemini" else "gemini-omni-1.2-flash"
                 gem_v = await gemini_generate_video(
                     prompt=compiled_prompt,
                     out_path=raw_clip_out,
                     aspect_ratio=project.aspect_ratio,
                     resolution=spec.resolution,
                     start_image_path=start_local,
+                    model=gem_model,
                     settings=resolved,
                     cancel=cancel,
                 )
                 if not isinstance(gem_v, Path) or not gem_v.is_file():
-                    raise RuntimeError(f"Video generation returned no file for {shot.shot_id}")
-                clip_usd = round(float(shot.duration_sec) * 0.12, 4)
+                    raise RuntimeError(
+                        f"Gemini Omni video generation returned no file for {shot.shot_id} (check GEMINI_API_KEY)"
+                    )
+                clip_usd = round(float(shot.duration_sec) * (spec.est_usd_per_sec or 0.07), 4)
 
             # 2. Selective Close-Up Lip-Sync Pass (only on `on_screen_speaking` shots!)
             lipsync_applied = False

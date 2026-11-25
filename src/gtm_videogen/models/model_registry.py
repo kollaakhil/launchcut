@@ -373,22 +373,22 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
     VideoModelSpec(
         id="gemini-omni-1.2-flash",
         i2v_id="gemini-omni-1.2-flash",
-        label="Google Gemini Omni 1.2 (Gemini CLI)",
+        label="Google Gemini Omni 1.2 Flash (Native Audio · 15s)",
         tier="master",
         provider="gemini",
         resolution="1080p",
         prompt_style="cinematic_prose",
-        durations_sec=[5, 8, 10],
+        durations_sec=[5, 8, 10, 15],
         default_duration_sec=8,
         duration_format="int",
         max_prompt_chars=2800,
         supports_start_frame=True,
-        supports_end_frame=False,
+        supports_end_frame=True,
         supports_elements=False,
         supports_native_audio=True,
-        est_usd_per_sec=0.12,
+        est_usd_per_sec=0.07,
         fallback_id="fal-ai/veo3/fast",
-        badge="Gemini CLI Native",
+        badge="Default · $0.07/s · Native Audio",
     ),
     VideoModelSpec(
         id="models/genie-4",
@@ -436,7 +436,9 @@ BUILTIN_VIDEO_MODELS: list[VideoModelSpec] = [
 ]
 
 BUILTIN_LLM_MODELS: list[dict[str, str]] = [
-    {"id": "", "label": "Server Default Flagship LLM (Auto: OpenRouter / Gemini CLI)"},
+    {"id": "", "label": "Server Default: Gemini 4 Neon (Auto: OpenRouter / Gemini API)"},
+    {"id": "google/gemini-4-neon", "label": "Gemini 4 Neon (Frontier Director LLM)"},
+    {"id": "gemini-cli/gemini-4-neon", "label": "Gemini 4 Neon (Direct Gemini API)"},
     {"id": "gemini-cli/gemini-4-hydrogen", "label": "Gemini 4 Hydrogen (Gemini CLI Native)"},
     {"id": "google/gemini-2.5-pro", "label": "Gemini 2.5 Pro (Director Craft)"},
     {"id": "anthropic/claude-sonnet-4", "label": "Claude Sonnet 4 (Story & Beats)"},
